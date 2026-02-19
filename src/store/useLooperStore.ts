@@ -12,6 +12,10 @@ interface LooperStore extends EngineState {
     setSections: (sections: SectionConfig[]) => void;
     setBpm: (bpm: number) => void;
     setTrackFX: (trackId: number, fx: Partial<FXState>) => void;
+    // Latency Actions
+    calibrateLatency: () => void;
+    setCompensation: (samples: number) => void;
+    setLastHitOffset: (ms: number) => void;
     handleEngineEvent: (event: any) => void;
 }
 
@@ -41,6 +45,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     queuedSectionIndex: null,
     sections: DEFAULT_SECTIONS,
     tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+    latencyMeasuredSamples: 0,
+    latencyCompensationSamples: 0,
+    isCalibratingLatency: false,
+    jitter: 0,
+    lastHitOffset: 0,
 
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setBpm: (bpm) => set({ bpm }),
@@ -68,11 +77,24 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         return { tracks: newTracks };
     }),
 
+    calibrateLatency: () => {
+        set({ isCalibratingLatency: true });
+        audioEngine.runRTLTest();
+    },
+
+    setCompensation: (samples) => {
+        set({ latencyCompensationSamples: samples });
+        audioEngine.setLatencyCompensation(samples);
+    },
+
+    setLastHitOffset: (ms) => set({ lastHitOffset: ms }),
+
     handleEngineEvent: (event) => {
         const { setTrackState, updateTick, setCurrentSection } = get();
         switch (event.type) {
             case 'TICK':
                 updateTick(event.bar, event.beat, event.sectionIndex ?? 0, event.sectionProgress ?? 0);
+                set({ jitter: event.jitter || 0 });
                 break;
             case 'RECORD_STOP':
                 setTrackState(event.trackId, {
@@ -88,9 +110,27 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
             case 'SECTION_CHANGE':
                 setCurrentSection(event.sectionIndex);
                 break;
+            case 'RTL_MEASURED':
+                set({
+                    latencyMeasuredSamples: event.samples,
+                    latencyCompensationSamples: event.samples, // Auto-apply measured as default
+                    isCalibratingLatency: false
+                });
+                audioEngine.setLatencyCompensation(event.samples);
+                break;
+            case 'RTL_TIMEOUT':
+                set({ isCalibratingLatency: false });
+                alert('Latency Calibration Timed Out. Ensure Output is looped to Input.');
+                break;
         }
     },
 }));
+
+// Initialize compensation from localStorage
+const savedComp = localStorage.getItem('looper_rtl_samples');
+if (savedComp) {
+    useLooperStore.getState().setCompensation(parseInt(savedComp, 10));
+}
 
 // Subscribe to store changes to update the audio engine
 useLooperStore.subscribe((state, prevState) => {

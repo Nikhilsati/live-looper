@@ -104,6 +104,27 @@ button:disabled {
   }
 }
 
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+
+  15% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+}
+
 /* Premium Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

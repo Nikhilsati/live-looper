@@ -69,6 +69,13 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     private sampleRate: number = 44100;
     private tracks: Track[] = [];
     private metronomeEnabled: boolean = true;
+    private lastProcessTime: number = 0;
+
+    // RTL & Compensation
+    private rtlTestActive: boolean = false;
+    private rtlTestStartTime: number = 0;
+    private rtlSpikeDetected: boolean = false;
+    private latencySamples: number = 0;
 
     // Section management
     private sections: SectionConfig[] = [];
@@ -102,12 +109,23 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                 this.sectionSampleOffset = 0;
 
             } else if (type === 'CONFIG') {
-                const { sampleRate, bpm, sections } = payload;
+                const { sampleRate, bpm, sections, latencySamples } = payload;
                 this.sampleRate = sampleRate;
                 this.samplesPerBeat = (sampleRate * 60) / bpm;
                 if (sections && sections.length > 0) {
                     this.sections = sections;
                 }
+                if (typeof latencySamples === 'number') {
+                    this.latencySamples = latencySamples;
+                }
+
+            } else if (type === 'RTL_TEST') {
+                this.rtlTestActive = true;
+                this.rtlSpikeDetected = false;
+                this.rtlTestStartTime = 0; // Will set in process loop
+
+            } else if (type === 'SET_LATENCY') {
+                this.latencySamples = payload.latencySamples;
 
             } else if (type === 'QUEUE_SECTION') {
                 this.queuedSectionIndex = payload.sectionIndex;
@@ -186,18 +204,55 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     }
 
     process(inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>) {
-        if (!this.isPlaying) return true;
+        const currentTime = (globalThis as any).currentTime;
+        const delta = this.lastProcessTime ? (currentTime - this.lastProcessTime) : 0;
+        this.lastProcessTime = currentTime;
+
+        if (!this.isPlaying && !this.rtlTestActive) return true;
 
         const input = inputs[0];
         const inputChannel = (input && input[0] && input[0].length > 0) ? input[0] : null;
 
         const sectionLen = this.currentSectionLen();
-        if (sectionLen === 0) return true;
+        if (sectionLen === 0 && !this.rtlTestActive) return true;
 
-        for (let i = 0; i < outputs[0][0].length; i++) {
+        const outputCount = outputs[0][0].length;
+
+        for (let i = 0; i < outputCount; i++) {
             this.currentSample++;
             const sectionRelative = this.currentSample - this.sectionSampleOffset;
-            const sectionSample = sectionRelative % sectionLen;
+            const sectionSample = sectionLen > 0 ? (sectionRelative % sectionLen) : 0;
+
+            // ── 0. RTL Test Logic ─────────────────────────────────────────────
+            if (this.rtlTestActive) {
+                // Emit spike at start
+                if (this.rtlTestStartTime === 0) {
+                    this.rtlTestStartTime = this.currentSample;
+                }
+
+                // Impulse on System Output (Port 4)
+                const sysOut = outputs[4];
+                if (sysOut && this.currentSample === this.rtlTestStartTime) {
+                    if (sysOut[0]) sysOut[0][i] = 1.0;
+                    if (sysOut[1]) sysOut[1][i] = 1.0;
+                }
+
+                // Detect on Input
+                if (!this.rtlSpikeDetected && inputChannel && inputChannel[i] > 0.3) {
+                    const measured = this.currentSample - this.rtlTestStartTime;
+                    this.rtlSpikeDetected = true;
+                    this.rtlTestActive = false;
+                    this.port.postMessage({ type: 'RTL_MEASURED', samples: measured, latencyMs: (measured / this.sampleRate) * 1000 });
+                }
+
+                // Timeout RTL test if nothing detected for 2 seconds
+                if (this.currentSample - this.rtlTestStartTime > this.sampleRate * 2) {
+                    this.rtlTestActive = false;
+                    this.port.postMessage({ type: 'RTL_TIMEOUT' });
+                }
+            }
+
+            if (!this.isPlaying) continue;
 
             // ── 1. Output Mixing (Individual Ports) ──────────────────────────
             const playIdx = (sectionRelative - 1 + sectionLen) % sectionLen;
@@ -222,9 +277,9 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                 if (trackOutput[1]) trackOutput[1][i] = trackSample;
             }
 
-            // Metronome/System on output 4
+            // Metronome/System on output 4 (if not RTL testing)
             const systemOutput = outputs[4];
-            if (systemOutput) {
+            if (systemOutput && !this.rtlTestActive) {
                 let systemSample = 0;
                 if (this.metronomeEnabled && this.samplesPerBeat > 0 &&
                     (this.currentSample % Math.floor(this.samplesPerBeat)) === 0) {
@@ -255,10 +310,23 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                 if (track.state === 'RECORDING' && sectionSample === 0) {
                     const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
                     const layerBuf = new Float32Array(sectionLen);
-                    layerBuf.set(sd.recordBuffer);
+
+                    // --- LATENCY COMPENSATION ---
+                    // The audio we just recorded is "late" by latencySamples.
+                    // We need to shift it left (early) to align.
+                    if (this.latencySamples > 0 && this.latencySamples < sectionLen) {
+                        for (let s = 0; s < sectionLen; s++) {
+                            const sourceIdx = (s + this.latencySamples) % sectionLen;
+                            layerBuf[s] = sd.recordBuffer[sourceIdx];
+                        }
+                    } else {
+                        layerBuf.set(sd.recordBuffer);
+                    }
+
                     sd.layers.push({ buffer: layerBuf });
                     for (let s = 0; s < sectionLen; s++) sd.masterBuffer[s] += layerBuf[s];
                     track.state = 'PLAYING';
+
                     const waveformData = computeWaveformData(sd.masterBuffer);
                     this.port.postMessage({
                         type: 'RECORD_STOP',
@@ -310,7 +378,8 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                 bar,
                 beat,
                 time: this.currentSample / this.sampleRate,
-                currentTime: (globalThis as any).currentTime,
+                currentTime: currentTime,
+                jitter: delta, // Report the process-to-process delta
                 sectionIndex: this.currentSectionIndex,
                 sectionProgress,
             });

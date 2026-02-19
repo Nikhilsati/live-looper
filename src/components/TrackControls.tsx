@@ -25,10 +25,27 @@ const LayerDots = ({ count }: { count: number }) => {
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
 const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: number) => void }) => {
-    const { tracks, sectionProgress } = useLooperStore();
+    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, setLastHitOffset } = useLooperStore();
     const track = tracks[trackId];
+    const [showHit, setShowHit] = useState(false);
 
     const handleArm = () => {
+        if (isPlaying && !track.isRecording) {
+            const currentSection = sections[currentSectionIndex];
+            if (currentSection) {
+                const sectionLengthMs = (60 / bpm) * 4 * currentSection.lengthInBars * 1000;
+                // Calculate offset from quantization boundary
+                let offset = 0;
+                if (sectionProgress > 0.5) {
+                    offset = (sectionProgress - 1.0) * sectionLengthMs; // Early (-)
+                } else {
+                    offset = sectionProgress * sectionLengthMs; // Late (+)
+                }
+                setLastHitOffset(offset);
+                setShowHit(true);
+                setTimeout(() => setShowHit(false), 2000);
+            }
+        }
         audioEngine.armTrack(trackId);
         useLooperStore.getState().setTrackState(trackId, { isRecording: !track.isRecording });
     };
@@ -70,11 +87,30 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
             gap: 12,
             minWidth: 0,
             padding: '20px 16px',
-            flex: 1
+            flex: 1,
+            position: 'relative'
         }}>
             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <Label style={{ fontSize: 14, fontWeight: 700 }}>TRACK {trackId + 1}</Label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {showHit && isPlaying && (
+                        <div style={{
+                            position: 'absolute',
+                            top: 12,
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: lastHitOffset > 0 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(34, 197, 94, 0.9)',
+                            color: 'white',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            zIndex: 10,
+                            animation: 'fadeInOut 2s forwards'
+                        }}>
+                            HIT: {lastHitOffset > 0 ? '+' : ''}{Math.round(lastHitOffset)}ms
+                        </div>
+                    )}
                     <Button
                         variant="ghost"
                         size="sm"

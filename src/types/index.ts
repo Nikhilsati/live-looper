@@ -74,5 +74,10 @@ export interface EngineState {
     queuedSectionIndex: number | null;
     sections: SectionConfig[];
     tracks: TrackState[];
+    // Performance & Latency Suite
+    latencyMeasuredSamples: number;
+    latencyCompensationSamples: number;
+    isCalibratingLatency: boolean;
+    jitter: number;
+    lastHitOffset: number; // ms offset from quantization boundary
 }
-

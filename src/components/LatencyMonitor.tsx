@@ -1,103 +1,130 @@
-import { useEffect, useState, useRef } from 'react';
-import { Card, Stack, Row, Label, ValueText, StatusDot, Text } from '../UI';
-import { audioEngine } from '../engine/AudioEngine';
+import { useState, useEffect } from 'react';
+import { Card, Stack, Row, Label, ValueText, StatusDot, Text, Button, Grid } from '../UI';
+import { useLooperStore } from '../store/useLooperStore';
+import { Activity, Zap, RefreshCw, AlertCircle } from 'lucide-react';
 
 export const LatencyMonitor = () => {
-    const [metrics, setMetrics] = useState<{
-        baseLatency: number;
-        outputLatency: number;
-        sampleRate: number;
-        processJitter: number;
-        workletDrift: number;
-    } | null>(null);
+    const {
+        latencyMeasuredSamples,
+        latencyCompensationSamples,
+        isCalibratingLatency,
+        jitter
+    } = useLooperStore();
+    const calibrateLatency = useLooperStore(state => state.calibrateLatency);
 
-    const lastTickRef = useRef<{ time: number; hostTime: number } | null>(null);
+    // We'll keep a small history of jitter for a simple trend line if needed
+    const [jitterHistory, setJitterHistory] = useState<number[]>([]);
 
     useEffect(() => {
-        const unsubscribe = audioEngine.subscribe((event) => {
-            if (event.type === 'TICK') {
-                const now = performance.now() / 1000;
-                const { time, currentTime } = event;
-                const engineMetrics = audioEngine.getLatencyMetrics();
+        if (jitter > 0) {
+            setJitterHistory(prev => [...prev.slice(-20), jitter * 1000]);
+        }
+    }, [jitter]);
 
-                if (engineMetrics) {
-                    let drift = 0;
-                    if (currentTime !== undefined) {
-                        drift = Math.abs(currentTime - time);
-                    }
+    const sampleRate = 44100; // Fallback or get from context
+    const measuredMs = (latencyMeasuredSamples / sampleRate) * 1000;
+    const compensationMs = (latencyCompensationSamples / sampleRate) * 1000;
 
-                    // Calculate jitter based on host arrival time of TICK messages
-                    // Note: This also includes main thread scheduling jitter, but it's a good proxy for perceived latency
-                    let jitter = 0;
-                    // if (lastTickRef.current) {
-                    //     const deltaHost = now - lastTickRef.current.hostTime;
-                    // }
-                    lastTickRef.current = { time, hostTime: now };
-
-                    setMetrics({
-                        baseLatency: engineMetrics.baseLatency,
-                        outputLatency: engineMetrics.outputLatency,
-                        sampleRate: engineMetrics.sampleRate,
-                        processJitter: jitter,
-                        workletDrift: drift,
-                    });
-                }
-            }
-        });
-
-        return unsubscribe;
-    }, []);
-
-    if (!metrics) return null;
-
-    const totalLatency = (metrics.baseLatency + metrics.outputLatency) * 1000;
-    const isGood = totalLatency < 20;
-    const isOk = totalLatency < 50;
+    const isStable = jitter * 1000 < 2; // Under 2ms jitter is great
 
     return (
-        <Card style={{ padding: '16px', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <Stack>
-                <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <Label style={{ fontSize: '12px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Realtime Latency</Label>
-                    <Row style={{ alignItems: 'center', gap: '6px' }}>
-                        <StatusDot className={isGood ? 'bg-success' : isOk ? 'bg-warning' : 'bg-danger'} />
-                        <ValueText style={{ fontSize: '14px', fontWeight: 'bold', color: isGood ? '#4ade80' : isOk ? '#fbbf24' : '#ef4444' }}>
-                            {totalLatency.toFixed(1)}ms
-                        </ValueText>
+        <Card style={{
+            padding: '20px',
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            width: '100%'
+        }}>
+            <Stack style={{ gap: '16px' }}>
+                <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Row style={{ alignItems: 'center', gap: '8px' }}>
+                        <Activity size={18} className="text-accent" />
+                        <Heading style={{ fontSize: '16px', margin: 0 }}>Engine Performance</Heading>
                     </Row>
+                    <StatusDot className={isStable ? 'bg-success' : 'bg-warning'} />
                 </Row>
 
-                <Grid cols="1fr 1fr" style={{ gap: '12px' }}>
-                    <Stack style={{ gap: '2px' }}>
-                        <Label style={{ fontSize: '10px', opacity: 0.6 }}>Base (HW)</Label>
-                        <ValueText style={{ fontSize: '12px' }}>{(metrics.baseLatency * 1000).toFixed(1)}ms</ValueText>
+                <Grid cols="1fr 1fr" style={{ gap: '20px' }}>
+                    {/* Latency Section */}
+                    <Stack style={{ gap: '12px' }}>
+                        <Stack style={{ gap: '4px' }}>
+                            <Label style={{ fontSize: '11px', opacity: 0.6 }}>ROUND-TRIP LATENCY (RTL)</Label>
+                            <Row style={{ alignItems: 'baseline', gap: '4px' }}>
+                                <ValueText style={{ fontSize: '20px', fontWeight: 'bold' }}>
+                                    {measuredMs > 0 ? measuredMs.toFixed(1) : '--'}
+                                </ValueText>
+                                <Label style={{ fontSize: '10px' }}>ms</Label>
+                            </Row>
+                            <Label style={{ fontSize: '10px', opacity: 0.5 }}>
+                                Compensation: -{compensationMs.toFixed(1)}ms
+                            </Label>
+                        </Stack>
+
+                        <Button
+                            variant={isCalibratingLatency ? 'active-warning' : 'outline'}
+                            size="sm"
+                            onClick={calibrateLatency}
+                            disabled={isCalibratingLatency}
+                            style={{ gap: '8px', fontSize: '11px', height: '32px' }}
+                        >
+                            {isCalibratingLatency ? (
+                                <RefreshCw size={14} className="animate-spin" />
+                            ) : (
+                                <Zap size={14} />
+                            )}
+                            {isCalibratingLatency ? 'CALIBRATING...' : 'CALIBRATE RTL'}
+                        </Button>
                     </Stack>
-                    <Stack style={{ gap: '2px' }}>
-                        <Label style={{ fontSize: '10px', opacity: 0.6 }}>Output</Label>
-                        <ValueText style={{ fontSize: '12px' }}>{(metrics.outputLatency * 1000).toFixed(1)}ms</ValueText>
-                    </Stack>
-                    <Stack style={{ gap: '2px' }}>
-                        <Label style={{ fontSize: '10px', opacity: 0.6 }}>Sample Rate</Label>
-                        <ValueText style={{ fontSize: '12px' }}>{metrics.sampleRate / 1000}kHz</ValueText>
-                    </Stack>
-                    <Stack style={{ gap: '2px' }}>
-                        <Label style={{ fontSize: '10px', opacity: 0.6 }}>Clock Drift</Label>
-                        <ValueText style={{ fontSize: '12px' }}>{(metrics.workletDrift * 1000).toFixed(3)}ms</ValueText>
+
+                    {/* Jitter & Stability Section */}
+                    <Stack style={{ gap: '12px' }}>
+                        <Stack style={{ gap: '4px' }}>
+                            <Label style={{ fontSize: '11px', opacity: 0.6 }}>PROCESS JITTER</Label>
+                            <Row style={{ alignItems: 'baseline', gap: '4px' }}>
+                                <ValueText style={{
+                                    fontSize: '20px',
+                                    fontWeight: 'bold',
+                                    color: isStable ? 'var(--success)' : 'var(--warning)'
+                                }}>
+                                    {(jitter * 1000).toFixed(3)}
+                                </ValueText>
+                                <Label style={{ fontSize: '10px' }}>ms</Label>
+                            </Row>
+                        </Stack>
+
+                        {/* Sparkline */}
+                        <div style={{ height: '32px', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <svg width="100%" height="100%" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                <polyline
+                                    fill="none"
+                                    stroke="var(--accent)"
+                                    strokeWidth="1.5"
+                                    points={jitterHistory.map((v, i) => `${(i / 20) * 100},${32 - Math.min(32, v * 10)}`).join(' ')}
+                                />
+                            </svg>
+                        </div>
                     </Stack>
                 </Grid>
 
-                {totalLatency > 50 && (
-                    <Text style={{ fontSize: '10px', color: '#ef4444', marginTop: '8px', fontStyle: 'italic' }}>
-                        High latency detected. Check audio settings or browser performance.
-                    </Text>
+                {measuredMs === 0 && (
+                    <Row style={{
+                        gap: '8px',
+                        padding: '10px',
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(245, 158, 11, 0.2)'
+                    }}>
+                        <AlertCircle size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                        <Text style={{ fontSize: '10px', color: 'var(--warning)', margin: 0, lineHeight: 1.4 }}>
+                            <strong>Calibration Required:</strong> Place your microphone near your speaker and hit Calibrate for sample-accurate loops.
+                        </Text>
+                    </Row>
                 )}
             </Stack>
         </Card>
     );
 };
 
-const Grid = ({ children, cols, style }: any) => (
-    <div style={{ display: 'grid', gridTemplateColumns: cols, ...style }}>
-        {children}
-    </div>
+const Heading = ({ children, style }: any) => (
+    <h3 style={{ color: 'white', fontWeight: 600, ...style }}>{children}</h3>
 );

@@ -66,12 +66,20 @@ class AudioEngine {
 
             this.workletNode.port.onmessage = (event) => this.notify(event.data);
 
+            const savedLatency = localStorage.getItem('looper_rtl_samples');
+            const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
+
             this.workletNode.port.postMessage({
                 type: 'CONFIG',
-                payload: { sampleRate: this.context.sampleRate, bpm, sections },
+                payload: {
+                    sampleRate: this.context.sampleRate,
+                    bpm,
+                    sections,
+                    latencySamples
+                },
             });
 
-            console.log('AudioEngine initialized with Multi-Output FX Chain');
+            console.log('AudioEngine initialized with Multi-Output FX Chain. Latency Comp:', latencySamples);
         } catch (e) {
             console.error('Failed to load AudioWorklet', e);
         }
@@ -82,7 +90,11 @@ class AudioEngine {
         if (!this.context) return;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false },
+                audio: {
+                    echoCancellation: false,
+                    autoGainControl: false,
+                    noiseSuppression: false
+                },
             });
             const source = this.context.createMediaStreamSource(stream);
             if (this.workletNode) source.connect(this.workletNode);
@@ -100,6 +112,16 @@ class AudioEngine {
 
     stop() {
         this.workletNode?.port.postMessage({ type: 'STOP' });
+    }
+
+    runRTLTest() {
+        if (!this.workletNode) return;
+        this.workletNode.port.postMessage({ type: 'RTL_TEST' });
+    }
+
+    setLatencyCompensation(samples: number) {
+        localStorage.setItem('looper_rtl_samples', samples.toString());
+        this.workletNode?.port.postMessage({ type: 'SET_LATENCY', payload: { latencySamples: samples } });
     }
 
     armTrack(trackId: number) {
@@ -134,11 +156,6 @@ class AudioEngine {
 
     setBpm(bpm: number) {
         this.workletNode?.port.postMessage({ type: 'SET_BPM', payload: { bpm } });
-        // Update all FX chains with new BPM (for delay sync)
-        // this.trackFX.forEach(chain => {
-        //     We'd need the current FX state here or just update the BPM part
-        //     For now, delay sync will happen on next state update or we can store state
-        // });
     }
 
     loadBuffer(trackId: number, sectionIndex: number, buffer: Float32Array) {

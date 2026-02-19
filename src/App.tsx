@@ -8,7 +8,7 @@ function App() {
   useAudioEngine();
 
   return (
-    <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto' }}>
+    <Stack style={{ width: '100%', maxWidth: 1400, margin: '0 auto' }}>
       <Row style={{
         width: '100%',
         justifyContent: 'space-between',
@@ -30,7 +30,7 @@ function App() {
       <TrackControls />
 
       <LatencyMonitor />
-    </div>
+    </Stack>
   );
 }
 
