@@ -11,6 +11,43 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Oat UI Theme Variables - Custom Premium Dark Theme */
+  --background: #0a0a0f;
+  --foreground: rgba(255, 255, 255, 0.9);
+  --card: rgba(255, 255, 255, 0.04);
+  --card-foreground: #ffffff;
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: #ffffff;
+  --muted: rgba(255, 255, 255, 0.03);
+  --muted-foreground: rgba(255, 255, 255, 0.5);
+  --faint: rgba(255, 255, 255, 0.03);
+  --faint-foreground: rgba(255, 255, 255, 0.3);
+  --accent: #4f46e5;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --warning: #ea580c;
+  --warning-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: #7c3aed;
+
+  /* Radius */
+  --radius-small: 8px;
+  --radius-medium: 12px;
+  --radius-large: 20px;
+
+  /* Spacing Scale (Matching Oat Defaults) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
 }
 
 *,
@@ -65,4 +102,29 @@ button:disabled {
     opacity: 0.55;
     transform: scale(0.88);
   }
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Selection */
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }

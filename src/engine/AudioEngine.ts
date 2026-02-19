@@ -1,4 +1,4 @@
-import type { SectionConfig } from '../types';
+import type { SectionConfig, FXState } from '../types';
 
 const DEFAULT_SECTIONS: SectionConfig[] = [
     { index: 0, name: 'Verse', lengthInBars: 4, trackLinks: [true, true, true, true] },
@@ -8,9 +8,14 @@ const DEFAULT_SECTIONS: SectionConfig[] = [
 
 const DEFAULT_BPM = 100;
 
+import { TrackFXChain } from './TrackFXChain';
+import { MasterBus } from './MasterBus';
+
 class AudioEngine {
     context: AudioContext | null = null;
     workletNode: AudioWorkletNode | null = null;
+    trackFX: TrackFXChain[] = [];
+    masterBus: MasterBus | null = null;
 
     private listeners: ((event: any) => void)[] = [];
     private static instance: AudioEngine;
@@ -41,8 +46,23 @@ class AudioEngine {
 
         try {
             await this.context.audioWorklet.addModule(processorUrl);
-            this.workletNode = new AudioWorkletNode(this.context, 'live-looper-processor');
-            this.workletNode.connect(this.context.destination);
+            this.workletNode = new AudioWorkletNode(this.context, 'live-looper-processor', {
+                numberOfInputs: 1,
+                numberOfOutputs: 5,
+                outputChannelCount: [2, 2, 2, 2, 2]
+            });
+
+            this.masterBus = new MasterBus(this.context);
+
+            for (let i = 0; i < 4; i++) {
+                const chain = new TrackFXChain(this.context);
+                this.trackFX.push(chain);
+                this.workletNode.connect(chain.input, i);
+                chain.output.connect(this.masterBus.input);
+            }
+
+            // Metronome (output 4) directly to master bus for now
+            this.workletNode.connect(this.masterBus.input, 4);
 
             this.workletNode.port.onmessage = (event) => this.notify(event.data);
 
@@ -51,11 +71,12 @@ class AudioEngine {
                 payload: { sampleRate: this.context.sampleRate, bpm, sections },
             });
 
-            console.log('AudioEngine initialized');
+            console.log('AudioEngine initialized with Multi-Output FX Chain');
         } catch (e) {
             console.error('Failed to load AudioWorklet', e);
         }
     }
+
 
     async initInput() {
         if (!this.context) return;
@@ -105,8 +126,19 @@ class AudioEngine {
         this.workletNode?.port.postMessage({ type: 'QUEUE_SECTION', payload: { sectionIndex } });
     }
 
+    updateFX(trackId: number, fxState: FXState, bpm: number) {
+        if (this.trackFX[trackId]) {
+            this.trackFX[trackId].update(fxState, bpm);
+        }
+    }
+
     setBpm(bpm: number) {
         this.workletNode?.port.postMessage({ type: 'SET_BPM', payload: { bpm } });
+        // Update all FX chains with new BPM (for delay sync)
+        // this.trackFX.forEach(chain => {
+        //     We'd need the current FX state here or just update the BPM part
+        //     For now, delay sync will happen on next state update or we can store state
+        // });
     }
 
     loadBuffer(trackId: number, sectionIndex: number, buffer: Float32Array) {

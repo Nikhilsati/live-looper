@@ -14,12 +14,54 @@ export interface SectionConfig {
     trackLinks: boolean[]; // length 4 — which tracks play in this section
 }
 
+export interface EQSettings {
+    low: number;
+    mid: number;
+    midFreq: number;
+    high: number;
+}
+
+export interface CompressorSettings {
+    threshold: number;
+    ratio: number;
+    attack: number;
+    release: number;
+    gain: number;
+}
+
+export interface DriveSettings {
+    amount: number;
+    enabled: boolean;
+}
+
+export interface DelaySettings {
+    time: number; // in beats
+    feedback: number;
+    mix: number;
+    enabled: boolean;
+}
+
+export interface ReverbSettings {
+    mix: number;
+    enabled: boolean;
+}
+
+export interface FXState {
+    eq: EQSettings;
+    compressor: CompressorSettings;
+    drive: DriveSettings;
+    delay: DelaySettings;
+    reverb: ReverbSettings;
+    pan: number;
+}
+
 export interface TrackState {
     isMuted: boolean;
     isRecording: boolean;
     hasAudio: boolean;    // has audio in current section
     layerCount: number;
     waveformData: number[];
+    fx: FXState;
 }
 
 export interface EngineState {
@@ -33,3 +75,4 @@ export interface EngineState {
     sections: SectionConfig[];
     tracks: TrackState[];
 }
+

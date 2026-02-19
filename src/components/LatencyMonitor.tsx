@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, Stack, Row, Label, ValueText, StatusDot, Text } from '../UI';
 import { audioEngine } from '../engine/AudioEngine';
 
@@ -12,7 +12,6 @@ export const LatencyMonitor = () => {
     } | null>(null);
 
     const lastTickRef = useRef<{ time: number; hostTime: number } | null>(null);
-    const jittersRef = useRef<number[]>([]);
 
     useEffect(() => {
         const unsubscribe = audioEngine.subscribe((event) => {
@@ -30,11 +29,9 @@ export const LatencyMonitor = () => {
                     // Calculate jitter based on host arrival time of TICK messages
                     // Note: This also includes main thread scheduling jitter, but it's a good proxy for perceived latency
                     let jitter = 0;
-                    if (lastTickRef.current) {
-                        const deltaHost = now - lastTickRef.current.hostTime;
-                        // Expected delta should be based on beat duration, but let's just track variance
-                        // For now, let's just use the context latencies as they are more reliable
-                    }
+                    // if (lastTickRef.current) {
+                    //     const deltaHost = now - lastTickRef.current.hostTime;
+                    // }
                     lastTickRef.current = { time, hostTime: now };
 
                     setMetrics({

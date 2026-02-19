@@ -1,3 +1,4 @@
+/// <reference path="../types/oat.d.ts" />
 import React from 'react';
 import './UI.css';
 
@@ -8,13 +9,13 @@ interface BaseProps {
 }
 
 export const Card = ({ children, className = '', style }: BaseProps) => (
-    <div className={`ui-card ${className}`} style={style}>
+    <div className={`card ${className}`} style={{ borderRadius: 'var(--radius-large)', ...style }}>
         {children}
     </div>
 );
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: 'primary' | 'success' | 'danger' | 'warning' | 'accent' | 'ghost' | 'active-primary' | 'active-warning';
+    variant?: 'primary' | 'success' | 'danger' | 'warning' | 'accent' | 'ghost' | 'active-primary' | 'active-warning' | 'outline';
     size?: 'sm' | 'md' | 'lg' | 'none';
 }
 
@@ -25,22 +26,30 @@ export const Button = ({
     className = '',
     ...props
 }: ButtonProps) => {
-    const classes = [
-        'ui-button',
-        variant ? variant : '',
-        size !== 'none' ? `size-${size}` : '',
-        className
-    ].filter(Boolean).join(' ');
+    // Map custom variants to Oat or keep them if specific
+    const finalVariant = variant?.startsWith('active-') ? variant : variant;
 
     return (
-        <button className={classes} {...props}>
+        <button className={`${finalVariant || ''} ${size === 'sm' ? 'small' : ''} ${className}`} {...props}>
             {children}
         </button>
     );
 };
 
+export const Switch = ({ checked, onChange, label }: { checked: boolean, onChange: (v: boolean) => void, label?: string }) => (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <input
+            type="checkbox"
+            role="switch"
+            checked={checked}
+            onChange={(e) => onChange(e.target.checked)}
+        />
+        {label && <span className="ui-text-label">{label}</span>}
+    </label>
+);
+
 export const Badge = ({ children, variant, className = '' }: BaseProps & { variant?: 'live' }) => (
-    <span className={`ui-badge ${variant === 'live' ? 'live' : ''} ${className}`}>
+    <span className={`badge ${variant === 'live' ? 'success' : ''} ${className}`} style={{ fontSize: '10px' }}>
         {children}
     </span>
 );
@@ -78,13 +87,13 @@ export const Text = ({ children, className = '', style }: BaseProps) => (
 );
 
 export const Stack = ({ children, className = '', style }: BaseProps) => (
-    <div className={`ui-stack ${className}`} style={style}>
+    <div className={`vstack ${className}`} style={style}>
         {children}
     </div>
 );
 
 export const Row = ({ children, className = '', style }: BaseProps) => (
-    <div className={`ui-row ${className}`} style={style}>
+    <div className={`hstack ${className}`} style={style}>
         {children}
     </div>
 );
@@ -121,14 +130,13 @@ export const Waveform = ({ data, progress, className = '', height = 36 }: { data
             {data.map((v, i) => {
                 const h = (v / max) * 100;
                 const isActive = i === activeIdx;
-                // Mirrored look
                 return (
                     <div
                         key={i}
                         style={{
                             flex: 1,
                             height: `${Math.max(6, h)}%`,
-                            background: isActive ? '#a78bfa' : (i < activeIdx ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'),
+                            background: isActive ? 'var(--primary-light, #a78bfa)' : (i < activeIdx ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'),
                             borderRadius: i % 2 === 0 ? '1px 1px 0 0' : '0 0 1px 1px',
                             transition: 'height 0.2s ease, background 0.1s',
                             opacity: i < activeIdx ? 0.8 : 1

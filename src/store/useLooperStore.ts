@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig } from '../types';
-import { DEFAULT_SECTIONS, DEFAULT_BPM } from '../engine/AudioEngine';
+import type { EngineState, TrackState, SectionConfig, FXState } from '../types';
+import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '../engine/AudioEngine';
 
 interface LooperStore extends EngineState {
     // Actions
@@ -11,6 +11,7 @@ interface LooperStore extends EngineState {
     setQueuedSection: (index: number | null) => void;
     setSections: (sections: SectionConfig[]) => void;
     setBpm: (bpm: number) => void;
+    setTrackFX: (trackId: number, fx: Partial<FXState>) => void;
     handleEngineEvent: (event: any) => void;
 }
 
@@ -20,6 +21,14 @@ const defaultTrack = (): TrackState => ({
     hasAudio: false,
     layerCount: 0,
     waveformData: [],
+    fx: {
+        eq: { low: 0, mid: 0, midFreq: 1000, high: 0 },
+        compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 },
+        drive: { amount: 0, enabled: false },
+        delay: { time: 0.5, feedback: 0.3, mix: 0, enabled: false },
+        reverb: { mix: 0, enabled: false },
+        pan: 0,
+    }
 });
 
 export const useLooperStore = create<LooperStore>((set, get) => ({
@@ -48,6 +57,17 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         return { tracks: newTracks };
     }),
 
+    setTrackFX: (trackId, fx) => set(prev => {
+        const newTracks = [...prev.tracks];
+        if (newTracks[trackId]) {
+            newTracks[trackId] = {
+                ...newTracks[trackId],
+                fx: { ...newTracks[trackId].fx, ...fx }
+            };
+        }
+        return { tracks: newTracks };
+    }),
+
     handleEngineEvent: (event) => {
         const { setTrackState, updateTick, setCurrentSection } = get();
         switch (event.type) {
@@ -67,9 +87,29 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 break;
             case 'SECTION_CHANGE':
                 setCurrentSection(event.sectionIndex);
-                // Reset per-track hasAudio/layerCount for new section (they may have audio in other sections)
-                // We don't reset — tracks keep their state; UI will show section-specific data when we add that
                 break;
         }
     },
 }));
+
+// Subscribe to store changes to update the audio engine
+useLooperStore.subscribe((state, prevState) => {
+    // Sync BPM
+    if (state.bpm !== prevState.bpm) {
+        audioEngine.setBpm(state.bpm);
+    }
+
+    // Sync Track FX
+    state.tracks.forEach((track, i) => {
+        const prevTrack = prevState.tracks[i];
+        if (track.fx !== prevTrack?.fx || state.bpm !== prevState.bpm) {
+            audioEngine.updateFX(i, track.fx, state.bpm);
+        }
+    });
+
+    // Sync Playing state
+    if (state.isPlaying !== prevState.isPlaying) {
+        if (state.isPlaying) audioEngine.start();
+        else audioEngine.stop();
+    }
+});

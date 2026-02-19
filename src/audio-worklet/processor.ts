@@ -188,47 +188,53 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     process(inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>) {
         if (!this.isPlaying) return true;
 
-        const output = outputs[0];
-        const leftChannel = output[0];
-        const rightChannel = output[1];
         const input = inputs[0];
         const inputChannel = (input && input[0] && input[0].length > 0) ? input[0] : null;
 
         const sectionLen = this.currentSectionLen();
         if (sectionLen === 0) return true;
 
-        for (let i = 0; i < leftChannel.length; i++) {
+        for (let i = 0; i < outputs[0][0].length; i++) {
             this.currentSample++;
             const sectionRelative = this.currentSample - this.sectionSampleOffset;
             const sectionSample = sectionRelative % sectionLen;
 
-            // ── 1. Output Mixing ──────────────────────────────────────────────
-            let sampleSum = 0;
-
-            // Metronome click (beat-accurate)
-            if (this.metronomeEnabled && this.samplesPerBeat > 0 &&
-                (this.currentSample % Math.floor(this.samplesPerBeat)) === 0) {
-                // Accent bar 1 beat 1
-                const totalBeats = Math.floor(this.currentSample / this.samplesPerBeat);
-                const isBarOne = (totalBeats % 4) === 0;
-                sampleSum += isBarOne ? 0.7 : 0.35;
-            }
-
-            // Track playback
+            // ── 1. Output Mixing (Individual Ports) ──────────────────────────
             const playIdx = (sectionRelative - 1 + sectionLen) % sectionLen;
             const currentSection = this.sections[this.currentSectionIndex];
-            for (const track of this.tracks) {
-                if (track.isMuted) continue;
-                if (!currentSection?.trackLinks[track.id]) continue;
-                if (track.state !== 'PLAYING' && track.state !== 'ARMED' && track.state !== 'RECORDING') continue;
-                const sd = track.sections.get(this.currentSectionIndex);
-                if (sd && sd.masterBuffer.length > 0) {
-                    sampleSum += sd.masterBuffer[playIdx];
+
+            // Tracks 0-3 on outputs 0-3
+            for (let t = 0; t < 4; t++) {
+                const track = this.tracks[t];
+                const trackOutput = outputs[t];
+                if (!trackOutput) continue;
+
+                let trackSample = 0;
+                if (!track.isMuted && currentSection?.trackLinks[track.id] &&
+                    (track.state === 'PLAYING' || track.state === 'ARMED' || track.state === 'RECORDING')) {
+                    const sd = track.sections.get(this.currentSectionIndex);
+                    if (sd && sd.masterBuffer.length > 0) {
+                        trackSample = sd.masterBuffer[playIdx];
+                    }
                 }
+
+                if (trackOutput[0]) trackOutput[0][i] = trackSample;
+                if (trackOutput[1]) trackOutput[1][i] = trackSample;
             }
 
-            leftChannel[i] = sampleSum;
-            if (rightChannel) rightChannel[i] = sampleSum;
+            // Metronome/System on output 4
+            const systemOutput = outputs[4];
+            if (systemOutput) {
+                let systemSample = 0;
+                if (this.metronomeEnabled && this.samplesPerBeat > 0 &&
+                    (this.currentSample % Math.floor(this.samplesPerBeat)) === 0) {
+                    const totalBeats = Math.floor(this.currentSample / this.samplesPerBeat);
+                    const isBarOne = (totalBeats % 4) === 0;
+                    systemSample = isBarOne ? 0.7 : 0.35;
+                }
+                if (systemOutput[0]) systemOutput[0][i] = systemSample;
+                if (systemOutput[1]) systemOutput[1][i] = systemSample;
+            }
 
             // ── 2. Recording Logic ────────────────────────────────────────────
             for (const track of this.tracks) {

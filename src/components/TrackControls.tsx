@@ -1,8 +1,9 @@
-import { Play, Square, Music2, Mic, Volume2, VolumeX, Undo2, Trash2, ChevronRight } from 'lucide-react';
+import { Play, Square, Music2, Mic, Volume2, VolumeX, Undo2, Trash2, ChevronRight, Sliders } from 'lucide-react';
 import { useState } from 'react';
 import { audioEngine } from '../engine/AudioEngine';
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Button, Label, ValueText, Badge, Slider, Row, Grid, Heading, Stack, Waveform } from '../UI';
+import { TrackFX } from './TrackFX';
 
 const ICON_SIZE = 22;
 
@@ -23,7 +24,7 @@ const LayerDots = ({ count }: { count: number }) => {
 };
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
-const TrackPad = ({ trackId }: { trackId: number }) => {
+const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: number) => void }) => {
     const { tracks, sectionProgress } = useLooperStore();
     const track = tracks[trackId];
 
@@ -74,6 +75,14 @@ const TrackPad = ({ trackId }: { trackId: number }) => {
             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <Label style={{ fontSize: 14, fontWeight: 700 }}>TRACK {trackId + 1}</Label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onOpenFX(trackId)}
+                        style={{ padding: '4px', opacity: 0.6 }}
+                    >
+                        <Sliders size={16} />
+                    </Button>
                     <LayerDots count={track.layerCount} />
                     <ValueText color={statusColor} style={{ fontSize: 11, fontWeight: 800 }}>{statusLabel}</ValueText>
                 </div>
@@ -290,12 +299,12 @@ export const DebugControls = () => {
                     <Button
                         onClick={isPlaying ? handleStop : handleStart}
                         size="lg"
-                        variant={isPlaying ? 'danger' : 'success'}
+                        variant={isPlaying ? 'danger' : 'primary'}
                         style={{
                             width: 100,
                             height: 100,
                             borderRadius: '50%',
-                            boxShadow: isPlaying ? '0 0 30px rgba(220, 38, 38, 0.2)' : '0 0 30px rgba(22, 163, 74, 0.2)'
+                            boxShadow: isPlaying ? '0 0 40px rgba(220, 38, 38, 0.25)' : '0 0 40px rgba(124, 58, 237, 0.25)'
                         }}
                     >
                         {isPlaying ? <Square size={40} fill="currentColor" /> : <Play size={40} fill="currentColor" />}
@@ -366,9 +375,41 @@ export const DebugControls = () => {
 
 
 // ─── 4-column Track Horizontal Grid ─────────────────────────────────────────
-export const TrackControls = () => (
-    <Grid cols="repeat(4, 1fr)" style={{ width: '100%', gap: 16 }}>
-        {[0, 1, 2, 3].map(id => <TrackPad key={id} trackId={id} />)}
-    </Grid>
-);
+export const TrackControls = () => {
+    const [activeFXTrack, setActiveFXTrack] = useState<number | null>(null);
+
+    return (
+        <div style={{ position: 'relative', width: '100%' }}>
+            <Grid cols="repeat(4, 1fr)" style={{ width: '100%', gap: 16 }}>
+                {[0, 1, 2, 3].map(id => (
+                    <TrackPad
+                        key={id}
+                        trackId={id}
+                        onOpenFX={(id) => setActiveFXTrack(id)}
+                    />
+                ))}
+            </Grid>
+
+            {activeFXTrack !== null && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 2000,
+                    background: 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }} onClick={() => setActiveFXTrack(null)}>
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <TrackFX
+                            trackId={activeFXTrack}
+                            onClose={() => setActiveFXTrack(null)}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
