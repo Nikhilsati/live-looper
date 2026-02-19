@@ -1,0 +1,231 @@
+:root {
+    --ui-bg-card: rgba(255, 255, 255, 0.04);
+    --ui-border-card: rgba(255, 255, 255, 0.08);
+    --ui-radius-lg: 20px;
+    --ui-radius-md: 12px;
+    --ui-radius-sm: 8px;
+    --ui-blur: 12px;
+
+    --ui-color-primary: #7c3aed;
+    --ui-color-primary-light: #a78bfa;
+    --ui-color-success: #16a34a;
+    --ui-color-success-light: #4ade80;
+    --ui-color-danger: #dc2626;
+    --ui-color-danger-light: #f87171;
+    --ui-color-warning: #ea580c;
+    --ui-color-accent: #4f46e5;
+
+    --ui-text-dim: rgba(255, 255, 255, 0.3);
+    --ui-text-main: rgba(255, 255, 255, 0.9);
+}
+
+.ui-card {
+    background: var(--ui-bg-card);
+    border: 1px solid var(--ui-border-card);
+    border-radius: var(--ui-radius-lg);
+    backdrop-filter: blur(var(--ui-blur));
+    -webkit-backdrop-filter: blur(var(--ui-blur));
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.ui-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--ui-radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: white;
+    background: rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ui-button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.ui-button:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.ui-button:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+
+.ui-button.primary {
+    background: var(--ui-color-primary);
+}
+
+.ui-button.success {
+    background: var(--ui-color-success);
+}
+
+.ui-button.danger {
+    background: var(--ui-color-danger);
+}
+
+.ui-button.warning {
+    background: var(--ui-color-warning);
+}
+
+.ui-button.accent {
+    background: var(--ui-color-accent);
+}
+
+.ui-button.size-sm {
+    width: 44px;
+    height: 44px;
+}
+
+.ui-button.size-md {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+}
+
+.ui-button.size-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
+}
+
+.ui-button.ghost {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--ui-text-dim);
+}
+
+.ui-button.ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ui-button.active-primary {
+    border: 1.5px solid var(--ui-color-primary);
+    background: rgba(124, 58, 237, 0.2);
+    color: var(--ui-color-primary-light);
+}
+
+.ui-button.active-warning {
+    border: 1.5px solid var(--ui-color-warning);
+    background: rgba(234, 88, 12, 0.15);
+    color: #fcd34d;
+}
+
+.ui-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+}
+
+.ui-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ui-color-primary-light);
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(124, 58, 237, 0.4);
+}
+
+.ui-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ui-text-dim);
+}
+
+.ui-badge.live {
+    background: rgba(22, 163, 74, 0.15);
+    color: var(--ui-color-success-light);
+}
+
+.ui-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ui-color-success-light);
+    box-shadow: 0 0 8px var(--ui-color-success-light);
+}
+
+.ui-text-label {
+    font-size: 11px;
+    color: var(--ui-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.ui-text-value {
+    font-size: 10px;
+    font-family: monospace;
+    letter-spacing: 0.08em;
+}
+
+.ui-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ui-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.ui-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.ui-heading {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: white;
+}
+
+.ui-text {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ui-text-dim);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
