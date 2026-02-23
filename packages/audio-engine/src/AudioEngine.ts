@@ -1,4 +1,4 @@
-import type { SectionConfig, FXState } from '@live-looper/types';
+import type { SectionConfig, FXState, Mode, FrozenProjectSnapshot } from '@live-looper/types';
 
 const DEFAULT_SECTIONS: SectionConfig[] = [
     { index: 0, name: 'Verse', lengthInBars: 4, trackLinks: [true, true, true, true] },
@@ -165,45 +165,56 @@ class AudioEngine {
         });
     }
 
+    setMode(mode: Mode) {
+        this.workletNode?.port.postMessage({ type: 'SET_MODE', payload: { mode } });
+    }
+
+    enterLiveMode(snapshot: FrozenProjectSnapshot) {
+        // Enforce snapshot settings on the engine
+        this.setBpm(snapshot.bpm);
+
+        // Update FX chains with snapshot values
+        snapshot.tracks.forEach((track, i) => {
+            this.updateFX(i, track.fx, snapshot.bpm);
+        });
+
+        // Pre-allocate or lock structures in worklet
+        this.workletNode?.port.postMessage({
+            type: 'ENTER_LIVE_MODE',
+            payload: { snapshot }
+        });
+    }
+
     async loadDemoData() {
         if (!this.context || !this.workletNode) await this.init();
         const ctx = this.context!;
-        const bpm = 100;
-        const secondsPerBeat = 60 / bpm;
-        const sectionBars = 4;
-        const totalSamples = Math.floor(ctx.sampleRate * secondsPerBeat * 4 * sectionBars);
 
-        const generateTrack = (type: 'kick' | 'snare' | 'bass' | 'lead') => {
-            const buf = new Float32Array(totalSamples);
-            const samplesPerBeat = ctx.sampleRate * secondsPerBeat;
+        const samples = [
+            '/samples/looperman-l-2148602-0151263-secret-trap-drumloop-100bpm.wav',
+            '/samples/looperman-l-6590395-0406745-zaytoven-2.wav',
+            '/samples/looperman-l-0498019-0103176-tumbleweed-100-e-acoustic-guitar-mute-rhythm.wav',
+            '/samples/looperman-l-0498019-0079454-tumbleweed-100-e-d-a-d-clean-strat-rhythm.wav'
+        ];
 
-            for (let i = 0; i < totalSamples; i++) {
-                const beat = (i / samplesPerBeat) % 4;
-                const bar = Math.floor(i / (samplesPerBeat * 4));
-
-                if (type === 'kick') {
-                    // Kick on 1 and 3
-                    if (beat < 0.1 || (beat > 2 && beat < 2.1)) {
-                        const t = (i % samplesPerBeat) / ctx.sampleRate;
-                        buf[i] = Math.exp(-t * 15) * Math.sin(2 * Math.PI * 55 * Math.exp(-t * 20));
-                    }
-                } else if (type === 'snare') {
-                    // Snare on 2 and 4
-                    if ((beat > 1 && beat < 1.1) || (beat > 3 && beat < 3.1)) {
-                        buf[i] = (Math.random() * 2 - 1) * Math.exp(-(beat % 1) * 10) * 0.3;
-                    }
-                } else if (type === 'bass') {
-                    // Bass pulse
-                    const freq = [55, 55, 41, 48][bar % 4];
-                    buf[i] = Math.sin(2 * Math.PI * freq * (i / ctx.sampleRate)) * 0.2;
-                }
+        const loadAndDecode = async (url: string) => {
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                // Return mono data for now as the looper engine expects Float32Array
+                return audioBuffer.getChannelData(0);
+            } catch (e) {
+                console.error(`Failed to load sample: ${url}`, e);
+                return null;
             }
-            return buf;
         };
 
-        this.loadBuffer(0, 0, generateTrack('kick'));
-        this.loadBuffer(1, 0, generateTrack('snare'));
-        this.loadBuffer(2, 0, generateTrack('bass'));
+        for (let i = 0; i < samples.length; i++) {
+            const buffer = await loadAndDecode(samples[i]);
+            if (buffer) {
+                this.loadBuffer(i, 0, buffer);
+            }
+        }
     }
     getLatencyMetrics() {
         if (!this.context) return null;

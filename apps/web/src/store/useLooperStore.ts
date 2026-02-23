@@ -1,9 +1,11 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig, FXState } from '@live-looper/types';
+import type { EngineState, TrackState, SectionConfig, FXState, Mode } from '@live-looper/types';
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
+import { modeController } from '@live-looper/mode-controller';
 
 interface LooperStore extends EngineState {
     // Actions
+    setMode: (mode: Mode) => Promise<void>;
     setIsPlaying: (v: boolean) => void;
     updateTick: (bar: number, beat: number, sectionIndex: number, sectionProgress: number) => void;
     setTrackState: (trackId: number, state: Partial<TrackState>) => void;
@@ -36,6 +38,7 @@ const defaultTrack = (): TrackState => ({
 });
 
 export const useLooperStore = create<LooperStore>((set, get) => ({
+    mode: 'planning',
     isPlaying: false,
     bpm: DEFAULT_BPM,
     currentBar: 1,
@@ -51,33 +54,78 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     jitter: 0,
     lastHitOffset: 0,
 
-    setIsPlaying: (isPlaying) => set({ isPlaying }),
-    setBpm: (bpm) => set({ bpm }),
-    setSections: (sections) => set({ sections }),
-    setCurrentSection: (index) => set({ currentSectionIndex: index, queuedSectionIndex: null }),
-    setQueuedSection: (index) => set({ queuedSectionIndex: index }),
+    setMode: async (targetMode) => {
+        const state = get();
+        const { success, error, snapshot } = await modeController.transitionTo(targetMode, state);
+        if (success) {
+            set({ mode: targetMode });
+            audioEngine.setMode(targetMode);
+            if (targetMode === 'live' && snapshot) {
+                audioEngine.enterLiveMode(snapshot);
+            }
+        } else if (error) {
+            alert(error);
+        }
+    },
+
+    setIsPlaying: (isPlaying) => {
+        if (!modeController.isActionAllowed(isPlaying ? 'start-transport' : 'stop-transport')) return;
+        set({ isPlaying });
+    },
+
+    setBpm: (bpm) => {
+        if (!modeController.isActionAllowed('change-tempo')) {
+            // Re-sync with actual BPM if blocked
+            return;
+        }
+        set({ bpm });
+    },
+
+    setSections: (sections) => {
+        if (!modeController.isActionAllowed('add-section')) return;
+        set({ sections });
+    },
+
+    setCurrentSection: (index) => {
+        if (!modeController.isActionAllowed('trigger-section')) return;
+        set({ currentSectionIndex: index, queuedSectionIndex: null });
+    },
+
+    setQueuedSection: (index) => {
+        if (!modeController.isActionAllowed('trigger-section')) return;
+        set({ queuedSectionIndex: index });
+    },
 
     updateTick: (bar, beat, sectionIndex, sectionProgress) =>
         set({ currentBar: bar, currentBeat: beat, currentSectionIndex: sectionIndex, sectionProgress }),
 
-    setTrackState: (trackId, state) => set(prev => {
-        const newTracks = [...prev.tracks];
-        if (newTracks[trackId]) newTracks[trackId] = { ...newTracks[trackId], ...state };
-        return { tracks: newTracks };
-    }),
+    setTrackState: (trackId, state) => {
+        const action = state.isRecording ? 'record' : state.hasAudio === false ? 'clear-track' : 'modify-track';
+        if (!modeController.isActionAllowed(action)) return;
 
-    setTrackFX: (trackId, fx) => set(prev => {
-        const newTracks = [...prev.tracks];
-        if (newTracks[trackId]) {
-            newTracks[trackId] = {
-                ...newTracks[trackId],
-                fx: { ...newTracks[trackId].fx, ...fx }
-            };
-        }
-        return { tracks: newTracks };
-    }),
+        set(prev => {
+            const newTracks = [...prev.tracks];
+            if (newTracks[trackId]) newTracks[trackId] = { ...newTracks[trackId], ...state };
+            return { tracks: newTracks };
+        });
+    },
+
+    setTrackFX: (trackId, fx) => {
+        if (!modeController.isActionAllowed('modify-fx-config')) return;
+        set(prev => {
+            const newTracks = [...prev.tracks];
+            if (newTracks[trackId]) {
+                newTracks[trackId] = {
+                    ...newTracks[trackId],
+                    fx: { ...newTracks[trackId].fx, ...fx }
+                };
+            }
+            return { tracks: newTracks };
+        });
+    },
 
     calibrateLatency: () => {
+        if (get().mode === 'live') return;
         set({ isCalibratingLatency: true });
         audioEngine.runRTLTest();
     },

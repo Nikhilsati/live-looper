@@ -25,8 +25,9 @@ const LayerDots = ({ count }: { count: number }) => {
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
 const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: number) => void }) => {
-    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, setLastHitOffset } = useLooperStore();
+    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, setLastHitOffset, mode } = useLooperStore();
     const track = tracks[trackId];
+    const isLive = mode === 'live';
     const [showHit, setShowHit] = useState(false);
 
     const handleArm = () => {
@@ -111,14 +112,16 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                             HIT: {lastHitOffset > 0 ? '+' : ''}{Math.round(lastHitOffset)}ms
                         </div>
                     )}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onOpenFX(trackId)}
-                        style={{ padding: '4px', opacity: 0.6 }}
-                    >
-                        <Sliders size={16} />
-                    </Button>
+                    {!isLive && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onOpenFX(trackId)}
+                            style={{ padding: '4px', opacity: 0.6 }}
+                        >
+                            <Sliders size={16} />
+                        </Button>
+                    )}
                     <LayerDots count={track.layerCount} />
                     <ValueText color={statusColor} style={{ fontSize: 11, fontWeight: 800 }}>{statusLabel}</ValueText>
                 </div>
@@ -176,7 +179,7 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                 </Button>
             </Row>
 
-            <Waveform data={track.waveformData} progress={sectionProgress} height={40} />
+            {!isLive && <Waveform data={track.waveformData} progress={sectionProgress} height={40} />}
         </Card>
     );
 };
@@ -291,7 +294,8 @@ const MetronomeButton = () => {
 
 // ─── Transport Bar ─────────────────────────────────────────────────────────────
 export const DebugControls = () => {
-    const { isPlaying, currentBar, currentBeat, sectionProgress, sections, currentSectionIndex, bpm } = useLooperStore();
+    const { isPlaying, currentBar, currentBeat, sectionProgress, sections, currentSectionIndex, bpm, mode } = useLooperStore();
+    const isLive = mode === 'live';
     const currentSection = sections[currentSectionIndex];
     const [showBpm, setShowBpm] = useState(false);
 
@@ -346,17 +350,20 @@ export const DebugControls = () => {
                         {isPlaying ? <Square size={40} fill="currentColor" /> : <Play size={40} fill="currentColor" />}
                     </Button>
 
-                    <Stack style={{ gap: 8 }}>
-                        <MetronomeButton />
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            style={{ fontSize: 11, padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}
-                            onClick={() => audioEngine.loadDemoData()}
-                        >
-                            LOAD DEMO
-                        </Button>
-                    </Stack>
+                    {!isLive && (
+                        <Stack style={{ gap: 8 }}>
+                            <MetronomeButton />
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                style={{ fontSize: 11, padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}
+                                onClick={() => audioEngine.loadDemoData()}
+                            >
+                                LOAD DEMO
+                            </Button>
+                        </Stack>
+                    )}
+                    {isLive && <MetronomeButton />}
                 </Row>
 
                 {/* Right: Section Navigation & BPM (De-prioritized) */}

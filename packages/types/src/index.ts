@@ -65,6 +65,20 @@ export interface TrackState {
     fx: FXState;
 }
 
+export type Mode = 'planning' | 'practice' | 'live';
+
+export interface QuantizationSettings {
+    snapToGrid: boolean;
+    gridResolution: number;
+}
+
+export interface FrozenProjectSnapshot {
+    sections: SectionConfig[];
+    tracks: TrackState[];
+    bpm: number;
+    quantization: QuantizationSettings;
+}
+
 export interface EngineState {
     isPlaying: boolean;
     bpm: number;
@@ -75,6 +89,7 @@ export interface EngineState {
     queuedSectionIndex: number | null;
     sections: SectionConfig[];
     tracks: TrackState[];
+    mode: Mode;
     // Performance & Latency Suite
     latencyMeasuredSamples: number;
     latencyCompensationSamples: number;
