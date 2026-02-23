@@ -5,6 +5,7 @@
     "main": "./src/index.ts",
     "types": "./src/index.ts",
     "dependencies": {
+        "@live-looper/storage": "workspace:*",
         "zustand": "^5.0.11"
     },
     "devDependencies": {

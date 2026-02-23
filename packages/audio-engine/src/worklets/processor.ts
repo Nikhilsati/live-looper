@@ -334,6 +334,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                         sectionIndex: this.currentSectionIndex,
                         layerCount: sd.layers.length,
                         waveformData,
+                        buffer: layerBuf // Send the actual buffer for storage
                     });
                 }
             }

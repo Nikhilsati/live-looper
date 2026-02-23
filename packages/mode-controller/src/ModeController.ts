@@ -1,4 +1,4 @@
-import { Mode, FrozenProjectSnapshot, EngineState } from '@live-looper/types';
+import type { Mode, FrozenProjectSnapshot, EngineState } from '@live-looper/types';
 
 export class ModeController {
     private static instance: ModeController;

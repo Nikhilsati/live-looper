@@ -10,12 +10,19 @@ const DEFAULT_BPM = 100;
 
 import { TrackFXChain } from './TrackFXChain';
 import { MasterBus } from './MasterBus';
+import { db, projectService } from '@live-looper/storage';
 
 class AudioEngine {
     context: AudioContext | null = null;
     workletNode: AudioWorkletNode | null = null;
     trackFX: TrackFXChain[] = [];
     masterBus: MasterBus | null = null;
+
+    // Storage Context
+    private currentProjectId: string | null = null;
+    private trackIdMap: string[] = []; // index 0-3 -> UUID
+    private sectionIdMap: string[] = []; // index 0-N -> UUID
+    private savedProjectId: string | null = null;
 
     private listeners: ((event: any) => void)[] = [];
     private static instance: AudioEngine;
@@ -64,7 +71,10 @@ class AudioEngine {
             // Metronome (output 4) directly to master bus for now
             this.workletNode.connect(this.masterBus.input, 4);
 
-            this.workletNode.port.onmessage = (event) => this.notify(event.data);
+            this.workletNode.port.onmessage = (event) => {
+                this.handleMessage(event.data);
+                this.notify(event.data);
+            };
 
             const savedLatency = localStorage.getItem('looper_rtl_samples');
             const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
@@ -187,6 +197,11 @@ class AudioEngine {
 
     async loadDemoData() {
         if (!this.context || !this.workletNode) await this.init();
+
+        if (!this.currentProjectId) {
+            await this.createNewProject("Demo Jam");
+        }
+
         const ctx = this.context!;
 
         const samples = [
@@ -211,11 +226,131 @@ class AudioEngine {
 
         for (let i = 0; i < samples.length; i++) {
             const buffer = await loadAndDecode(samples[i]);
-            if (buffer) {
-                this.loadBuffer(i, 0, buffer);
+            if (buffer && this.currentProjectId) {
+                const trackId = this.trackIdMap[i % 4];
+                const sectionId = this.sectionIdMap[0];
+
+                await projectService.saveLayer({
+                    projectId: this.currentProjectId!,
+                    trackId,
+                    sectionId,
+                    audioData: buffer,
+                    sampleRate: ctx.sampleRate
+                });
+
+                this.loadBuffer(i % 4, 0, buffer);
             }
         }
     }
+
+    private async handleMessage(data: any) {
+        if (data.type === 'RECORD_STOP' && this.currentProjectId && data.buffer) {
+            const trackId = this.trackIdMap[data.trackId];
+            const sectionId = this.sectionIdMap[data.sectionIndex];
+
+            if (trackId && sectionId) {
+                await projectService.saveLayer({
+                    projectId: this.currentProjectId,
+                    trackId,
+                    sectionId,
+                    audioData: data.buffer,
+                    sampleRate: this.context!.sampleRate
+                });
+                console.log('Layer saved to IndexedDB');
+            }
+        }
+    }
+
+    async loadProject(projectId: string) {
+        if (!this.context || !this.workletNode) await this.init();
+
+        const project = await db.projects.get(projectId);
+        if (!project) return;
+
+        this.currentProjectId = projectId;
+        localStorage.setItem('looper_current_project_id', projectId);
+
+        const tracks = await db.tracks.where({ projectId }).sortBy('order');
+        this.trackIdMap = tracks.map((t: any) => t.id);
+
+        const sections = await db.sections.where({ projectId }).sortBy('order');
+        this.sectionIdMap = sections.map((s: any) => s.id);
+
+        // Sync worklet config with project structure
+        const savedLatency = localStorage.getItem('looper_rtl_samples');
+        const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
+
+        const sampleRate = this.context!.sampleRate;
+        this.workletNode?.port.postMessage({
+            type: 'CONFIG',
+            payload: {
+                sampleRate,
+                bpm: project.bpm,
+                sections: sections.map(s => {
+                    // Convert samples to bars if lengthInBars isn't stored
+                    const bars = Math.max(1, Math.round((s.lengthSamples * project.bpm) / (60 * sampleRate * 4)));
+                    return {
+                        index: s.order,
+                        name: s.name,
+                        lengthInBars: bars,
+                        trackLinks: [true, true, true, true]
+                    };
+                }),
+                latencySamples
+            },
+        });
+
+        // Apply FX state
+        tracks.forEach((t: any, i: number) => {
+            if (t.fx) {
+                this.updateFX(i, t.fx, project.bpm);
+            }
+        });
+
+        // Load Audio Blobs into Engine and collect stats
+        const layers = await db.layers.where({ projectId }).toArray();
+        const layerCounts: Record<number, number> = {};
+
+        for (const layer of layers) {
+            const blobRecord = await db.audioBlobs.get(layer.audioBlobId);
+            if (blobRecord && this.context) {
+                try {
+                    const arrayBuffer = await blobRecord.blob.arrayBuffer();
+                    const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+                    const data = audioBuffer.getChannelData(0);
+
+                    const trackIdx = this.trackIdMap.indexOf(layer.trackId);
+                    const sectionIdx = this.sectionIdMap.indexOf(layer.sectionId);
+
+                    if (trackIdx !== -1 && sectionIdx !== -1) {
+                        this.loadBuffer(trackIdx, sectionIdx, data);
+                        layerCounts[trackIdx] = (layerCounts[trackIdx] || 0) + 1;
+                    }
+                } catch (e) {
+                    console.error('Error loading audio blob into engine', e);
+                }
+            }
+        }
+
+        // Notify UI about loaded project structure and content
+        this.notify({
+            type: 'PROJECT_LOADED',
+            payload: {
+                project,
+                tracks,
+                sections,
+                layerCounts // trackIndex -> count
+            }
+        });
+    }
+
+    async createNewProject(name: string) {
+        if (!this.context) await this.init();
+        const projectId = await projectService.createProject(name, 100);
+        await this.loadProject(projectId);
+        return projectId;
+    }
+
     getLatencyMetrics() {
         if (!this.context) return null;
         return {

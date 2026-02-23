@@ -1,10 +1,20 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig, FXState, Mode } from '@live-looper/types';
+import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectRecord } from '@live-looper/types';
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 import { modeController } from '@live-looper/mode-controller';
+import { db, projectService, exportService } from '@live-looper/storage';
 
 interface LooperStore extends EngineState {
+    projectList: ProjectRecord[];
+    currentProject: ProjectRecord | null;
     // Actions
+    fetchProjects: () => Promise<void>;
+    createNewProject: (name: string) => Promise<string>;
+    loadProject: (id: string) => Promise<void>;
+    closeProject: () => void;
+    deleteProject: (id: string) => Promise<void>;
+    exportProject: (id: string) => Promise<void>;
+    importProject: (file: File) => Promise<void>;
     setMode: (mode: Mode) => Promise<void>;
     setIsPlaying: (v: boolean) => void;
     updateTick: (bar: number, beat: number, sectionIndex: number, sectionProgress: number) => void;
@@ -53,6 +63,59 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     isCalibratingLatency: false,
     jitter: 0,
     lastHitOffset: 0,
+    projectList: [],
+    currentProject: null,
+
+    fetchProjects: async () => {
+        const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
+        set({ projectList: projects });
+    },
+
+    createNewProject: async (name) => {
+        if (!modeController.isActionAllowed('add-section')) return ""; // Basic check
+        const id = await audioEngine.createNewProject(name);
+        await get().fetchProjects();
+        return id;
+    },
+
+    loadProject: async (id) => {
+        // Reset current tracks before loading to avoid flicker/stale data
+        set({
+            tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+            isPlaying: false
+        });
+        await audioEngine.loadProject(id);
+        const project = await db.projects.get(id);
+        set({ currentProject: project || null });
+    },
+
+    closeProject: () => {
+        audioEngine.stop();
+        localStorage.removeItem('looper_current_project_id');
+        set({
+            currentProject: null,
+            isPlaying: false,
+            tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()]
+        });
+    },
+
+    deleteProject: async (id) => {
+        if (get().currentProject?.id === id) {
+            set({ currentProject: null });
+        }
+        await projectService.deleteProject(id);
+        await get().fetchProjects();
+    },
+
+    exportProject: async (id) => {
+        await exportService.exportProject(id);
+    },
+
+    importProject: async (file) => {
+        const id = await exportService.importProject(file);
+        await get().fetchProjects();
+        await get().loadProject(id);
+    },
 
     setMode: async (targetMode) => {
         const state = get();
@@ -170,6 +233,22 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 set({ isCalibratingLatency: false });
                 alert('Latency Calibration Timed Out. Ensure Output is looped to Input.');
                 break;
+            case 'PROJECT_LOADED':
+                set({
+                    bpm: event.payload.project.bpm,
+                    sections: event.payload.sections,
+                    tracks: event.payload.tracks.map((t: any, i: number) => {
+                        const count = event.payload.layerCounts?.[i] || 0;
+                        return {
+                            ...defaultTrack(),
+                            isMuted: t.muted,
+                            fx: t.fx || defaultTrack().fx,
+                            hasAudio: count > 0,
+                            layerCount: count
+                        };
+                    })
+                });
+                break;
         }
     },
 }));
@@ -178,6 +257,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 const savedComp = localStorage.getItem('looper_rtl_samples');
 if (savedComp) {
     useLooperStore.getState().setCompensation(parseInt(savedComp, 10));
+}
+
+// Resume last project
+const lastProjectId = localStorage.getItem('looper_current_project_id');
+if (lastProjectId) {
+    useLooperStore.getState().loadProject(lastProjectId);
 }
 
 // Subscribe to store changes to update the audio engine
@@ -192,6 +277,24 @@ useLooperStore.subscribe((state, prevState) => {
         const prevTrack = prevState.tracks[i];
         if (track.fx !== prevTrack?.fx || state.bpm !== prevState.bpm) {
             audioEngine.updateFX(i, track.fx, state.bpm);
+
+            // Persist FX to DB
+            const projectId = state.currentProject?.id;
+            if (projectId) {
+                db.tracks.where({ projectId, order: i }).first().then(t => {
+                    if (t) db.tracks.update(t.id, { fx: track.fx });
+                });
+            }
+        }
+
+        // Sync Mute state to DB
+        if (track.isMuted !== prevTrack?.isMuted) {
+            const projectId = state.currentProject?.id;
+            if (projectId) {
+                db.tracks.where({ projectId, order: i }).first().then(t => {
+                    if (t) db.tracks.update(t.id, { muted: track.isMuted });
+                });
+            }
         }
     });
 

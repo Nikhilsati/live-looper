@@ -1,0 +1,21 @@
+{
+    "name": "@live-looper/storage",
+    "version": "0.0.0",
+    "private": true,
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w"
+    },
+    "dependencies": {
+        "@live-looper/types": "workspace:*",
+        "dexie": "^4.0.8",
+        "jszip": "^3.10.1",
+        "uuid": "^10.0.0"
+    },
+    "devDependencies": {
+        "@live-looper/typescript-config": "workspace:*",
+        "@types/uuid": "^10.0.0"
+    }
+}

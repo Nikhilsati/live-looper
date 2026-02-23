@@ -97,3 +97,54 @@ export interface EngineState {
     jitter: number;
     lastHitOffset: number; // ms offset from quantization boundary
 }
+
+// Storage Interfaces
+export interface ProjectRecord {
+    id: string;
+    name: string;
+    createdAt: number;
+    updatedAt: number;
+    bpm: number;
+    timeSignature: string;
+    masterLengthSamples: number;
+    schemaVersion: number;
+    appVersion: string;
+}
+
+export interface TrackRecord {
+    id: string;
+    projectId: string;
+    name: string;
+    order: number;
+    color: string;
+    muted: boolean;
+    solo: boolean;
+    fx?: FXState;
+}
+
+export interface SectionRecord {
+    id: string;
+    projectId: string;
+    name: string;
+    order: number;
+    lengthSamples: number;
+}
+
+export interface LayerRecord {
+    id: string;
+    projectId: string;
+    trackId: string;
+    sectionId: string;
+    audioBlobId: string;
+    gain: number;
+    order: number;
+}
+
+export interface AudioBlobRecord {
+    id: string;
+    projectId: string;
+    blob: Blob;   // WAV
+    sampleRate: number;
+    channels: number;
+    lengthSamples: number;
+}
