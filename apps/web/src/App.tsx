@@ -1,7 +1,7 @@
 import { DebugControls, TrackControls } from './components/TrackControls';
 import { LatencyMonitor } from './components/LatencyMonitor';
 import { useAudioEngine } from './hooks/useAudioEngine';
-import { StatusDot, Row, Heading, Text, Stack } from './UI';
+import { StatusDot, Row, Heading, Text, Stack } from '@live-looper/ui';
 import './index.css';
 
 function App() {

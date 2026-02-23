@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { audioEngine } from '../engine/AudioEngine';
+import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
 
 export const useAudioEngine = () => {

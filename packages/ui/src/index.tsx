@@ -1,4 +1,4 @@
-/// <reference path="../types/oat.d.ts" />
+/// <reference types="@live-looper/types" />
 import React from 'react';
 import './UI.css';
 
@@ -25,7 +25,7 @@ export const Button = ({
     size = 'none',
     className = '',
     ...props
-}: ButtonProps) => {
+}: React.PropsWithChildren<ButtonProps>) => {
     // Map custom variants to Oat or keep them if specific
     const finalVariant = variant?.startsWith('active-') ? variant : variant;
 
@@ -35,6 +35,7 @@ export const Button = ({
         </button>
     );
 };
+
 
 export const Switch = ({ checked, onChange, label }: { checked: boolean, onChange: (v: boolean) => void, label?: string }) => (
     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>

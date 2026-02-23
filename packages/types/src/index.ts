@@ -1,3 +1,4 @@
+/// <reference path="./oat.d.ts" />
 export interface SongConfig {
     songId: string;
     name: string;

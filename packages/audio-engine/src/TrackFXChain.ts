@@ -1,4 +1,4 @@
-import type { FXState } from '../types';
+import type { FXState } from '@live-looper/types';
 
 export class TrackFXChain {
     private context: AudioContext;

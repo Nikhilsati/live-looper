@@ -1,8 +1,8 @@
 import { Play, Square, Music2, Mic, Volume2, VolumeX, Undo2, Trash2, ChevronRight, Sliders } from 'lucide-react';
 import { useState } from 'react';
-import { audioEngine } from '../engine/AudioEngine';
+import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
-import { Card, Button, Label, ValueText, Badge, Slider, Row, Grid, Heading, Stack, Waveform } from '../UI';
+import { Card, Button, Label, ValueText, Badge, Slider, Row, Grid, Heading, Stack, Waveform } from '@live-looper/ui';
 import { TrackFX } from './TrackFX';
 
 const ICON_SIZE = 22;

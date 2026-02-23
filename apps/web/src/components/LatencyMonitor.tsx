@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Stack, Row, Label, ValueText, StatusDot, Text, Button, Grid } from '../UI';
+import { Card, Stack, Row, Label, ValueText, StatusDot, Text, Button, Grid } from '@live-looper/ui';
 import { useLooperStore } from '../store/useLooperStore';
 import { Activity, Zap, RefreshCw, AlertCircle } from 'lucide-react';
 

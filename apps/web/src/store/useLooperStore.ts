@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig, FXState } from '../types';
-import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '../engine/AudioEngine';
+import type { EngineState, TrackState, SectionConfig, FXState } from '@live-looper/types';
+import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 
 interface LooperStore extends EngineState {
     // Actions

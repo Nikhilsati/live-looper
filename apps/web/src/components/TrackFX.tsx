@@ -1,7 +1,7 @@
 import { useLooperStore } from '../store/useLooperStore';
-import { Card, Stack, Row, Label, ValueText, Slider, Button, Grid, Heading, Switch } from '../UI';
+import { Card, Stack, Row, Label, ValueText, Slider, Button, Grid, Heading, Switch } from '@live-looper/ui';
 import { X, Activity, Zap, Clock, Speaker, Sliders } from 'lucide-react';
-import type { FXState } from '../types';
+import type { FXState } from '@live-looper/types';
 
 interface TrackFXProps {
     trackId: number;

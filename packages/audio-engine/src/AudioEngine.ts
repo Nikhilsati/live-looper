@@ -1,4 +1,4 @@
-import type { SectionConfig, FXState } from '../types';
+import type { SectionConfig, FXState } from '@live-looper/types';
 
 const DEFAULT_SECTIONS: SectionConfig[] = [
     { index: 0, name: 'Verse', lengthInBars: 4, trackLinks: [true, true, true, true] },
@@ -42,7 +42,7 @@ class AudioEngine {
         this.context = new AudioContext();
 
         // @ts-ignore
-        const processorUrl = new URL('../audio-worklet/processor.ts', import.meta.url).href;
+        const processorUrl = new URL('./worklets/processor.ts', import.meta.url).href;
 
         try {
             await this.context.audioWorklet.addModule(processorUrl);
