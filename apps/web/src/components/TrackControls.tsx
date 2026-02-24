@@ -340,6 +340,7 @@ export const DebugControls = () => {
                         onClick={isPlaying ? handleStop : handleStart}
                         size="lg"
                         variant={isPlaying ? 'danger' : 'primary'}
+                        data-testid="transport-button"
                         style={{
                             width: 100,
                             height: 100,
@@ -380,9 +381,10 @@ export const DebugControls = () => {
                                 <Button
                                     variant="ghost"
                                     onClick={() => setShowBpm(!showBpm)}
+                                    data-testid="bpm-button"
                                     style={{ padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}
                                 >
-                                    <ValueText style={{ fontSize: 24, fontWeight: 700 }}>{bpm}</ValueText>
+                                    <ValueText data-testid="bpm-value" style={{ fontSize: 24, fontWeight: 700 }}>{bpm}</ValueText>
                                     <Label style={{ marginLeft: 4, opacity: 0.6 }}>BPM</Label>
                                 </Button>
                             </Stack>
@@ -400,16 +402,16 @@ export const DebugControls = () => {
                     animation: 'slideDown 0.2s ease-out'
                 }}>
                     <Label style={{ minWidth: 60 }}>Adjust BPM</Label>
-                    <Button onClick={() => handleBpmChange(bpm - 5)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>-5</Button>
-                    <Button onClick={() => handleBpmChange(bpm - 1)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>-</Button>
+                    <Button data-testid="bpm-minus-5" onClick={() => handleBpmChange(bpm - 5)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>-5</Button>
+                    <Button data-testid="bpm-minus-1" onClick={() => handleBpmChange(bpm - 1)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>-</Button>
                     <Slider
                         min={40} max={220} step={1}
                         value={bpm}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleBpmChange(Number(e.target.value))}
                         style={{ flex: 1, height: 40 }}
                     />
-                    <Button onClick={() => handleBpmChange(bpm + 1)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>+</Button>
-                    <Button onClick={() => handleBpmChange(bpm + 5)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>+5</Button>
+                    <Button data-testid="bpm-plus-1" onClick={() => handleBpmChange(bpm + 1)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>+</Button>
+                    <Button data-testid="bpm-plus-5" onClick={() => handleBpmChange(bpm + 5)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>+5</Button>
                 </div>
             )}
         </Card >

@@ -2,14 +2,14 @@
 import React from 'react';
 import './UI.css';
 
-interface BaseProps {
+interface BaseProps extends React.HTMLAttributes<HTMLDivElement | HTMLSpanElement | HTMLHeadingElement | HTMLParagraphElement> {
     children?: React.ReactNode;
     className?: string;
     style?: React.CSSProperties;
 }
 
-export const Card = ({ children, className = '', style }: BaseProps) => (
-    <div className={`card ${className}`} style={{ borderRadius: 'var(--radius-large)', ...style }}>
+export const Card = ({ children, className = '', style, ...props }: BaseProps) => (
+    <div className={`card ${className}`} style={{ borderRadius: 'var(--radius-large)', ...style }} {...props}>
         {children}
     </div>
 );
@@ -49,8 +49,8 @@ export const Switch = ({ checked, onChange, label }: { checked: boolean, onChang
     </label>
 );
 
-export const Badge = ({ children, variant, className = '' }: BaseProps & { variant?: 'live' }) => (
-    <span className={`badge ${variant === 'live' ? 'success' : ''} ${className}`} style={{ fontSize: '10px' }}>
+export const Badge = ({ children, variant, className = '', ...props }: BaseProps & { variant?: 'live' }) => (
+    <span className={`badge ${variant === 'live' ? 'success' : ''} ${className}`} style={{ fontSize: '10px' }} {...props}>
         {children}
     </span>
 );
@@ -63,46 +63,47 @@ export const Slider = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input type="range" className="ui-slider" {...props} />
 );
 
-export const Label = ({ children, className = '', style }: BaseProps) => (
-    <span className={`ui-text-label ${className}`} style={style}>
+export const Label = ({ children, className = '', style, ...props }: BaseProps) => (
+    <span className={`ui-text-label ${className}`} style={style} {...props}>
         {children}
     </span>
 );
 
-export const ValueText = ({ children, className = '', color, style }: BaseProps & { color?: string }) => (
-    <span className={`ui-text-value ${className}`} style={{ color, ...style }}>
+export const ValueText = ({ children, className = '', color, style, ...props }: BaseProps & { color?: string }) => (
+    <span className={`ui-text-value ${className}`} style={{ color, ...style }} {...props}>
         {children}
     </span>
 );
 
-export const Heading = ({ children, className = '', style }: BaseProps) => (
-    <h1 className={`ui-heading ${className}`} style={style}>
+export const Heading = ({ children, className = '', style, ...props }: BaseProps) => (
+    <h1 className={`ui-heading ${className}`} style={style} {...props}>
         {children}
     </h1>
 );
 
-export const Text = ({ children, className = '', style }: BaseProps) => (
-    <p className={`ui-text ${className}`} style={style}>
+export const Text = ({ children, className = '', style, ...props }: BaseProps) => (
+    <p className={`ui-text ${className}`} style={style} {...props}>
         {children}
     </p>
 );
 
-export const Stack = ({ children, className = '', style }: BaseProps) => (
-    <div className={`vstack ${className}`} style={style}>
+export const Stack = ({ children, className = '', style, ...props }: BaseProps) => (
+    <div className={`vstack ${className}`} style={style} {...props}>
         {children}
     </div>
 );
 
-export const Row = ({ children, className = '', style }: BaseProps) => (
-    <div className={`hstack ${className}`} style={style}>
+export const Row = ({ children, className = '', style, ...props }: BaseProps) => (
+    <div className={`hstack ${className}`} style={style} {...props}>
         {children}
     </div>
 );
 
-export const Grid = ({ children, className = '', style, cols }: BaseProps & { cols?: string }) => (
+export const Grid = ({ children, className = '', style, cols, ...props }: BaseProps & { cols?: string }) => (
     <div
         className={`ui-grid ${className}`}
         style={{ gridTemplateColumns: cols, ...style }}
+        {...props}
     >
         {children}
     </div>

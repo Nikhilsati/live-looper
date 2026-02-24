@@ -24,3 +24,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ─── Playwright E2E Test Artifacts ───────────────────────────────
+packages/tests-e2e/test-results/
+packages/tests-e2e/playwright-report/
+packages/tests-e2e/.cache/
