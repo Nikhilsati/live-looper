@@ -243,3 +243,40 @@ oat-dialog::part(panel) {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(20px);
 }
+
+/* ─── ButtonGroup ─────────────────────────────────────────────────────────── */
+.ui-btn-group {
+    display: flex;
+    flex-direction: row;
+}
+
+/* Lock border-width so switching between outline (1px) and active-* (2px)
+   never causes a layout shift. The width is always 2px; only the color changes. */
+.ui-btn-group>button {
+    border-width: 2px;
+}
+
+/* Flatten inner radii — left button keeps left corners, right button keeps right corners */
+.ui-btn-group>button:not(:first-child):not(:last-child) {
+    border-radius: 0;
+}
+
+.ui-btn-group>button:first-child:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.ui-btn-group>button:last-child:not(:first-child) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* Merge adjacent borders into a single hairline */
+.ui-btn-group>button+button {
+    margin-left: -2px;
+}
+
+/* Prevent the scale-down :active effect from the global rule — it looks jittery in a group */
+.ui-btn-group>button:active:not(:disabled) {
+    transform: none;
+}

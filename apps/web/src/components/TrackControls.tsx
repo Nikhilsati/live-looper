@@ -1,8 +1,8 @@
-import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, SpeakerSlashIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon } from '@phosphor-icons/react';
+import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
-import { Card, Stack, Row, Button, Label, ValueText, Badge, Heading, Grid, Switch, Waveform, Modal } from '@live-looper/ui';
+import { Card, Stack, Row, Button, ButtonGroup, Label, ValueText, Badge, Heading, Grid, Switch, Waveform, Modal } from '@live-looper/ui';
 import { TrackFX } from './TrackFX';
 
 const ICON_SIZE = 22;
@@ -88,7 +88,7 @@ const LayerIndicator = ({ count, accent }: { count: number; accent: string }) =>
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
 const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: number) => void }) => {
-    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, mode, toggleTrackRecording } = useLooperStore();
+    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, mode, toggleTrackRecording, setSolo } = useLooperStore();
     const track = tracks[trackId];
     const isLive = mode === 'live';
     const [showHit, setShowHit] = useState(false);
@@ -113,8 +113,11 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
         toggleTrackRecording(trackId);
     };
     const handleMute = () => {
-        audioEngine.toggleMute(trackId);
+        // Route through store — subscriber calls audioEngine.setMute with shadow tracking
         useLooperStore.getState().setTrackState(trackId, { isMuted: !track.isMuted });
+    };
+    const handleSolo = () => {
+        useLooperStore.getState().setSolo(trackId);
     };
     const handleUndo = () => {
         audioEngine.undoLayer(trackId);
@@ -365,16 +368,31 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                 </div>
             </Button>
 
-            {/* Bottom controls — Mute + Undo (Erase moved to header in Live mode) */}
+            {/* Bottom controls — M/S pill + Undo (Erase moved to header in Live mode) */}
             <Row style={{ gap: 10 }}>
-                <Button
-                    onClick={handleMute}
-                    size="md"
-                    variant={track.isMuted ? 'warning' : undefined}
-                    style={{ flex: 1, height: 60, borderRadius: 16 }}
-                >
-                    {track.isMuted ? <SpeakerSlashIcon size={24} weight="bold" /> : <SpeakerHighIcon size={24} weight="bold" />}
-                </Button>
+                {/* M / S — joined segmented control */}
+                <ButtonGroup style={{ flex: 1, height: 60 }}>
+                    <Button
+                        id={`track-${trackId}-mute-btn`}
+                        onClick={handleMute}
+                        size="md"
+                        variant={track.isMuted ? 'active-warning' : 'outline'}
+                        title={track.isMuted ? 'Unmute track' : 'Mute track'}
+                        style={{ flex: 1, height: '100%' }}
+                    >
+                        M
+                    </Button>
+                    <Button
+                        id={`track-${trackId}-solo-btn`}
+                        onClick={handleSolo}
+                        size="md"
+                        variant={track.isSoloed ? 'active-primary' : 'outline'}
+                        title={track.isSoloed ? 'Clear solo' : 'Solo this track'}
+                        style={{ flex: 1, height: '100%' }}
+                    >
+                        S
+                    </Button>
+                </ButtonGroup>
                 <Button
                     onClick={handleUndo}
                     disabled={track.layerCount === 0}

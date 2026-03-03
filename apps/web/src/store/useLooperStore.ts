@@ -36,6 +36,7 @@ interface LooperStore extends EngineState {
     setLastHitOffset: (ms: number) => void;
     handleEngineEvent: (event: EngineEvent) => void;
     deleteLayer: (layerId: string) => Promise<void>;
+    setSolo: (trackId: number) => void;
     toggleTrackRecording: (trackId: number) => void;
     togglePlayback: () => Promise<void>;
     // I/O Actions
@@ -46,6 +47,7 @@ interface LooperStore extends EngineState {
 
 const defaultTrack = (): TrackState => ({
     isMuted: false,
+    isSoloed: false,
     isRecording: false,
     isArmed: false,
     hasAudio: false,
@@ -295,18 +297,48 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                         const count = layerCounts?.[i] || 0;
                         return {
                             ...defaultTrack(),
-                            isMuted: t.muted,
+                            isMuted: t.muted ?? false,
+                            // solo field may be absent on old records — default to false
+                            isSoloed: t.solo ?? false,
                             fx: t.fx || defaultTrack().fx,
                             hasAudio: count > 0,
                             layerCount: count,
-                            // Include waveform data computed on load — bypasses the
-                            // setTrackState mode-gate so previews always appear.
                             waveformData: waveformDataMap?.[i] ?? [],
                         };
                     })
                 });
+                // Re-apply any persisted solo isolation to the audio engine
+                const newTracks = get().tracks;
+                const soloedIds = newTracks.map((t, i) => t.isSoloed ? i : -1).filter(i => i !== -1);
+                if (soloedIds.length > 0) {
+                    audioEngine.applySolo(soloedIds, newTracks.map(t => t.isMuted));
+                }
                 break;
             }
+        }
+    },
+
+    setSolo: (trackId) => {
+        const { tracks } = get();
+        if (!tracks[trackId]) return;
+
+        // Simply toggle this track's solo — other tracks are unaffected
+        set(prev => ({
+            tracks: prev.tracks.map((t, i) => i === trackId ? { ...t, isSoloed: !t.isSoloed } : t)
+        }));
+
+        const updatedTracks = get().tracks;
+        const soloedIds = updatedTracks.map((t, i) => t.isSoloed ? i : -1).filter(i => i !== -1);
+        audioEngine.applySolo(soloedIds, updatedTracks.map(t => t.isMuted));
+
+        // Persist solo flag for every track
+        const projectId = get().currentProject?.id;
+        if (projectId) {
+            updatedTracks.forEach((t, i) => {
+                db.tracks.where({ projectId, order: i }).first().then(rec => {
+                    if (rec) db.tracks.update(rec.id, { solo: t.isSoloed });
+                });
+            });
         }
     },
 
@@ -429,8 +461,15 @@ useLooperStore.subscribe((state, prevState) => {
             }
         }
 
-        // Sync Mute state to DB
+        // Sync Mute state to audio engine + DB
         if (track.isMuted !== prevTrack?.isMuted) {
+            // Only drive the worklet if no solo is active — when a solo is on,
+            // applySolo controls mute isolation; the flag is persisted and will
+            // be restored correctly when solo is cleared.
+            const hasSolo = state.tracks.some(t => t.isSoloed);
+            if (!hasSolo) {
+                audioEngine.setMute(i, track.isMuted);
+            }
             const projectId = state.currentProject?.id;
             if (projectId) {
                 db.tracks.where({ projectId, order: i }).first().then(t => {

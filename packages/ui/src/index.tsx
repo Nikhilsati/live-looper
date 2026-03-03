@@ -26,15 +26,27 @@ export const Button = ({
     className = '',
     ...props
 }: React.PropsWithChildren<ButtonProps>) => {
-    // Map custom variants to Oat or keep them if specific
-    const finalVariant = variant?.startsWith('active-') ? variant : variant;
-
     return (
-        <button className={`${finalVariant || ''} ${size === 'sm' ? 'small' : ''} ${className}`} {...props}>
+        <button className={`${variant || ''} ${size === 'sm' ? 'small' : ''} ${className}`} {...props}>
             {children}
         </button>
     );
 };
+
+/**
+ * ButtonGroup — wraps two or more Button elements into a joined segmented control.
+ * Inner borders are flattened; only the outermost corners remain rounded.
+ * Usage:
+ *   <ButtonGroup>
+ *     <Button variant="active-warning">M</Button>
+ *     <Button variant="outline">S</Button>
+ *   </ButtonGroup>
+ */
+export const ButtonGroup = ({ children, style, className = '' }: BaseProps) => (
+    <div className={`ui-btn-group ${className}`} style={style}>
+        {children}
+    </div>
+);
 
 
 export const Switch = ({ checked, onChange, label }: { checked: boolean, onChange: (v: boolean) => void, label?: string }) => (

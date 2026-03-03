@@ -21,6 +21,10 @@ class AudioEngine {
     private currentStream: MediaStream | null = null;
     private currentInputNode: MediaStreamAudioSourceNode | null = null;
 
+    /** Shadow of each track's current mute state inside the worklet. Used by applySolo/setMute
+     *  to determine whether a MUTE_TRACK toggle is actually needed. */
+    private _workletMuteState: boolean[] = [false, false, false, false];
+
     // Storage Context
     private currentProjectId: string | null = null;
     private trackIdMap: string[] = []; // index 0-3 -> UUID
@@ -229,6 +233,40 @@ class AudioEngine {
 
     toggleMute(trackId: number) {
         this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId } });
+    }
+
+    /**
+     * Apply solo isolation across all 4 tracks.
+     *
+     * @param soloedIds    Track indices currently soloed. Empty array = no solo active.
+     * @param muteStates   Each track's individual isMuted flag, restored when solo clears.
+     *
+     * effectiveMuted:
+     *   - soloedIds non-empty → track is muted unless its index is in soloedIds
+     *   - soloedIds empty     → track is muted only if its own isMuted flag is true
+     */
+    applySolo(soloedIds: number[], muteStates: boolean[]) {
+        const hasSolo = soloedIds.length > 0;
+        for (let i = 0; i < 4; i++) {
+            const effectiveMuted = hasSolo
+                ? !soloedIds.includes(i)   // solo active: mute unless in solo set
+                : muteStates[i] ?? false;  // no solo: restore individual mute
+
+            const current = this._workletMuteState[i] ?? false;
+            if (effectiveMuted !== current) {
+                this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId: i } });
+                this._workletMuteState[i] = effectiveMuted;
+            }
+        }
+    }
+
+    /** Sync a single track's mute state so _workletMuteState stays accurate. */
+    setMute(trackId: number, muted: boolean) {
+        const current = this._workletMuteState[trackId] ?? false;
+        if (muted !== current) {
+            this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId } });
+            this._workletMuteState[trackId] = muted;
+        }
     }
 
     toggleMetronome() {
@@ -446,6 +484,17 @@ class AudioEngine {
         // Apply FX per track
         tracks.forEach((t: any, i: number) => {
             if (t.fx) this.updateFX(i, t.fx, project.bpm);
+        });
+
+        // Restore persisted mute state — worklet starts all tracks unmuted after
+        // clearAllTracks, so we send MUTE_TRACK for any track that was saved as muted.
+        this._workletMuteState = [false, false, false, false];
+        tracks.forEach((t: any, i: number) => {
+            const shouldBeMuted = t.muted ?? false;
+            if (shouldBeMuted) {
+                this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId: i } });
+                this._workletMuteState[i] = true;
+            }
         });
 
         // Load persisted audio blobs into the engine — skip soft-deleted layers.

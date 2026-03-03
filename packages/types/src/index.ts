@@ -51,6 +51,7 @@ export interface FXState {
 
 export interface TrackState {
     isMuted: boolean;
+    isSoloed: boolean;
     isRecording: boolean;
     isArmed: boolean;    // pending recording at next section boundary
     hasAudio: boolean;    // has audio in current section
