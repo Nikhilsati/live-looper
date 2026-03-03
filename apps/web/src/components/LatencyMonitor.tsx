@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Stack, Row, Label, ValueText, StatusDot, Text, Button, Grid } from '@live-looper/ui';
 import { useLooperStore } from '../store/useLooperStore';
-import { Activity, Zap, RefreshCw, AlertCircle } from 'lucide-react';
+import { PulseIcon, LightningIcon, ArrowsClockwiseIcon, WarningCircleIcon } from '@phosphor-icons/react';
 
 export const LatencyMonitor = () => {
     const {
@@ -29,17 +29,22 @@ export const LatencyMonitor = () => {
 
     return (
         <Card style={{
-            padding: '20px',
-            background: 'rgba(15, 23, 42, 0.7)',
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            padding: '16px 20px',
+            background: 'rgba(0,0,0,0.6)',
             backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            width: '100%'
+            border: '1px solid rgba(255,255,255,0.08)',
+            width: 320,
+            zIndex: 100,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
         }}>
-            <Stack style={{ gap: '16px' }}>
+            <Stack style={{ gap: '14px' }}>
                 <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                     <Row style={{ alignItems: 'center', gap: '8px' }}>
-                        <Activity size={18} className="text-accent" />
-                        <Heading style={{ fontSize: '16px', margin: 0 }}>Engine Performance</Heading>
+                        <PulseIcon size={16} className="text-accent" />
+                        <Heading style={{ fontSize: '14px', margin: 0, letterSpacing: '0.02em' }}>Performance</Heading>
                     </Row>
                     <StatusDot className={isStable ? 'bg-success' : 'bg-warning'} />
                 </Row>
@@ -68,9 +73,9 @@ export const LatencyMonitor = () => {
                             style={{ gap: '8px', fontSize: '11px', height: '32px' }}
                         >
                             {isCalibratingLatency ? (
-                                <RefreshCw size={14} className="animate-spin" />
+                                <ArrowsClockwiseIcon size={14} className="animate-spin" />
                             ) : (
-                                <Zap size={14} />
+                                <LightningIcon size={14} />
                             )}
                             {isCalibratingLatency ? 'CALIBRATING...' : 'CALIBRATE RTL'}
                         </Button>
@@ -114,7 +119,7 @@ export const LatencyMonitor = () => {
                         borderRadius: '8px',
                         border: '1px solid rgba(245, 158, 11, 0.2)'
                     }}>
-                        <AlertCircle size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                        <WarningCircleIcon size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
                         <Text style={{ fontSize: '10px', color: 'var(--warning)', margin: 0, lineHeight: 1.4 }}>
                             <strong>Calibration Required:</strong> Place your microphone near your speaker and hit Calibrate for sample-accurate loops.
                         </Text>

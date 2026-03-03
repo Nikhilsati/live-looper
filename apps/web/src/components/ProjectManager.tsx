@@ -3,7 +3,7 @@ import { useLooperStore } from '../store/useLooperStore';
 import {
     Stack, Row, Card, Button, Heading, Text, Badge,
 } from '@live-looper/ui';
-import { FolderOpen, Plus, Save, Download, Upload, Trash2, X } from 'lucide-react';
+import { FolderOpenIcon, PlusIcon, FloppyDiskIcon, DownloadSimpleIcon, UploadSimpleIcon, TrashIcon, XIcon } from '@phosphor-icons/react';
 
 export const ProjectManager: React.FC = () => {
     const {
@@ -39,7 +39,7 @@ export const ProjectManager: React.FC = () => {
     if (!isOpen) {
         return (
             <Button variant="ghost" onClick={() => setIsOpen(true)}>
-                <FolderOpen size={18} style={{ marginRight: 8 }} />
+                <FolderOpenIcon size={18} style={{ marginRight: 8 }} />
                 {currentProject?.name || 'Projects'}
             </Button>
         );
@@ -64,7 +64,7 @@ export const ProjectManager: React.FC = () => {
                     <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                         <Heading>Project Manager</Heading>
                         <Button variant="ghost" onClick={() => setIsOpen(false)}>
-                            <X size={24} />
+                            <XIcon size={24} />
                         </Button>
                     </Row>
 
@@ -95,12 +95,12 @@ export const ProjectManager: React.FC = () => {
                         <Stack style={{ gap: 20 }}>
                             <Row style={{ gap: 12 }}>
                                 <Button onClick={() => setIsCreating(true)}>
-                                    <Plus size={18} style={{ marginRight: 8 }} />
+                                    <PlusIcon size={18} style={{ marginRight: 8 }} />
                                     New Project
                                 </Button>
                                 <label style={{ cursor: 'pointer' }}>
                                     <div style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontWeight: 500 }}>
-                                        <Upload size={18} style={{ marginRight: 8 }} />
+                                        <UploadSimpleIcon size={18} style={{ marginRight: 8 }} />
                                         Import .llp
                                     </div>
                                     <input type="file" accept=".llp" onChange={handleImport} style={{ display: 'none' }} />
@@ -130,10 +130,10 @@ export const ProjectManager: React.FC = () => {
                                             </div>
                                             <Row style={{ gap: 8 }}>
                                                 <Button variant="ghost" onClick={() => exportProject(p.id)} title="Export .llp">
-                                                    <Download size={18} />
+                                                    <DownloadSimpleIcon size={18} />
                                                 </Button>
                                                 <Button variant="ghost" onClick={() => deleteProject(p.id)} style={{ color: '#ff4444' }}>
-                                                    <Trash2 size={18} />
+                                                    <TrashIcon size={18} />
                                                 </Button>
                                             </Row>
                                         </Row>

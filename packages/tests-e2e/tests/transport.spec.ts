@@ -27,15 +27,13 @@ test.describe('Transport & Playback', () => {
     });
 
     test('should change BPM', async ({ page }) => {
-        // Open BPM controls
-        await page.getByTestId('bpm-button').click();
-
+        // BPM controls are always visible (no toggle needed)
         // Find the +5 button and click it
         const plusFiveBtn = page.getByTestId('bpm-plus-5');
         await expect(plusFiveBtn).toBeVisible();
         await plusFiveBtn.click({ force: true });
 
-        // Check if BPM value updated. Default 100 -> 105.
-        await expect(page.getByTestId('bpm-value')).toHaveText('105', { timeout: 10000 });
+        // Check if BPM value updated via the input. Default 100 -> 105.
+        await expect(page.getByTestId('bpm-input')).toHaveValue('105', { timeout: 10000 });
     });
 });

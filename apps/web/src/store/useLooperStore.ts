@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectRecord } from '@live-looper/types';
+import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectRecord, EngineEvent } from '@live-looper/types';
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 import { modeController } from '@live-looper/mode-controller';
 import { db, projectService, exportService } from '@live-looper/storage';
@@ -7,17 +7,23 @@ import { db, projectService, exportService } from '@live-looper/storage';
 interface LooperStore extends EngineState {
     projectList: ProjectRecord[];
     currentProject: ProjectRecord | null;
+    // I/O state
+    availableInputs: MediaDeviceInfo[];
+    availableOutputs: MediaDeviceInfo[];
+    inputDeviceId: string | null;
+    outputDeviceId: string | null;
     // Actions
     fetchProjects: () => Promise<void>;
     createNewProject: (name: string) => Promise<string>;
     loadProject: (id: string) => Promise<void>;
+    loadDemoData: () => Promise<void>;
     closeProject: () => void;
     deleteProject: (id: string) => Promise<void>;
     exportProject: (id: string) => Promise<void>;
     importProject: (file: File) => Promise<void>;
     setMode: (mode: Mode) => Promise<void>;
     setIsPlaying: (v: boolean) => void;
-    updateTick: (bar: number, beat: number, sectionIndex: number, sectionProgress: number) => void;
+    updateTick: (tick: { bar: number, beat: number, sectionIndex: number, sectionProgress: number }) => void;
     setTrackState: (trackId: number, state: Partial<TrackState>) => void;
     setCurrentSection: (index: number) => void;
     setQueuedSection: (index: number | null) => void;
@@ -28,12 +34,20 @@ interface LooperStore extends EngineState {
     calibrateLatency: () => void;
     setCompensation: (samples: number) => void;
     setLastHitOffset: (ms: number) => void;
-    handleEngineEvent: (event: any) => void;
+    handleEngineEvent: (event: EngineEvent) => void;
+    deleteLayer: (layerId: string) => Promise<void>;
+    toggleTrackRecording: (trackId: number) => void;
+    togglePlayback: () => Promise<void>;
+    // I/O Actions
+    refreshDevices: () => Promise<void>;
+    setInputDevice: (deviceId: string) => Promise<void>;
+    setOutputDevice: (deviceId: string) => Promise<void>;
 }
 
 const defaultTrack = (): TrackState => ({
     isMuted: false,
     isRecording: false,
+    isArmed: false,
     hasAudio: false,
     layerCount: 0,
     waveformData: [],
@@ -65,6 +79,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     lastHitOffset: 0,
     projectList: [],
     currentProject: null,
+    // I/O state
+    availableInputs: [],
+    availableOutputs: [],
+    inputDeviceId: null,
+    outputDeviceId: null,
 
     fetchProjects: async () => {
         const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
@@ -87,6 +106,20 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         await audioEngine.loadProject(id);
         const project = await db.projects.get(id);
         set({ currentProject: project || null });
+    },
+
+    loadDemoData: async () => {
+        set({
+            tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+            isPlaying: false
+        });
+        await audioEngine.loadDemoData();
+        // audioEngine.loadDemoData creates a new project and calls loadProject
+        // internally, which emits PROJECT_LOADED. We still need to sync
+        // currentProject and the project list in the store.
+        const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
+        const lastProject = projects[0] ?? null;
+        set({ projectList: projects, currentProject: lastProject });
     },
 
     closeProject: () => {
@@ -142,6 +175,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
             return;
         }
         set({ bpm });
+        // Persist the new BPM to IndexedDB so it survives a page reload.
+        const projectId = get().currentProject?.id;
+        if (projectId) {
+            db.projects.update(projectId, { bpm });
+        }
     },
 
     setSections: (sections) => {
@@ -159,12 +197,13 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         set({ queuedSectionIndex: index });
     },
 
-    updateTick: (bar, beat, sectionIndex, sectionProgress) =>
+    updateTick: ({ bar, beat, sectionIndex, sectionProgress }) =>
         set({ currentBar: bar, currentBeat: beat, currentSectionIndex: sectionIndex, sectionProgress }),
 
     setTrackState: (trackId, state) => {
         const action = state.isRecording ? 'record' : state.hasAudio === false ? 'clear-track' : 'modify-track';
-        if (!modeController.isActionAllowed(action)) return;
+        // Allow isArmed to be set without mode check? Or maybe it's fine.
+        if (state.isRecording !== undefined && !modeController.isActionAllowed(action)) return;
 
         set(prev => {
             const newTracks = [...prev.tracks];
@@ -200,16 +239,29 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
     setLastHitOffset: (ms) => set({ lastHitOffset: ms }),
 
-    handleEngineEvent: (event) => {
+    deleteLayer: async (layerId) => {
+        const { currentProject, loadProject } = get();
+        if (!currentProject?.id) return;
+        await projectService.deleteLayer(layerId);
+        await loadProject(currentProject.id);
+    },
+
+    handleEngineEvent: (event: EngineEvent) => {
         const { setTrackState, updateTick, setCurrentSection } = get();
         switch (event.type) {
             case 'TICK':
-                updateTick(event.bar, event.beat, event.sectionIndex ?? 0, event.sectionProgress ?? 0);
+                updateTick({
+                    bar: event.currentBar,
+                    beat: event.currentBeat,
+                    sectionIndex: event.sectionIndex ?? 0,
+                    sectionProgress: event.sectionProgress ?? 0
+                });
                 set({ jitter: event.jitter || 0 });
                 break;
             case 'RECORD_STOP':
                 setTrackState(event.trackId, {
                     isRecording: false,
+                    isArmed: false,
                     hasAudio: true,
                     waveformData: event.waveformData ?? [],
                     layerCount: event.layerCount ?? 1,
@@ -233,23 +285,98 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 set({ isCalibratingLatency: false });
                 alert('Latency Calibration Timed Out. Ensure Output is looped to Input.');
                 break;
-            case 'PROJECT_LOADED':
+            case 'PROJECT_LOADED': {
+                const { project, tracks, sections, layerCounts, waveformDataMap } = event.payload;
                 set({
-                    bpm: event.payload.project.bpm,
-                    sections: event.payload.sections,
-                    tracks: event.payload.tracks.map((t: any, i: number) => {
-                        const count = event.payload.layerCounts?.[i] || 0;
+                    bpm: project.bpm,
+                    sections,
+                    currentProject: project,
+                    tracks: tracks.map((t: any, i: number) => {
+                        const count = layerCounts?.[i] || 0;
                         return {
                             ...defaultTrack(),
                             isMuted: t.muted,
                             fx: t.fx || defaultTrack().fx,
                             hasAudio: count > 0,
-                            layerCount: count
+                            layerCount: count,
+                            // Include waveform data computed on load — bypasses the
+                            // setTrackState mode-gate so previews always appear.
+                            waveformData: waveformDataMap?.[i] ?? [],
                         };
                     })
                 });
                 break;
+            }
         }
+    },
+
+    toggleTrackRecording: (trackId) => {
+        const { isPlaying, sections, currentSectionIndex, sectionProgress, bpm, setLastHitOffset, tracks, setTrackState } = get();
+        const track = tracks[trackId];
+        if (!track) return;
+
+        if (isPlaying && !track.isRecording) {
+            const currentSection = sections[currentSectionIndex];
+            if (currentSection) {
+                const sectionLengthMs = (60 / bpm) * 4 * currentSection.lengthInBars * 1000;
+                let offset = 0;
+                if (sectionProgress > 0.5) {
+                    offset = (sectionProgress - 1.0) * sectionLengthMs;
+                } else {
+                    offset = sectionProgress * sectionLengthMs;
+                }
+                setLastHitOffset(offset);
+
+                setTrackState(trackId, { isArmed: true });
+                // Fallback: auto-clear after 1.5× section length
+                setTimeout(() => {
+                    const currentTrack = get().tracks[trackId];
+                    if (currentTrack?.isArmed) {
+                        setTrackState(trackId, { isArmed: false });
+                    }
+                }, sectionLengthMs * 1.5);
+            }
+        } else if (track.isRecording) {
+            setTrackState(trackId, { isArmed: false });
+        }
+
+        audioEngine.armTrack(trackId);
+        setTrackState(trackId, { isRecording: !track.isRecording });
+    },
+
+    togglePlayback: async () => {
+        const { isPlaying, setIsPlaying, sections, bpm } = get();
+        if (isPlaying) {
+            audioEngine.stop();
+            setIsPlaying(false);
+        } else {
+            await audioEngine.init(sections, bpm);
+            audioEngine.start();
+            setIsPlaying(true);
+        }
+    },
+
+    refreshDevices: async () => {
+        const { inputs, outputs } = await audioEngine.enumerateDevices();
+        set({ availableInputs: inputs, availableOutputs: outputs });
+
+        // Subscribe to hardware changes once
+        if (!navigator.mediaDevices.ondevicechange) {
+            navigator.mediaDevices.ondevicechange = async () => {
+                const updated = await audioEngine.enumerateDevices();
+                set({ availableInputs: updated.inputs, availableOutputs: updated.outputs });
+            };
+        }
+    },
+
+    setInputDevice: async (deviceId: string) => {
+        await audioEngine.setInputDevice(deviceId);
+        set({ inputDeviceId: deviceId });
+    },
+
+    setOutputDevice: async (deviceId: string) => {
+        await audioEngine.setOutputDevice(deviceId);
+        set({ outputDeviceId: deviceId });
     },
 }));
 
@@ -270,6 +397,21 @@ useLooperStore.subscribe((state, prevState) => {
     // Sync BPM
     if (state.bpm !== prevState.bpm) {
         audioEngine.setBpm(state.bpm);
+    }
+
+    // Sync Section config (lengthInBars, name) to DB
+    if (state.sections !== prevState.sections) {
+        const projectId = state.currentProject?.id;
+        if (projectId) {
+            state.sections.forEach((section, i) => {
+                const prev = prevState.sections[i];
+                if (section.lengthInBars !== prev?.lengthInBars || section.name !== prev?.name) {
+                    db.sections.where({ projectId, order: i }).first().then(s => {
+                        if (s) db.sections.update(s.id, { lengthInBars: section.lengthInBars, name: section.name });
+                    });
+                }
+            });
+        }
     }
 
     // Sync Track FX

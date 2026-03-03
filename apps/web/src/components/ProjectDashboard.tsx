@@ -3,7 +3,7 @@ import { useLooperStore } from '../store/useLooperStore';
 import {
     Stack, Row, Card, Button, Heading, Text, Grid
 } from '@live-looper/ui';
-import { Plus, Download, Upload, Trash2, Music, Clock, FileJson } from 'lucide-react';
+import { PlusIcon, DownloadSimpleIcon, UploadSimpleIcon, TrashIcon, MusicNoteIcon, ClockIcon, VinylRecordIcon } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 
 export const ProjectDashboard: React.FC = () => {
@@ -65,7 +65,7 @@ export const ProjectDashboard: React.FC = () => {
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 transition: 'all 0.2s'
                             }}>
-                                <Upload size={20} style={{ marginRight: 10 }} />
+                                <UploadSimpleIcon size={20} style={{ marginRight: 10 }} />
                                 Import .llp
                             </div>
                             <input type="file" accept=".llp" onChange={handleImport} style={{ display: 'none' }} />
@@ -75,7 +75,7 @@ export const ProjectDashboard: React.FC = () => {
                             style={{ height: 50, padding: '0 24px', borderRadius: 12 }}
                             onClick={() => setIsCreating(true)}
                         >
-                            <Plus size={20} style={{ marginRight: 10 }} />
+                            <PlusIcon size={20} style={{ marginRight: 10 }} />
                             Create Project
                         </Button>
                     </Row>
@@ -120,7 +120,7 @@ export const ProjectDashboard: React.FC = () => {
                 <Grid cols="repeat(auto-fill, minmax(340px, 1fr))" style={{ gap: 24 }}>
                     {projectList.length === 0 && (
                         <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px 0', opacity: 0.3 }}>
-                            <Music size={64} style={{ marginBottom: 20 }} />
+                            <MusicNoteIcon size={64} style={{ marginBottom: 20 }} />
                             <Text>No projects found. Start by creating one above.</Text>
                         </div>
                     )}
@@ -146,7 +146,7 @@ export const ProjectDashboard: React.FC = () => {
                                         backgroundColor: 'var(--accent)',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
-                                        <FileJson size={24} color="white" />
+                                        <VinylRecordIcon size={24} color="white" />
                                     </div>
                                     <div style={{ display: 'flex', gap: 8 }} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                         <Button
@@ -155,7 +155,7 @@ export const ProjectDashboard: React.FC = () => {
                                             onClick={() => exportProject(p.id)}
                                             style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
                                         >
-                                            <Download size={18} />
+                                            <DownloadSimpleIcon size={18} />
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -163,7 +163,7 @@ export const ProjectDashboard: React.FC = () => {
                                             onClick={() => { if (confirm('Delete project?')) deleteProject(p.id); }}
                                             style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
                                         >
-                                            <Trash2 size={18} />
+                                            <TrashIcon size={18} />
                                         </Button>
                                     </div>
                                 </div>
@@ -172,7 +172,7 @@ export const ProjectDashboard: React.FC = () => {
                                     <Heading style={{ fontSize: 24, margin: 0 }}>{p.name}</Heading>
                                     <Row style={{ gap: 12, alignItems: 'center', opacity: 0.5 }}>
                                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                            <Clock size={14} />
+                                            <ClockIcon size={14} />
                                             <Text style={{ fontSize: 13 }}>{new Date(p.updatedAt).toLocaleDateString()}</Text>
                                         </div>
                                         <Text style={{ fontSize: 13 }}>•</Text>

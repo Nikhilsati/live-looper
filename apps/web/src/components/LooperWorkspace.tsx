@@ -3,17 +3,23 @@ import { useLooperStore } from '../store/useLooperStore';
 import {
     Stack, Row, Heading, Text, Button, StatusDot
 } from '@live-looper/ui';
-import { DebugControls, TrackControls } from './TrackControls';
+import { TrackControls, HeaderIndications, GlobalActionBar } from './TrackControls';
 import { LatencyMonitor } from './LatencyMonitor';
+import { KeyboardCheatSheet } from './KeyboardCheatSheet';
+import { DevInspector } from './DevInspector';
 import { ModeSwitcher } from './ModeSwitcher';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeftIcon } from '@phosphor-icons/react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 export const LooperWorkspace: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { currentProject, mode, closeProject, loadProject } = useLooperStore();
+
+    // Initialize keyboard shortcuts
+    useKeyboardShortcuts();
 
     useEffect(() => {
         if (id && currentProject?.id !== id) {
@@ -27,30 +33,38 @@ export const LooperWorkspace: React.FC = () => {
     };
 
     const isLive = mode === 'live';
+    const isPractice = mode === 'practice';
 
     return (
         <Stack style={{
             width: '100%',
             maxWidth: 1400,
             margin: '0 auto',
-            padding: '24px',
-            paddingBottom: 100
+            padding: isLive ? '16px' : '24px',
+            paddingBottom: 120,
+            transition: 'padding 0.3s ease'
         }}>
-            {/* Header / Top Bar */}
+            {/* Header / Top Bar — always visible */}
             <Row style={{
                 width: '100%',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: 32,
+                marginBottom: isLive ? 20 : 32,
+                transition: 'margin 0.3s ease'
             }}>
-                <Row style={{ gap: 20, alignItems: 'center' }}>
-                    <Button variant="ghost" onClick={handleBack} style={{ padding: 8 }}>
-                        <ArrowLeft size={24} />
-                    </Button>
+                <Row style={{ gap: 20, alignItems: 'center', flex: 1 }}>
+                    {/* Hide back button in Live mode — no accidental navigation */}
+                    {!isLive && (
+                        <Button variant="ghost" onClick={handleBack} style={{ padding: 8 }}>
+                            <ArrowLeftIcon size={24} />
+                        </Button>
+                    )}
                     <Stack style={{ gap: 0 }}>
-                        <Heading style={{ fontSize: 28 }}>{currentProject?.name || 'Live Looper'}</Heading>
-                        <Text style={{ opacity: 0.5, fontSize: 14 }}>Session started</Text>
+                        <Heading style={{ fontSize: isLive ? 22 : 28 }}>{currentProject?.name || 'Live Looper'}</Heading>
+                        {!isLive && <Text style={{ opacity: 0.5, fontSize: 14 }}>Session started</Text>}
                     </Stack>
+                    <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
+                    <HeaderIndications />
                 </Row>
 
                 <Row style={{ gap: 24, alignItems: 'center' }}>
@@ -60,13 +74,21 @@ export const LooperWorkspace: React.FC = () => {
             </Row>
 
             {/* Main Content Area */}
-            <Stack style={{ gap: 32 }}>
-                {!isLive && <DebugControls />}
-
+            <Stack style={{ gap: isLive ? 20 : 32, transition: 'gap 0.3s ease' }}>
+                {/* Track Pads — always visible, same grid layout across all modes */}
                 <TrackControls />
 
-                {!isLive && <LatencyMonitor />}
+                {/* Dev Inspector — Planning only, toggled */}
+                <DevInspector />
             </Stack>
+
+            {/* Sticky Performance Widget — Planning only */}
+            {!isLive && !isPractice && (
+                <LatencyMonitor />
+            )}
+
+            {/* Global Action Bar — fixed at bottom */}
+            <GlobalActionBar />
         </Stack>
     );
 };

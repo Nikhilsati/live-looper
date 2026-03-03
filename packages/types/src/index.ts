@@ -1,12 +1,5 @@
 /// <reference path="./oat.d.ts" />
-export interface SongConfig {
-    songId: string;
-    name: string;
-    bpm: number;
-    timeSignature: '4/4';
-    key: string;
-    sections: SectionConfig[];
-}
+
 
 export interface SectionConfig {
     index: number;
@@ -59,6 +52,7 @@ export interface FXState {
 export interface TrackState {
     isMuted: boolean;
     isRecording: boolean;
+    isArmed: boolean;    // pending recording at next section boundary
     hasAudio: boolean;    // has audio in current section
     layerCount: number;
     waveformData: number[];
@@ -128,6 +122,7 @@ export interface SectionRecord {
     name: string;
     order: number;
     lengthSamples: number;
+    lengthInBars?: number; // Preferred source of truth; lengthSamples is a fallback
 }
 
 export interface LayerRecord {
@@ -138,6 +133,8 @@ export interface LayerRecord {
     audioBlobId: string;
     gain: number;
     order: number;
+    /** Timestamp (ms) when this layer was soft-deleted (undo). Null/undefined = active. */
+    deletedAt?: number | null;
 }
 
 export interface AudioBlobRecord {
@@ -148,3 +145,50 @@ export interface AudioBlobRecord {
     channels: number;
     lengthSamples: number;
 }
+
+export type ConfigPayload = {
+    sampleRate: number;
+    bpm: number;
+    sections: SectionConfig[];
+    latencySamples: number;
+};
+
+export type WorkletMessage =
+    | { type: 'CONFIG'; payload: ConfigPayload }
+    | { type: 'START' }
+    | { type: 'STOP' }
+    | { type: 'RTL_TEST' }
+    | { type: 'SET_LATENCY'; payload: Pick<ConfigPayload, 'latencySamples'> }
+    | { type: 'ARM_TRACK'; payload: { trackId: number } }
+    | { type: 'MUTE_TRACK'; payload: { trackId: number } }
+    | { type: 'MUTE_METRONOME' }
+    | { type: 'UNDO_LAYER'; payload: { trackId: number } }
+    | { type: 'CLEAR_TRACK'; payload: { trackId: number } }
+    | { type: 'CLEAR_ALL_TRACKS' }
+    | { type: 'QUEUE_SECTION'; payload: { sectionIndex: number } }
+    | { type: 'SET_BPM'; payload: Pick<ConfigPayload, 'bpm'> }
+    | { type: 'SET_BUFFER'; payload: { trackId: number; sectionIndex: number; buffer: Float32Array } }
+    | { type: 'SET_MODE'; payload: { mode: Mode } }
+    | { type: 'ENTER_LIVE_MODE'; payload: { snapshot: FrozenProjectSnapshot } };
+
+export type WorkletEvent =
+    | ({ type: 'TICK' } & Pick<EngineState, 'currentBar' | 'currentBeat' | 'sectionProgress' | 'jitter'> & { sectionIndex: number })
+    | { type: 'RECORD_STOP'; trackId: number; sectionIndex: number; buffer: Float32Array; waveformData: number[]; layerCount: number }
+    | { type: 'TRACK_CLEARED'; trackId: number }
+    | { type: 'SECTION_CHANGE'; sectionIndex: number }
+    | { type: 'RTL_MEASURED'; samples: number }
+    | { type: 'RTL_TIMEOUT' }
+    | { type: 'UNDO_LAYER'; trackId: number; sectionIndex?: number };
+
+export type EngineEvent =
+    | WorkletEvent
+    | {
+        type: 'PROJECT_LOADED';
+        payload: {
+            project: ProjectRecord;
+            tracks: TrackRecord[];
+            sections: SectionConfig[];
+            layerCounts: Record<number, number>;
+            waveformDataMap: Record<number, number[]>;
+        };
+    };

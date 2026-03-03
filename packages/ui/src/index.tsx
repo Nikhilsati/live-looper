@@ -109,43 +109,110 @@ export const Grid = ({ children, className = '', style, cols, ...props }: BasePr
     </div>
 );
 
-export const Waveform = ({ data, progress, className = '', height = 36 }: { data: number[], progress: number, className?: string, height?: number }) => {
+export const Modal = ({ children, onClose, className = '', style, ...props }: BaseProps & { onClose: () => void }) => (
+    <div
+        className={`ui-modal-overlay ${className}`}
+        style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2000,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...style
+        }}
+        onClick={onClose}
+        {...props}
+    >
+        <div onClick={(e) => e.stopPropagation()}>
+            {children}
+        </div>
+    </div>
+);
+
+export const Waveform = ({
+    data,
+    progress,
+    className = '',
+    height = 36,
+    bars = 0,
+    beatsPerBar = 4,
+    variant = 'default'
+}: {
+    data: number[],
+    progress: number,
+    className?: string,
+    height?: number,
+    bars?: number,
+    beatsPerBar?: number,
+    variant?: 'default' | 'minimal'
+}) => {
     if (!data.length) return null;
     const max = Math.max(...data, 0.01);
     const activeIdx = Math.floor(progress * data.length);
+    const isMinimal = variant === 'minimal';
 
     return (
         <div
             className={`ui-waveform ${className}`}
             style={{
                 height,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                background: 'rgba(0,0,0,0.2)',
+                background: isMinimal ? 'transparent' : 'rgba(0,0,0,0.2)',
                 borderRadius: 8,
-                padding: '0 8px',
-                marginTop: 10,
-                overflow: 'hidden'
+                marginTop: isMinimal ? 0 : 10,
+                padding: isMinimal ? 0 : '0 8px',
+                overflow: 'hidden',
+                opacity: isMinimal ? 0.3 : 1
             }}
         >
-            {data.map((v, i) => {
-                const h = (v / max) * 100;
-                const isActive = i === activeIdx;
-                return (
+            <div
+                style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: isMinimal ? 1 : 1.5,
+                }}
+            >
+                {/* Grid lines - only show in default mode */}
+                {!isMinimal && bars > 0 && Array.from({ length: bars * beatsPerBar }).map((_, i) => (
                     <div
-                        key={i}
+                        key={`grid-${i}`}
                         style={{
-                            flex: 1,
-                            height: `${Math.max(6, h)}%`,
-                            background: isActive ? 'var(--primary-light, #a78bfa)' : (i < activeIdx ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'),
-                            borderRadius: i % 2 === 0 ? '1px 1px 0 0' : '0 0 1px 1px',
-                            transition: 'height 0.2s ease, background 0.1s',
-                            opacity: i < activeIdx ? 0.8 : 1
+                            position: 'absolute',
+                            left: `${(i / (bars * beatsPerBar)) * 100}%`,
+                            top: 0,
+                            bottom: 0,
+                            width: 1,
+                            background: i % beatsPerBar === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+                            zIndex: 0,
+                            pointerEvents: 'none'
                         }}
                     />
-                );
-            })}
+                ))}
+
+                {data.map((v, i) => {
+                    const h = (v / max) * 100;
+                    const isActive = i === activeIdx;
+                    return (
+                        <div
+                            key={i}
+                            style={{
+                                flex: 1,
+                                height: `${Math.max(isMinimal ? 4 : 6, h)}%`,
+                                background: isActive ? 'var(--primary-light, #a78bfa)' : (i < activeIdx ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'),
+                                borderRadius: i % 2 === 0 ? '1px 1px 0 0' : '0 0 1px 1px',
+                                transition: 'height 0.2s ease, background 100ms',
+                                opacity: i < activeIdx ? 0.8 : 1,
+                                zIndex: 1
+                            }}
+                        />
+                    );
+                })}
+            </div>
         </div>
     );
 };

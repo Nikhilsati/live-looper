@@ -1,54 +1,116 @@
-import { Play, Square, Music2, Mic, Volume2, VolumeX, Undo2, Trash2, ChevronRight, Sliders } from 'lucide-react';
-import { useState } from 'react';
+import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, SpeakerSlashIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon } from '@phosphor-icons/react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
-import { Card, Button, Label, ValueText, Badge, Slider, Row, Grid, Heading, Stack, Waveform } from '@live-looper/ui';
+import { Card, Stack, Row, Button, Label, ValueText, Badge, Heading, Grid, Switch, Waveform, Modal } from '@live-looper/ui';
 import { TrackFX } from './TrackFX';
 
 const ICON_SIZE = 22;
+const MAX_LAYER_INDICATOR_BARS = 4;
+const ERASE_HOLD_MS = 600;
 
-// ─── Layer Dots ────────────────────────────────────────────────────────────────
-const LayerDots = ({ count }: { count: number }) => {
+// ─── Per-Track Color Palette ──────────────────────────────────────────────────
+// Each track gets a distinct hue so your eyes can find it in < 100ms.
+const TRACK_COLORS = [
+    // Track 0 — Violet (purple)
+    {
+        idle: 'rgba(124, 58, 237, 0.10)',
+        haudio: 'rgba(124, 58, 237, 0.15)',
+        border: '#7c3aed',
+        borderHasAudio: '#a78bfa',
+        glow: 'glow-violet',
+        accent: '#a78bfa',
+        progressFill: 'rgba(167, 139, 250, 0.08)',
+    },
+    // Track 1 — Cyan (teal)
+    {
+        idle: 'rgba(8, 145, 178, 0.10)',
+        haudio: 'rgba(8, 145, 178, 0.15)',
+        border: '#0891b2',
+        borderHasAudio: '#22d3ee',
+        glow: 'glow-cyan',
+        accent: '#22d3ee',
+        progressFill: 'rgba(34, 211, 238, 0.08)',
+    },
+    // Track 2 — Amber (warm)
+    {
+        idle: 'rgba(217, 119, 6, 0.10)',
+        haudio: 'rgba(217, 119, 6, 0.15)',
+        border: '#d97706',
+        borderHasAudio: '#fbbf24',
+        glow: 'glow-amber',
+        accent: '#fbbf24',
+        progressFill: 'rgba(251, 191, 36, 0.08)',
+    },
+    // Track 3 — Rose (red-pink)
+    {
+        idle: 'rgba(225, 29, 72, 0.10)',
+        haudio: 'rgba(225, 29, 72, 0.15)',
+        border: '#e11d48',
+        borderHasAudio: '#fb7185',
+        glow: 'glow-rose',
+        accent: '#fb7185',
+        progressFill: 'rgba(251, 113, 133, 0.08)',
+    },
+] as const;
+
+// ─── Layer Indicator ──────────────────────────────────────────────────────────
+const LayerIndicator = ({ count, accent }: { count: number; accent: string }) => {
     if (count === 0) return null;
     return (
-        <div style={{ display: 'flex', gap: 4 }}>
-            {Array.from({ length: Math.min(count, 6) }).map((_, i) => (
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column-reverse',
+            gap: 3,
+            alignItems: 'center',
+            padding: '5px 3px',
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: 4,
+            border: '1px solid rgba(255,255,255,0.06)',
+            pointerEvents: 'none',
+            marginLeft: 4,
+            transition: 'all 0.2s ease'
+        }}>
+            {Array.from({ length: MAX_LAYER_INDICATOR_BARS }).map((_, i) => (
                 <div key={i} style={{
-                    width: 5, height: 5, borderRadius: '50%',
-                    background: i === count - 1 ? '#a78bfa' : 'rgba(255,255,255,0.25)',
+                    width: 7,
+                    height: 2.5,
+                    borderRadius: 1,
+                    background: i <= count - 1 ? accent : 'rgba(255,255,255,0.12)',
+                    boxShadow: i <= count - 1 ? `0 0 8px ${accent}80` : 'none',
+                    transition: 'all 0.2s ease'
                 }} />
             ))}
-            {count > 6 && <span style={{ fontSize: 9, color: '#666' }}>+{count - 6}</span>}
+            {MAX_LAYER_INDICATOR_BARS > 8 && <span style={{ fontSize: 9, color: accent, fontWeight: 900, marginTop: -2 }}>+</span>}
         </div>
     );
 };
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
 const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: number) => void }) => {
-    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, setLastHitOffset, mode } = useLooperStore();
+    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, mode, toggleTrackRecording } = useLooperStore();
     const track = tracks[trackId];
     const isLive = mode === 'live';
     const [showHit, setShowHit] = useState(false);
+    const [eraseProgress, setEraseProgress] = useState(0); // 0–1 for hold progress
+    const eraseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const eraseAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const palette = TRACK_COLORS[trackId] ?? TRACK_COLORS[0];
+
+    const prevIsArmed = useRef(track.isArmed);
+
+    useEffect(() => {
+        if (track.isArmed && !prevIsArmed.current) {
+            setShowHit(true);
+            const timer = setTimeout(() => setShowHit(false), 2000);
+            return () => clearTimeout(timer);
+        }
+        prevIsArmed.current = track.isArmed;
+    }, [track.isArmed]);
 
     const handleArm = () => {
-        if (isPlaying && !track.isRecording) {
-            const currentSection = sections[currentSectionIndex];
-            if (currentSection) {
-                const sectionLengthMs = (60 / bpm) * 4 * currentSection.lengthInBars * 1000;
-                // Calculate offset from quantization boundary
-                let offset = 0;
-                if (sectionProgress > 0.5) {
-                    offset = (sectionProgress - 1.0) * sectionLengthMs; // Early (-)
-                } else {
-                    offset = sectionProgress * sectionLengthMs; // Late (+)
-                }
-                setLastHitOffset(offset);
-                setShowHit(true);
-                setTimeout(() => setShowHit(false), 2000);
-            }
-        }
-        audioEngine.armTrack(trackId);
-        useLooperStore.getState().setTrackState(trackId, { isRecording: !track.isRecording });
+        toggleTrackRecording(trackId);
     };
     const handleMute = () => {
         audioEngine.toggleMute(trackId);
@@ -64,22 +126,74 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
         useLooperStore.getState().setTrackState(trackId, { isRecording: false, hasAudio: false, waveformData: [], layerCount: 0 });
     };
 
-    const isOverdubbing = track.isRecording && track.hasAudio;
-    const padColor = track.isRecording
-        ? (isOverdubbing ? '#7c3aed' : '#dc2626')
-        : track.hasAudio ? '#16a34a' : 'rgba(255,255,255,0.06)';
+    // Long-press erase logic (Live mode)
+    const startEraseHold = useCallback(() => {
+        if (!track.hasAudio && !track.isRecording) return;
+        const start = Date.now();
+        setEraseProgress(0);
+        eraseAnimRef.current = setInterval(() => {
+            const elapsed = Date.now() - start;
+            setEraseProgress(Math.min(1, elapsed / ERASE_HOLD_MS));
+        }, 16);
+        eraseTimerRef.current = setTimeout(() => {
+            cancelEraseHold();
+            handleClear();
+        }, ERASE_HOLD_MS);
+    }, [track.hasAudio, track.isRecording]);
 
-    const padBorder = track.isRecording
-        ? `2px solid ${isOverdubbing ? '#a78bfa' : '#f87171'}`
-        : track.hasAudio ? '2px solid #4ade80' : '1px solid rgba(255,255,255,0.05)';
+    const cancelEraseHold = useCallback(() => {
+        if (eraseTimerRef.current) { clearTimeout(eraseTimerRef.current); eraseTimerRef.current = null; }
+        if (eraseAnimRef.current) { clearInterval(eraseAnimRef.current); eraseAnimRef.current = null; }
+        setEraseProgress(0);
+    }, []);
 
-    const statusLabel = track.isRecording
-        ? (isOverdubbing ? 'OVERDUB' : 'REC')
-        : track.hasAudio ? 'LOOP' : 'EMPTY';
+    useEffect(() => () => cancelEraseHold(), []);
 
-    const statusColor = track.isRecording
-        ? (isOverdubbing ? '#f87171' : '#f87171')
-        : track.hasAudio ? '#4ade80' : '#374151';
+    // --- Visual state derivation ---
+    const beatDuration = 60 / bpm;
+    const animationStyle = { animationDuration: `${beatDuration}s` };
+
+    const isOverdubbing = !track.isArmed && track.isRecording && track.hasAudio;
+    const isRecording = !track.isArmed && track.isRecording && !track.hasAudio;
+
+    // Pad colour — uses per-track palette for idle/hasAudio states
+    const padColor = track.isArmed
+        ? 'rgba(124,58,237,0.12)'
+        : isOverdubbing
+            ? '#4c1d95'
+            : isRecording
+                ? '#7f1d1d'
+                : track.hasAudio ? palette.haudio : palette.idle;
+
+    const padBorderColor = track.isArmed
+        ? '#a78bfa'
+        : isOverdubbing
+            ? '#7c3aed'
+            : isRecording
+                ? '#ef4444'
+                : track.hasAudio ? palette.borderHasAudio : palette.border;
+
+    const padBorderWidth = (track.isArmed || track.isRecording || track.hasAudio) ? 2 : 1;
+
+    let padGlowClass = '';
+    if (track.isArmed) padGlowClass = 'glow-purple';
+    else if (isOverdubbing) padGlowClass = 'glow-purple';
+    else if (isRecording) padGlowClass = 'glow-red';
+    else if (track.hasAudio) padGlowClass = palette.glow;
+
+    const statusLabel = track.isArmed ? '◌ ARMED'
+        : isOverdubbing ? '◎ OD'
+            : isRecording ? '● REC'
+                : track.hasAudio ? '▶ LOOP'
+                    : '○ EMPTY';
+
+    const statusColor = track.isArmed ? '#c4b5fd'
+        : isOverdubbing ? '#c4b5fd'
+            : isRecording ? '#fca5a5'
+                : track.hasAudio ? palette.accent
+                    : '#374151';
+
+    const eraseDisabled = !track.hasAudio && !track.isRecording;
 
     return (
         <Card style={{
@@ -87,12 +201,20 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
             flexDirection: 'column',
             gap: 12,
             minWidth: 0,
-            padding: '20px 16px',
+            padding: isLive ? '24px 20px' : '20px 16px',
             flex: 1,
-            position: 'relative'
+            position: 'relative',
+            background: isLive ? 'rgba(0,0,0,0.4)' : undefined,
+            border: isLive ? `1px solid ${palette.border}30` : undefined,
         }}>
+            {/* Header row */}
             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Label style={{ fontSize: 14, fontWeight: 700 }}>TRACK {trackId + 1}</Label>
+                <Label style={{
+                    fontSize: isLive ? 18 : 14,
+                    fontWeight: 800,
+                    letterSpacing: isLive ? '0.05em' : 'normal',
+                    color: palette.accent,
+                }}>TRACK {trackId + 1}</Label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {showHit && isPlaying && (
                         <div style={{
@@ -119,39 +241,131 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                             onClick={() => onOpenFX(trackId)}
                             style={{ padding: '4px', opacity: 0.6 }}
                         >
-                            <Sliders size={16} />
+                            <SlidersIcon size={16} />
                         </Button>
                     )}
-                    <LayerDots count={track.layerCount} />
-                    <ValueText color={statusColor} style={{ fontSize: 11, fontWeight: 800 }}>{statusLabel}</ValueText>
+
+                    {/* Erase button: top-right in Live mode, separated + hold-to-fire */}
+                    {isLive && (
+                        <div style={{ position: 'relative' }}>
+                            {/* Hold-progress ring */}
+                            {eraseProgress > 0 && (
+                                <svg
+                                    width={32} height={32}
+                                    style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)', pointerEvents: 'none', zIndex: 2 }}
+                                >
+                                    <circle cx={16} cy={16} r={14} fill="none" stroke="rgba(239,68,68,0.3)" strokeWidth={2.5} />
+                                    <circle
+                                        cx={16} cy={16} r={14} fill="none"
+                                        stroke="#ef4444" strokeWidth={2.5}
+                                        strokeDasharray={`${2 * Math.PI * 14 * eraseProgress} ${2 * Math.PI * 14}`}
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
+                            )}
+                            <Button
+                                size="sm"
+                                disabled={eraseDisabled}
+                                onMouseDown={startEraseHold}
+                                onMouseUp={cancelEraseHold}
+                                onMouseLeave={cancelEraseHold}
+                                onTouchStart={startEraseHold}
+                                onTouchEnd={cancelEraseHold}
+                                style={{
+                                    width: 32, height: 32,
+                                    padding: 0,
+                                    borderRadius: 10,
+                                    opacity: eraseDisabled ? 0.18 : (eraseProgress > 0 ? 0.8 : 0.32),
+                                    background: eraseProgress > 0 ? 'rgba(239,68,68,0.15)' : 'transparent',
+                                    border: '1px solid rgba(239,68,68,0.3)',
+                                    flexShrink: 0,
+                                    transition: 'opacity 0.15s, background 0.15s',
+                                    position: 'relative',
+                                    zIndex: 1,
+                                }}
+                            >
+                                <EraserIcon size={14} weight="bold" />
+                            </Button>
+                        </div>
+                    )}
+
+                    <LayerIndicator count={track.layerCount} accent={palette.accent} />
                 </div>
             </Row>
 
-            {/* Main pad */}
+            {/* Main pad — waveform is overlaid inside as a backdrop */}
             <Button
                 onClick={handleArm}
+                className={padGlowClass}
                 style={{
                     background: padColor,
-                    border: padBorder,
-                    height: 140,
+                    border: `${padBorderWidth}px solid ${padBorderColor}`,
+                    height: isLive ? 220 : 140,
                     width: '100%',
-                    borderRadius: 20,
+                    borderRadius: 24,
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: track.isRecording ? '0 0 20px rgba(220, 38, 38, 0.3)' : 'none',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    gap: 8,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    animationDuration: `${beatDuration}s`
                 }}
             >
-                {track.isRecording
-                    ? <Mic size={48} style={{ animation: 'pulse 0.7s ease-in-out infinite alternate' }} />
-                    : track.hasAudio
-                        ? <Play size={48} />
-                        : <Mic size={44} color="rgba(255,255,255,0.2)" />
-                }
+                {/* Progress Background (Live Mode) */}
+                {isLive && isPlaying && track.hasAudio && (
+                    <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${sectionProgress * 100}%`,
+                        background: palette.progressFill,
+                        pointerEvents: 'none',
+                        zIndex: 0
+                    }} />
+                )}
+
+                {/* Waveform backdrop — always inside pad in Live mode */}
+                {track.hasAudio && (
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none',
+                        opacity: isLive ? 0.45 : 0.25,
+                        zIndex: 0,
+                        padding: isLive ? '0 8px' : '0 12px',
+                    }}>
+                        <Waveform
+                            data={track.waveformData}
+                            progress={sectionProgress}
+                            height={isLive ? 180 : 100}
+                            bars={sections[currentSectionIndex]?.lengthInBars}
+                            variant={isLive ? 'minimal' : undefined}
+                        />
+                    </div>
+                )}
+
+                {/* Icon — on top of waveform */}
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                    {track.isArmed
+                        ? <CircleIcon size={isLive ? 56 : 44} style={{ animation: 'pulse var(--anim-speed) ease-in-out infinite alternate', color: '#a78bfa', ...animationStyle } as any} />
+                        : isOverdubbing
+                            ? <ArrowsClockwiseIcon size={isLive ? 56 : 44} style={{ animation: 'spin var(--anim-speed) linear infinite', ...animationStyle } as any} />
+                            : isRecording
+                                ? <RecordIcon size={isLive ? 56 : 48} style={{ animation: 'pulse var(--anim-speed) ease-in-out infinite alternate', ...animationStyle } as any} />
+                                : track.hasAudio
+                                    ? <PlayIcon size={isLive ? 56 : 48} />
+                                    : <MicrophoneIcon size={isLive ? 52 : 44} color="rgba(255,255,255,0.2)" />
+                    }
+                </div>
             </Button>
 
-            {/* Bottom controls */}
+            {/* Bottom controls — Mute + Undo (Erase moved to header in Live mode) */}
             <Row style={{ gap: 10 }}>
                 <Button
                     onClick={handleMute}
@@ -159,7 +373,7 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                     variant={track.isMuted ? 'warning' : undefined}
                     style={{ flex: 1, height: 60, borderRadius: 16 }}
                 >
-                    {track.isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                    {track.isMuted ? <SpeakerSlashIcon size={24} weight="bold" /> : <SpeakerHighIcon size={24} weight="bold" />}
                 </Button>
                 <Button
                     onClick={handleUndo}
@@ -167,19 +381,25 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                     size="md"
                     style={{ flex: 1, height: 60, borderRadius: 16, opacity: track.layerCount === 0 ? 0.2 : 1 }}
                 >
-                    <Undo2 size={24} />
+                    <ArrowBendUpLeftIcon size={24} weight="bold" />
                 </Button>
-                <Button
-                    onClick={handleClear}
-                    disabled={!track.hasAudio && !track.isRecording}
-                    size="md"
-                    style={{ flex: 0.6, height: 60, borderRadius: 16, opacity: (!track.hasAudio && !track.isRecording) ? 0.2 : 0.6 }}
-                >
-                    <Trash2 size={20} />
-                </Button>
+                {/* Erase in bottom row for non-Live modes only */}
+                {!isLive && (
+                    <Button
+                        onClick={handleClear}
+                        disabled={!track.hasAudio && !track.isRecording}
+                        size="md"
+                        style={{ flex: 0.6, height: 60, borderRadius: 16, opacity: (!track.hasAudio && !track.isRecording) ? 0.2 : 0.6 }}
+                    >
+                        <EraserIcon size={24} weight="bold" />
+                    </Button>
+                )}
             </Row>
 
-            {!isLive && <Waveform data={track.waveformData} progress={sectionProgress} height={40} />}
+            {/* Planning-mode waveform strip — only shown outside Live mode */}
+            {!isLive && !track.hasAudio && (
+                <Waveform data={track.waveformData} progress={sectionProgress} height={40} bars={sections[currentSectionIndex]?.lengthInBars} />
+            )}
         </Card>
     );
 };
@@ -187,21 +407,21 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
 
 // ─── Section Progress Ring ─────────────────────────────────────────────────────
 const ProgressRing = ({ progress, bar, beat }: { progress: number; bar: number; beat: number }) => {
-    const r = 48;
+    const r = 54;
     const circ = 2 * Math.PI * r;
     const dash = circ * progress;
     return (
-        <div style={{ position: 'relative', width: 130, height: 130, flexShrink: 0 }}>
-            <svg width="130" height="130" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="65" cy="65" r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="8" />
+        <div style={{ position: 'relative', width: 160, height: 160, flexShrink: 0 }}>
+            <svg width="160" height="160" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="80" cy="80" r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="9" />
                 <circle
-                    cx="65" cy="65" r={r} fill="none"
-                    stroke="#a78bfa" strokeWidth="8"
+                    cx="80" cy="80" r={r} fill="none"
+                    stroke="#a78bfa" strokeWidth="9"
                     strokeDasharray={`${dash} ${circ}`}
                     strokeLinecap="round"
                     style={{
                         transition: 'stroke-dasharray 0.05s linear',
-                        filter: 'drop-shadow(0 0 8px rgba(167, 139, 250, 0.4))'
+                        filter: 'drop-shadow(0 0 10px rgba(167, 139, 250, 0.5))'
                     }}
                 />
             </svg>
@@ -209,10 +429,10 @@ const ProgressRing = ({ progress, bar, beat }: { progress: number; bar: number; 
                 position: 'absolute', inset: 0,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             }}>
-                <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'monospace', color: 'white', lineHeight: 1 }}>
+                <div style={{ fontSize: 44, fontWeight: 800, fontFamily: 'monospace', color: 'white', lineHeight: 1 }}>
                     {bar}
                 </div>
-                <div style={{ fontSize: 16, color: '#a78bfa', fontWeight: 600, fontFamily: 'monospace', marginTop: -4 }}>
+                <div style={{ fontSize: 18, color: '#a78bfa', fontWeight: 600, fontFamily: 'monospace', marginTop: -4 }}>
                     .{beat}
                 </div>
             </div>
@@ -265,7 +485,7 @@ const SectionNavigator = () => {
                         }}
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {isQueued && <ChevronRight size={16} />}
+                            {isQueued && <CaretRightIcon size={16} />}
                             {sec.name}
                         </div>
                         <span style={{ fontSize: 10, opacity: 0.6 }}>{sec.lengthInBars} BARS</span>
@@ -284,20 +504,298 @@ const MetronomeButton = () => {
         <Button
             onClick={() => { audioEngine.toggleMetronome(); setOn(p => !p); }}
             size="sm"
-            variant={on ? 'accent' : undefined}
+            variant={on ? 'accent' : 'outline'}
             title={on ? 'Mute Metronome' : 'Unmute Metronome'}
         >
-            <Music2 size={ICON_SIZE} />
+            <MetronomeIcon size={ICON_SIZE} />
         </Button>
     );
 };
 
-// ─── Transport Bar ─────────────────────────────────────────────────────────────
-export const DebugControls = () => {
-    const { isPlaying, currentBar, currentBeat, sectionProgress, sections, currentSectionIndex, bpm, mode } = useLooperStore();
-    const isLive = mode === 'live';
+// ─── Header Indications ───────────────────────────────────────────────────────
+export const HeaderIndications = () => {
+    const { currentBar, currentBeat, sectionProgress, sections, currentSectionIndex, isPlaying, mode } = useLooperStore();
     const currentSection = sections[currentSectionIndex];
-    const [showBpm, setShowBpm] = useState(false);
+    const isLive = mode === 'live';
+
+    return (
+        <Row style={{ gap: 16, alignItems: 'center', justifyContent: 'space-between', flex: 1 }}>
+            <Stack style={{ gap: 0 }}>
+                <Heading style={{ fontSize: 18, margin: 0 }}>{currentSection?.name ?? 'Section'}</Heading>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: isPlaying ? '#4ade80' : '#374151',
+                        boxShadow: isPlaying ? '0 0 8px #4ade80' : 'none'
+                    }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.5, letterSpacing: '0.05em' }}>
+                        {isPlaying ? 'LIVE' : 'STOPPED'}
+                    </span>
+                </div>
+            </Stack>
+
+            {/* Beat/bar ring — full size in Live mode, scaled down otherwise */}
+            {isLive ? (
+                <ProgressRing progress={sectionProgress} bar={currentBar} beat={currentBeat} />
+            ) : (
+                <div style={{ transform: 'scale(0.5)', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ProgressRing progress={sectionProgress} bar={currentBar} beat={currentBeat} />
+                </div>
+            )}
+        </Row>
+    );
+};
+
+
+// ─── BPM Edit Popup ───────────────────────────────────────────────────────────
+const BpmEditPopup = ({ onClose }: { onClose: () => void }) => {
+    const { bpm, isPlaying } = useLooperStore();
+    const bpmInputRef = useRef<HTMLInputElement>(null);
+
+    const handleBpmChange = (newBpm: number) => {
+        const clamped = Math.min(220, Math.max(40, newBpm));
+        useLooperStore.getState().setBpm(clamped);
+        if (isPlaying) audioEngine.setBpm(clamped);
+    };
+
+    const handleBpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val)) handleBpmChange(val);
+    };
+
+    return (
+        <Modal onClose={onClose}>
+            <Card style={{
+                width: 360,
+                padding: 24,
+                background: '#1a1a1e',
+                border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 20
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Label style={{ fontSize: 12, opacity: 0.5 }}>ADJUST TEMPO</Label>
+                    <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: 4 }}>
+                        <StopIcon size={16} />
+                    </Button>
+                </div>
+
+                <Row style={{ alignItems: 'center', gap: 12, justifyContent: 'center' }}>
+                    <Button
+                        onClick={() => handleBpmChange(bpm - 5)}
+                        style={{ width: 44, height: 44, borderRadius: 12, fontSize: 13, fontWeight: 700 }}
+                    >
+                        −5
+                    </Button>
+                    <Button
+                        onClick={() => handleBpmChange(bpm - 1)}
+                        style={{ width: 40, height: 44, borderRadius: 12, fontSize: 18, fontWeight: 700 }}
+                    >
+                        −
+                    </Button>
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            autoFocus
+                            ref={bpmInputRef}
+                            type="number"
+                            value={bpm}
+                            onChange={handleBpmInputChange}
+                            style={{
+                                width: '100%',
+                                height: 44,
+                                minWidth: 100,
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: 12,
+                                color: 'white',
+                                fontSize: 24,
+                                fontWeight: 800,
+                                textAlign: 'center',
+                                fontFamily: 'monospace',
+                                outline: 'none',
+                            }}
+                        />
+                    </div>
+                    <Button
+                        onClick={() => handleBpmChange(bpm + 1)}
+                        style={{ width: 40, height: 44, borderRadius: 12, fontSize: 18, fontWeight: 700 }}
+                    >
+                        +
+                    </Button>
+                    <Button
+                        onClick={() => handleBpmChange(bpm + 5)}
+                        style={{ width: 44, height: 44, borderRadius: 12, fontSize: 13, fontWeight: 700 }}
+                    >
+                        +5
+                    </Button>
+                </Row>
+
+                <Button variant="primary" onClick={onClose} style={{ height: 44, borderRadius: 12, fontWeight: 700 }}>
+                    DONE
+                </Button>
+            </Card>
+        </Modal>
+    );
+};
+
+
+// ─── Settings Popover (Load Demo + I/O Devices) ──────────────────────────────
+const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
+    const {
+        availableInputs,
+        availableOutputs,
+        inputDeviceId,
+        outputDeviceId,
+        refreshDevices,
+        setInputDevice,
+        setOutputDevice,
+    } = useLooperStore();
+
+    const deviceChangeRegistered = useRef(false);
+    useEffect(() => {
+        refreshDevices();
+        if (!deviceChangeRegistered.current) {
+            deviceChangeRegistered.current = true;
+            navigator.mediaDevices.addEventListener('devicechange', () => refreshDevices());
+        }
+    }, []);
+
+    const selectStyle: React.CSSProperties = {
+        width: '100%',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 8,
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 12,
+        padding: '6px 10px',
+        outline: 'none',
+        cursor: 'pointer',
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 10px center',
+        paddingRight: 28,
+    };
+
+    /** True if AudioContext.setSinkId is available (Chrome 110+). */
+    const supportsOutputSelection = typeof (window as any).AudioContext !== 'undefined' &&
+        'setSinkId' in AudioContext.prototype;
+
+    return (
+        <div style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 12px)',
+            right: 0,
+            background: 'rgba(13, 13, 15, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 16,
+            padding: '12px 8px',
+            minWidth: 240,
+            boxShadow: '0 -8px 32px rgba(0,0,0,0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            zIndex: 10,
+        }}>
+            <Button
+                variant="ghost"
+                size="sm"
+                style={{ height: 40, padding: '0 16px', borderRadius: 10, justifyContent: 'flex-start', gap: 10, fontSize: 13 }}
+                onClick={() => { useLooperStore.getState().loadDemoData(); onClose(); }}
+            >
+                <CloudArrowDownIcon size={16} />
+                Load Demo
+            </Button>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />
+
+            {/* I/O Devices section */}
+            <div style={{ padding: '4px 8px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Section header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <MicrophoneIcon size={13} style={{ color: 'var(--accent, #a78bfa)' }} weight="fill" />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.04em' }}>I/O Devices</span>
+                    </div>
+                    <button
+                        onClick={() => refreshDevices()}
+                        title="Refresh device list"
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'rgba(255,255,255,0.35)',
+                            padding: 4,
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: 6,
+                            transition: 'color 0.15s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}
+                    >
+                        <ArrowsClockwiseIcon size={13} />
+                    </button>
+                </div>
+
+                {/* Input */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <MicrophoneIcon size={11} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                        <span style={{ fontSize: 9, opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Input</span>
+                    </div>
+                    {availableInputs.length === 0 ? (
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>Grant mic permission first</span>
+                    ) : (
+                        <select style={selectStyle} value={inputDeviceId ?? ''} onChange={e => setInputDevice(e.target.value)}>
+                            {availableInputs.map(d => (
+                                <option key={d.deviceId} value={d.deviceId}>
+                                    {d.label || `Microphone (${d.deviceId.slice(0, 8)}…)`}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+
+                {/* Output */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <SpeakerHighIcon size={11} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                        <span style={{ fontSize: 9, opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Output</span>
+                    </div>
+                    {!supportsOutputSelection ? (
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Output selection requires Chrome</span>
+                    ) : availableOutputs.length === 0 ? (
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>No output devices found</span>
+                    ) : (
+                        <select style={selectStyle} value={outputDeviceId ?? ''} onChange={e => setOutputDevice(e.target.value)}>
+                            {availableOutputs.map(d => (
+                                <option key={d.deviceId} value={d.deviceId}>
+                                    {d.label || `Speaker (${d.deviceId.slice(0, 8)}…)`}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// ─── Global Action Bar ────────────────────────────────────────────────────────
+export const GlobalActionBar = () => {
+    const { isPlaying, sections, bpm, currentSectionIndex, queuedSectionIndex, mode } = useLooperStore();
+    const [showBpmPopup, setShowBpmPopup] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const isLive = mode === 'live';
 
     const handleStart = async () => {
         await audioEngine.init(sections, bpm);
@@ -309,114 +807,117 @@ export const DebugControls = () => {
         useLooperStore.getState().setIsPlaying(false);
     };
 
-    const handleBpmChange = (newBpm: number) => {
-        useLooperStore.getState().setBpm(newBpm);
-        if (isPlaying) audioEngine.setBpm(newBpm);
-    };
-
     return (
-        <Card style={{
-            width: '100%',
-            padding: '24px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)'
-        }}>
-            <Row style={{ gap: 32, alignItems: 'center', justifyContent: 'space-between' }}>
-                {/* Left: Progress & Info */}
-                <Row style={{ gap: 24, alignItems: 'center' }}>
-                    <ProgressRing progress={sectionProgress} bar={currentBar} beat={currentBeat} />
-                    <Stack style={{ gap: 4 }}>
-                        <Label style={{ opacity: 0.5, fontSize: 12 }}>CURRENT SECTION</Label>
-                        <Heading style={{ fontSize: 24, margin: 0 }}>{currentSection?.name ?? 'Section'}</Heading>
-                        <Badge variant={isPlaying ? 'live' : undefined} style={{ width: 'fit-content', marginTop: 4 }}>
-                            {isPlaying ? '▶ LIVE PERFORMANCE' : '■ SESSION STOPPED'}
-                        </Badge>
-                    </Stack>
-                </Row>
+        <>
+            <div style={{
+                position: 'fixed',
+                bottom: 24,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 1100,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 16px',
+                background: 'rgba(13, 13, 15, 0.90)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: 28,
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+                minWidth: 400,
+            }}>
+                {/* ── Play / Stop — dominant element ── */}
+                <Button
+                    onClick={isPlaying ? handleStop : handleStart}
+                    variant={isPlaying ? 'danger' : 'primary'}
+                    style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        boxShadow: isPlaying
+                            ? '0 0 28px rgba(220, 38, 38, 0.45)'
+                            : '0 0 28px rgba(124, 58, 237, 0.45)'
+                    }}
+                >
+                    {isPlaying ? <StopIcon size={30} weight="fill" /> : <PlayIcon size={30} weight="fill" />}
+                </Button>
 
-                {/* Center: Main Transport */}
-                <Row style={{ gap: 16, background: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 24 }}>
+                <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
+
+                {/* ── Secondary controls ── */}
+                <Row style={{ gap: 8, alignItems: 'center' }}>
+                    <MetronomeButton />
+
+                    {/* Tempo */}
                     <Button
-                        onClick={isPlaying ? handleStop : handleStart}
-                        size="lg"
-                        variant={isPlaying ? 'danger' : 'primary'}
-                        data-testid="transport-button"
+                        variant="ghost"
+                        onClick={() => setShowBpmPopup(true)}
                         style={{
-                            width: 100,
-                            height: 100,
-                            borderRadius: '50%',
-                            boxShadow: isPlaying ? '0 0 40px rgba(220, 38, 38, 0.25)' : '0 0 40px rgba(124, 58, 237, 0.25)'
+                            height: 48,
+                            padding: '0 16px',
+                            borderRadius: 16,
+                            background: 'rgba(255,255,255,0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            border: '1px solid rgba(255,255,255,0.05)'
                         }}
                     >
-                        {isPlaying ? <Square size={40} fill="currentColor" /> : <Play size={40} fill="currentColor" />}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: 9, opacity: 0.4, fontWeight: 800, letterSpacing: '0.05em' }}>TEMPO</span>
+                            <span style={{ fontSize: 18, fontWeight: 900, fontFamily: 'monospace' }}>{bpm} <span style={{ fontSize: 10, opacity: 0.5 }}>BPM</span></span>
+                        </div>
                     </Button>
 
-                    {!isLive && (
-                        <Stack style={{ gap: 8 }}>
-                            <MetronomeButton />
+                    <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,0.08)' }} />
+
+                    {/* Section Quick Queue */}
+                    <Row style={{ gap: 6 }}>
+                        {sections.slice(0, 4).map((sec) => (
                             <Button
-                                variant="ghost"
-                                size="sm"
-                                style={{ fontSize: 11, padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}
-                                onClick={() => audioEngine.loadDemoData()}
+                                key={sec.index}
+                                onClick={() => {
+                                    if (!isPlaying) return;
+                                    useLooperStore.getState().setQueuedSection(sec.index);
+                                    audioEngine.queueSection(sec.index);
+                                }}
+                                variant={sec.index === currentSectionIndex ? 'active-primary' : (sec.index === queuedSectionIndex ? 'active-warning' : 'ghost')}
+                                disabled={!isPlaying}
+                                style={{
+                                    height: 36,
+                                    padding: '0 12px',
+                                    borderRadius: 12,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    minWidth: 70
+                                }}
                             >
-                                LOAD DEMO
+                                {sec.name}
                             </Button>
-                        </Stack>
-                    )}
-                    {isLive && <MetronomeButton />}
+                        ))}
+                    </Row>
+
+                    {/* ── Settings gear — replaces Load Demo in bar ── */}
+                    <div style={{ position: 'relative' }}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowSettings(p => !p)}
+                            title="Settings"
+                            style={{ width: 36, height: 36, padding: 0, borderRadius: 10, opacity: 0.5 }}
+                        >
+                            <GearIcon size={18} />
+                        </Button>
+                        {showSettings && <SettingsPopover onClose={() => setShowSettings(false)} />}
+                    </div>
                 </Row>
-
-                {/* Right: Section Navigation & BPM (De-prioritized) */}
-                <div style={{ flex: 1, maxWidth: 400 }}>
-                    {isPlaying ? (
-                        <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
-                            <Label style={{ display: 'block', marginBottom: 8, fontSize: 11, opacity: 0.5 }}>QUEUE NEXT</Label>
-                            <SectionNavigator />
-                        </div>
-                    ) : (
-                        <Row style={{ justifyContent: 'flex-end', gap: 12 }}>
-                            <Stack style={{ alignItems: 'flex-end', gap: 4 }}>
-                                <Label style={{ fontSize: 11, opacity: 0.5 }}>TEMPO</Label>
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => setShowBpm(!showBpm)}
-                                    data-testid="bpm-button"
-                                    style={{ padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}
-                                >
-                                    <ValueText data-testid="bpm-value" style={{ fontSize: 24, fontWeight: 700 }}>{bpm}</ValueText>
-                                    <Label style={{ marginLeft: 4, opacity: 0.6 }}>BPM</Label>
-                                </Button>
-                            </Stack>
-                        </Row>
-                    )}
-                </div>
-            </Row>
-
-            {/* Expandable BPM Controls */}
-            {showBpm && !isPlaying && (
-                <div style={{
-                    marginTop: 20, paddingTop: 20,
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex', alignItems: 'center', gap: 20,
-                    animation: 'slideDown 0.2s ease-out'
-                }}>
-                    <Label style={{ minWidth: 60 }}>Adjust BPM</Label>
-                    <Button data-testid="bpm-minus-5" onClick={() => handleBpmChange(bpm - 5)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>-5</Button>
-                    <Button data-testid="bpm-minus-1" onClick={() => handleBpmChange(bpm - 1)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>-</Button>
-                    <Slider
-                        min={40} max={220} step={1}
-                        value={bpm}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleBpmChange(Number(e.target.value))}
-                        style={{ flex: 1, height: 40 }}
-                    />
-                    <Button data-testid="bpm-plus-1" onClick={() => handleBpmChange(bpm + 1)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>+</Button>
-                    <Button data-testid="bpm-plus-5" onClick={() => handleBpmChange(bpm + 5)} style={{ width: 44, height: 44, borderRadius: 12, fontSize: 18 }}>+5</Button>
-                </div>
-            )}
-        </Card >
+            </div>
+            {showBpmPopup && <BpmEditPopup onClose={() => setShowBpmPopup(false)} />}
+        </>
     );
 };
+
 
 
 // ─── 4-column Track Horizontal Grid ─────────────────────────────────────────
@@ -436,25 +937,13 @@ export const TrackControls = () => {
             </Grid>
 
             {activeFXTrack !== null && (
-                <div style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 2000,
-                    background: 'rgba(0,0,0,0.6)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }} onClick={() => setActiveFXTrack(null)}>
-                    <div onClick={(e) => e.stopPropagation()}>
-                        <TrackFX
-                            trackId={activeFXTrack}
-                            onClose={() => setActiveFXTrack(null)}
-                        />
-                    </div>
-                </div>
+                <Modal onClose={() => setActiveFXTrack(null)}>
+                    <TrackFX
+                        trackId={activeFXTrack}
+                        onClose={() => setActiveFXTrack(null)}
+                    />
+                </Modal>
             )}
         </div>
     );
 };
-

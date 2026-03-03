@@ -1,20 +1,54 @@
 import React from 'react';
 import { useLooperStore } from '../store/useLooperStore';
-import { Row, Button, Badge } from '@live-looper/ui';
-import { Layout, Play, Radio } from 'lucide-react';
+import { Row, Button } from '@live-looper/ui';
+import { LayoutIcon, PlayIcon, BroadcastIcon } from '@phosphor-icons/react';
 import type { Mode } from '@live-looper/types';
 
 export const ModeSwitcher: React.FC = () => {
     const { mode, setMode } = useLooperStore();
 
-    const modes: { id: Mode; label: string; icon: any; color: string; variant: any }[] = [
-        { id: 'planning', label: 'Planning', icon: Layout, color: '#4dabf7', variant: 'outline' },
-        { id: 'practice', label: 'Practice', icon: Play, color: '#fab005', variant: 'warning' },
-        { id: 'live', label: 'Live', icon: Radio, color: '#fa5252', variant: 'danger' },
-    ];
+    const modes: {
+        id: Mode;
+        label: string;
+        icon: any;
+        activeColor: string;
+        activeBg: string;
+        glowColor: string;
+    }[] = [
+            {
+                id: 'planning',
+                label: 'Plan',
+                icon: LayoutIcon,
+                activeColor: '#93c5fd',
+                activeBg: 'rgba(59,130,246,0.2)',
+                glowColor: 'rgba(59,130,246,0.3)',
+            },
+            {
+                id: 'practice',
+                label: 'Practice',
+                icon: PlayIcon,
+                activeColor: '#fcd34d',
+                activeBg: 'rgba(234,179,8,0.2)',
+                glowColor: 'rgba(234,179,8,0.3)',
+            },
+            {
+                id: 'live',
+                label: '● LIVE',
+                icon: BroadcastIcon,
+                activeColor: '#fca5a5',
+                activeBg: 'rgba(220,38,38,0.25)',
+                glowColor: 'rgba(220,38,38,0.4)',
+            },
+        ];
 
     return (
-        <Row style={{ gap: 12, padding: '8px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: 12 }}>
+        <Row style={{
+            gap: 6,
+            padding: '6px',
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: 14,
+            border: '1px solid rgba(255,255,255,0.07)'
+        }}>
             {modes.map((m) => {
                 const isActive = mode === m.id;
                 const Icon = m.icon;
@@ -22,29 +56,37 @@ export const ModeSwitcher: React.FC = () => {
                     <Button
                         key={m.id}
                         onClick={() => setMode(m.id)}
-                        variant={isActive ? (m.id === 'planning' ? 'primary' : m.variant) : 'outline'}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '8px 16px',
-                            minWidth: 120,
+                            gap: 7,
+                            padding: '9px 18px',
+                            minWidth: 0,
                             justifyContent: 'center',
-                            borderColor: isActive ? m.color : 'rgba(255,255,255,0.1)',
-                            boxShadow: isActive ? `0 0 15px ${m.color}44` : 'none',
-                            opacity: isActive ? 1 : 0.6
+                            borderRadius: 10,
+                            fontWeight: isActive ? 700 : 400,
+                            fontSize: 13,
+                            letterSpacing: isActive ? '0.04em' : 0,
+                            // Active: coloured bg + shadow glow
+                            background: isActive ? m.activeBg : 'transparent',
+                            color: isActive ? m.activeColor : 'rgba(255,255,255,0.45)',
+                            border: isActive
+                                ? `1px solid ${m.activeColor}44`
+                                : '1px solid transparent',
+                            boxShadow: isActive
+                                ? `0 0 16px ${m.glowColor}`
+                                : 'none',
+                            // Smooth transitions — no layout shift between states
+                            transition: 'background 0.2s, color 0.2s, box-shadow 0.2s, border-color 0.2s',
+                            // Blink only for LIVE badge when active
+                            animation: (isActive && m.id === 'live') ? 'live-pulse 2s ease-in-out infinite' : 'none',
                         }}
                     >
-                        <Icon size={18} color={isActive ? 'white' : '#888'} />
-                        <span style={{ fontWeight: isActive ? 600 : 400 }}>{m.label}</span>
+                        <Icon size={15} />
+                        <span>{m.label}</span>
                     </Button>
                 );
             })}
-            <div style={{ marginLeft: 'auto' }}>
-                <Badge variant={mode === 'live' ? 'live' : undefined}>
-                    {mode.toUpperCase()} MODE
-                </Badge>
-            </div>
         </Row>
     );
 };

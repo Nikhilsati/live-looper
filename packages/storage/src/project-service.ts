@@ -50,7 +50,8 @@ export class ProjectService {
                 projectId,
                 name: 'Verse',
                 order: 0,
-                lengthSamples: 0 // Will be set on first recording
+                lengthSamples: 0, // Will be set on first recording
+                lengthInBars: 4,  // Default loop length; persisted as the source of truth
             };
             await db.sections.add(section);
         });
@@ -83,7 +84,11 @@ export class ProjectService {
             };
             await db.audioBlobs.add(audioBlob);
 
-            const layerCount = await db.layers.where({ projectId, trackId, sectionId }).count();
+            // Only count active (non-deleted) layers for the order field.
+            const activeLayerCount = await db.layers
+                .where({ projectId, trackId, sectionId })
+                .filter(l => !l.deletedAt)
+                .count();
 
             const layer: LayerRecord = {
                 id: layerId,
@@ -92,10 +97,55 @@ export class ProjectService {
                 sectionId,
                 audioBlobId,
                 gain,
-                order: layerCount
+                order: activeLayerCount,
+                deletedAt: null,
             };
             await db.layers.add(layer);
 
+            await db.projects.update(projectId, { updatedAt: Date.now() });
+        });
+    }
+
+    /**
+     * Soft-deletes the most recently recorded active layer for the given
+     * track + section, mirroring what the in-memory worklet does for UNDO_LAYER.
+     * The underlying audio blob is kept so potential redo can restore it.
+     */
+    async removeTopLayer(params: {
+        projectId: string;
+        trackId: string;
+        sectionId: string;
+    }): Promise<boolean> {
+        const { projectId, trackId, sectionId } = params;
+
+        const activeLayers = await db.layers
+            .where({ projectId, trackId, sectionId })
+            .filter(l => !l.deletedAt)
+            .sortBy('order');
+
+        if (activeLayers.length === 0) return false;
+
+        // The last active layer (highest order) is the one that was most recently recorded.
+        const topLayer = activeLayers[activeLayers.length - 1];
+        await db.layers.update(topLayer.id, { deletedAt: Date.now() });
+        await db.projects.update(projectId, { updatedAt: Date.now() });
+        return true;
+    }
+
+    /**
+     * Hard-deletes a specific layer and its corresponding audio blob.
+     */
+    async deleteLayer(layerId: string): Promise<void> {
+        const layer = await db.layers.get(layerId);
+        if (!layer) return;
+
+        const { projectId, audioBlobId } = layer;
+
+        await db.transaction('rw', [db.layers, db.audioBlobs, db.projects], async () => {
+            await db.layers.delete(layerId);
+            if (audioBlobId) {
+                await db.audioBlobs.delete(audioBlobId);
+            }
             await db.projects.update(projectId, { updatedAt: Date.now() });
         });
     }

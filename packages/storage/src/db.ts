@@ -23,6 +23,10 @@ export class LiveLooperDB extends Dexie {
             layers: 'id, projectId, trackId, sectionId',
             audioBlobs: 'id, projectId'
         });
+        // v2: adds deletedAt index to layers for soft-delete (undo) support.
+        this.version(2).stores({
+            layers: 'id, projectId, trackId, sectionId, deletedAt'
+        });
     }
 }
 

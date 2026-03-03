@@ -132,6 +132,104 @@ button.active-warning {
     }
 }
 
+@keyframes glow-pulse-red {
+    from {
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.5);
+    }
+}
+
+@keyframes glow-pulse-purple {
+    from {
+        box-shadow: 0 0 10px rgba(167, 139, 250, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(167, 139, 250, 0.5);
+    }
+}
+
+@keyframes glow-pulse-green {
+    from {
+        box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(74, 222, 128, 0.5);
+    }
+}
+
+.glow-red {
+    animation: glow-pulse-red 1.5s ease-in-out infinite alternate !important;
+}
+
+.glow-purple {
+    animation: glow-pulse-purple 1.5s ease-in-out infinite alternate !important;
+}
+
+.glow-green {
+    animation: glow-pulse-green 1.5s ease-in-out infinite alternate !important;
+}
+
+@keyframes glow-pulse-cyan {
+    from {
+        box-shadow: 0 0 10px rgba(34, 211, 238, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(34, 211, 238, 0.5);
+    }
+}
+
+@keyframes glow-pulse-amber {
+    from {
+        box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+    }
+}
+
+@keyframes glow-pulse-rose {
+    from {
+        box-shadow: 0 0 10px rgba(251, 113, 133, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(251, 113, 133, 0.5);
+    }
+}
+
+@keyframes glow-pulse-violet {
+    from {
+        box-shadow: 0 0 10px rgba(167, 139, 250, 0.2);
+    }
+
+    to {
+        box-shadow: 0 0 30px rgba(167, 139, 250, 0.5);
+    }
+}
+
+.glow-cyan {
+    animation: glow-pulse-cyan 1.5s ease-in-out infinite alternate !important;
+}
+
+.glow-amber {
+    animation: glow-pulse-amber 1.5s ease-in-out infinite alternate !important;
+}
+
+.glow-rose {
+    animation: glow-pulse-rose 1.5s ease-in-out infinite alternate !important;
+}
+
+.glow-violet {
+    animation: glow-pulse-violet 1.5s ease-in-out infinite alternate !important;
+}
+
 /* Oat Switch Styling */
 input[role="switch"] {
     --primary: var(--success);

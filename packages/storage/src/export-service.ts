@@ -16,8 +16,15 @@ export class ExportService {
 
         const tracks = await db.tracks.where({ projectId }).toArray();
         const sections = await db.sections.where({ projectId }).toArray();
-        const layers = await db.layers.where({ projectId }).toArray();
-        const audioBlobs = await db.audioBlobs.where({ projectId }).toArray();
+        // Only export active (non-deleted) layers.
+        const layers = await db.layers
+            .where({ projectId })
+            .filter(l => !l.deletedAt)
+            .toArray();
+        // Only export audio blobs that are referenced by active layers.
+        const activeBlobIds = new Set(layers.map(l => l.audioBlobId));
+        const audioBlobs = (await db.audioBlobs.where({ projectId }).toArray())
+            .filter(b => activeBlobIds.has(b.id));
 
         const zip = new JSZip();
 
@@ -71,6 +78,9 @@ export class ExportService {
     async importProject(file: File): Promise<string> {
         const zip = await JSZip.loadAsync(file);
         const manifestStr = await zip.file('project.json')?.async('string');
+
+        console.log("Invalid project file", { manifestStr, zip, zips: zip.files });
+
         if (!manifestStr) throw new Error('Invalid project file');
 
         const manifest = JSON.parse(manifestStr);
@@ -109,6 +119,9 @@ export class ExportService {
             }
 
             for (const l of oldLayers) {
+                // Skip deleted layers — they shouldn't be imported.
+                if (l.deletedAt) continue;
+
                 const newLayerId = uuidv4();
                 const oldAudioBlobId = l.audioBlobId;
                 const newAudioBlobId = uuidv4();
@@ -135,7 +148,8 @@ export class ExportService {
                     projectId: newProjectId,
                     trackId: idMap.get(l.trackId)!,
                     sectionId: idMap.get(l.sectionId)!,
-                    audioBlobId: newAudioBlobId
+                    audioBlobId: newAudioBlobId,
+                    deletedAt: null,
                 });
             }
 

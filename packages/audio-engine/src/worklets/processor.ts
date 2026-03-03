@@ -1,3 +1,5 @@
+// import {  AudioWorkletProcessor } from "@live-looper/types/src/audio-worklet";
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface LayerMeta {
     buffer: Float32Array;
@@ -17,10 +19,12 @@ interface SectionData {
     recordBuffer: Float32Array;
 }
 
+// Sync with @live-looper/types
 interface SectionConfig {
     index: number;
+    name: string;
     lengthInBars: number;
-    trackLinks: boolean[]; // which tracks are active in this section
+    trackLinks: boolean[]; // length 4 — which tracks play in this section
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -91,108 +95,144 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         }
 
         // Default: one section, 8 bars
-        this.sections = [{ index: 0, lengthInBars: 8, trackLinks: [true, true, true, true] }];
+        this.sections = [{ index: 0, name: 'Initial', lengthInBars: 8, trackLinks: [true, true, true, true] }];
 
         this.port.onmessage = (event) => {
             const { type, payload } = event.data;
 
-            if (type === 'START') {
-                this.isPlaying = true;
-                this.currentSample = 0;
-                this.sectionSampleOffset = 0;
-                this.currentSectionIndex = 0;
-                this.queuedSectionIndex = null;
+            switch (type) {
+                case 'START':
+                    this.isPlaying = true;
+                    this.currentSample = 0;
+                    this.sectionSampleOffset = 0;
+                    this.currentSectionIndex = 0;
+                    this.queuedSectionIndex = null;
+                    break;
 
-            } else if (type === 'STOP') {
-                this.isPlaying = false;
-                this.currentSample = 0;
-                this.sectionSampleOffset = 0;
+                case 'STOP':
+                    this.isPlaying = false;
+                    this.currentSample = 0;
+                    this.sectionSampleOffset = 0;
+                    break;
 
-            } else if (type === 'CONFIG') {
-                const { sampleRate, bpm, sections, latencySamples } = payload;
-                this.sampleRate = sampleRate;
-                this.samplesPerBeat = (sampleRate * 60) / bpm;
-                if (sections && sections.length > 0) {
-                    this.sections = sections;
-                }
-                if (typeof latencySamples === 'number') {
-                    this.latencySamples = latencySamples;
-                }
-
-            } else if (type === 'RTL_TEST') {
-                this.rtlTestActive = true;
-                this.rtlSpikeDetected = false;
-                this.rtlTestStartTime = 0; // Will set in process loop
-
-            } else if (type === 'SET_LATENCY') {
-                this.latencySamples = payload.latencySamples;
-
-            } else if (type === 'QUEUE_SECTION') {
-                this.queuedSectionIndex = payload.sectionIndex;
-
-            } else if (type === 'SET_BPM') {
-                this.samplesPerBeat = (this.sampleRate * 60) / payload.bpm;
-
-            } else if (type === 'ARM_TRACK') {
-                const { trackId } = payload;
-                const track = this.tracks[trackId];
-                if (!track) return;
-                const sd = getOrCreateSectionData(track, this.currentSectionIndex, this.currentSectionLen());
-                if (track.state === 'IDLE' || track.state === 'PLAYING') {
-                    track.state = 'ARMED';
-                } else if (track.state === 'ARMED') {
-                    track.state = sd.layers.length > 0 ? 'PLAYING' : 'IDLE';
+                case 'CONFIG': {
+                    const { sampleRate, bpm, sections, latencySamples } = payload;
+                    this.sampleRate = sampleRate;
+                    this.samplesPerBeat = (sampleRate * 60) / bpm;
+                    if (sections && sections.length > 0) {
+                        this.sections = sections;
+                    }
+                    if (typeof latencySamples === 'number') {
+                        this.latencySamples = latencySamples;
+                    }
+                    break;
                 }
 
-            } else if (type === 'MUTE_TRACK') {
-                const track = this.tracks[payload.trackId];
-                if (track) track.isMuted = !track.isMuted;
+                case 'RTL_TEST':
+                    this.rtlTestActive = true;
+                    this.rtlSpikeDetected = false;
+                    this.rtlTestStartTime = 0; // Will set in process loop
+                    break;
 
-            } else if (type === 'UNDO_LAYER') {
-                const { trackId } = payload;
-                const track = this.tracks[trackId];
-                if (!track) return;
-                const sd = track.sections.get(this.currentSectionIndex);
-                if (!sd || sd.layers.length === 0) return;
-                sd.layers.pop();
-                rebuildMaster(sd);
-                if (sd.layers.length === 0) {
+                case 'SET_LATENCY':
+                    this.latencySamples = payload.latencySamples;
+                    break;
+
+                case 'QUEUE_SECTION':
+                    this.queuedSectionIndex = payload.sectionIndex;
+                    break;
+
+                case 'SET_BPM':
+                    this.samplesPerBeat = (this.sampleRate * 60) / payload.bpm;
+                    break;
+
+                case 'ARM_TRACK': {
+                    const { trackId } = payload;
+                    const track = this.tracks[trackId];
+                    if (!track) return;
+                    const sd = getOrCreateSectionData(track, this.currentSectionIndex, this.currentSectionLen());
+                    if (track.state === 'IDLE' || track.state === 'PLAYING') {
+                        track.state = 'ARMED';
+                    } else if (track.state === 'ARMED') {
+                        track.state = sd.layers.length > 0 ? 'PLAYING' : 'IDLE';
+                    }
+                    break;
+                }
+
+                case 'MUTE_TRACK': {
+                    const track = this.tracks[payload.trackId];
+                    if (track) track.isMuted = !track.isMuted;
+                    break;
+                }
+
+                case 'UNDO_LAYER': {
+                    const { trackId } = payload;
+                    const track = this.tracks[trackId];
+                    if (!track) return;
+                    const sd = track.sections.get(this.currentSectionIndex);
+                    if (!sd || sd.layers.length === 0) return;
+                    sd.layers.pop();
+                    rebuildMaster(sd);
+                    if (sd.layers.length === 0) {
+                        track.state = 'IDLE';
+                        this.port.postMessage({ type: 'TRACK_CLEARED', trackId, sectionIndex: this.currentSectionIndex });
+                    } else {
+                        const waveformData = computeWaveformData(sd.masterBuffer);
+                        this.port.postMessage({ type: 'RECORD_STOP', trackId, sectionIndex: this.currentSectionIndex, layerCount: sd.layers.length, waveformData });
+                    }
+                    // Emit a confirmation so AudioEngine can soft-delete the DB record.
+                    this.port.postMessage({ type: 'UNDO_LAYER', trackId, sectionIndex: this.currentSectionIndex });
+                    break;
+                }
+
+                case 'CLEAR_TRACK': {
+                    const { trackId } = payload;
+                    const track = this.tracks[trackId];
+                    if (!track) return;
+                    track.sections.clear();
                     track.state = 'IDLE';
                     this.port.postMessage({ type: 'TRACK_CLEARED', trackId, sectionIndex: this.currentSectionIndex });
-                } else {
-                    const waveformData = computeWaveformData(sd.masterBuffer);
-                    this.port.postMessage({ type: 'RECORD_STOP', trackId, sectionIndex: this.currentSectionIndex, layerCount: sd.layers.length, waveformData });
+                    break;
                 }
 
-            } else if (type === 'CLEAR_TRACK') {
-                const { trackId } = payload;
-                const track = this.tracks[trackId];
-                if (!track) return;
-                track.sections.clear();
-                track.state = 'IDLE';
-                this.port.postMessage({ type: 'TRACK_CLEARED', trackId, sectionIndex: this.currentSectionIndex });
+                case 'CLEAR_ALL_TRACKS':
+                    // Reset the entire worklet state for a fresh project load.
+                    // Clears all section buffers and brings every track back to IDLE.
+                    for (const track of this.tracks) {
+                        track.sections.clear();
+                        track.state = 'IDLE';
+                        track.isMuted = false;
+                    }
+                    this.currentSample = 0;
+                    this.sectionSampleOffset = 0;
+                    this.currentSectionIndex = 0;
+                    this.queuedSectionIndex = null;
+                    break;
 
-            } else if (type === 'MUTE_METRONOME') {
-                this.metronomeEnabled = !this.metronomeEnabled;
+                case 'MUTE_METRONOME':
+                    this.metronomeEnabled = !this.metronomeEnabled;
+                    break;
 
-            } else if (type === 'SET_BUFFER') {
-                const { trackId, sectionIndex, buffer } = payload;
-                const track = this.tracks[trackId];
-                if (!track) return;
+                case 'SET_BUFFER': {
+                    const { trackId, sectionIndex, buffer } = payload;
+                    const track = this.tracks[trackId];
+                    if (!track) return;
 
-                const sd = getOrCreateSectionData(track, sectionIndex, buffer.length);
-                sd.layers = [{ buffer: new Float32Array(buffer) }];
-                sd.masterBuffer.set(buffer);
-                track.state = 'PLAYING';
+                    const sd = getOrCreateSectionData(track, sectionIndex, buffer.length);
+                    sd.layers = [{ buffer: new Float32Array(buffer) }];
+                    sd.masterBuffer.set(buffer);
+                    track.state = 'PLAYING';
 
-                const waveformData = computeWaveformData(sd.masterBuffer);
-                this.port.postMessage({
-                    type: 'RECORD_STOP',
-                    trackId,
-                    sectionIndex,
-                    layerCount: 1,
-                    waveformData
-                });
+                    const waveformData = computeWaveformData(sd.masterBuffer);
+                    this.port.postMessage({
+                        type: 'RECORD_STOP',
+                        trackId,
+                        sectionIndex,
+                        layerCount: 1,
+                        waveformData
+                    });
+                    break;
+                }
             }
         };
     }
@@ -371,13 +411,14 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
             const bar = Math.floor(sectionBeat / 4) + 1;
             const beat = (sectionBeat % 4) + 1;
             const sectionProgress = sectionLen2 > 0 ? (sectionRelative % sectionLen2) / sectionLen2 : 0;
+            const currentBar = bar;
+            const currentBeat = beat;
 
             // Measure jitter (time between process calls is implicit in the host, but we can check drift)
-            // We'll report current time to compare with host time
             this.port.postMessage({
                 type: 'TICK',
-                bar,
-                beat,
+                currentBar,
+                currentBeat,
                 time: this.currentSample / this.sampleRate,
                 currentTime: currentTime,
                 jitter: delta, // Report the process-to-process delta

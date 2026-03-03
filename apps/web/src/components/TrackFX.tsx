@@ -1,6 +1,6 @@
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Stack, Row, Label, ValueText, Slider, Button, Grid, Heading, Switch } from '@live-looper/ui';
-import { X, Activity, Zap, Clock, Speaker, Sliders } from 'lucide-react';
+import { XIcon, WaveformIcon, LightningIcon, ClockIcon, SpeakerHighIcon, SlidersIcon, WavesIcon } from '@phosphor-icons/react';
 import type { FXState } from '@live-looper/types';
 
 interface TrackFXProps {
@@ -35,12 +35,12 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                 <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                     <Row style={{ alignItems: 'center', gap: '16px' }}>
                         <div style={{ background: 'var(--secondary)', padding: '10px', borderRadius: '12px', display: 'flex' }}>
-                            <Sliders size={20} style={{ color: 'var(--primary)' }} />
+                            <SlidersIcon size={20} style={{ color: 'var(--primary)' }} />
                         </div>
                         <Heading style={{ fontSize: '22px', margin: 0 }}>Track {trackId + 1} Master FX</Heading>
                     </Row>
                     <Button onClick={onClose} variant="ghost" style={{ padding: '8px', borderRadius: '50%', width: 44, height: 44 }}>
-                        <X size={20} />
+                        <XIcon size={20} />
                     </Button>
                 </Row>
 
@@ -49,7 +49,7 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                     <Card style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
                         <Stack style={{ gap: '16px' }}>
                             <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                <Activity size={16} style={{ color: 'var(--primary)' }} />
+                                <WaveformIcon size={16} style={{ color: 'var(--primary)' }} />
                                 <Label style={{ fontWeight: 800 }}>EQ (3-Band)</Label>
                             </Row>
                             <Stack style={{ gap: '14px' }}>
@@ -64,7 +64,7 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                     <Card style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
                         <Stack style={{ gap: '16px' }}>
                             <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                <Speaker size={16} style={{ color: 'var(--success)' }} />
+                                <SpeakerHighIcon size={16} style={{ color: 'var(--success)' }} />
                                 <Label style={{ fontWeight: 800 }}>Dynamics (Comp)</Label>
                             </Row>
                             <Stack style={{ gap: '14px' }}>
@@ -80,7 +80,7 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                         <Stack style={{ gap: '16px' }}>
                             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                    <Zap size={16} style={{ color: 'var(--warning)' }} />
+                                    <LightningIcon size={16} style={{ color: 'var(--warning)' }} />
                                     <Label style={{ fontWeight: 800 }}>Drive</Label>
                                 </Row>
                                 <Switch checked={fx.drive.enabled} onChange={(v) => updateFX('drive', { enabled: v })} />
@@ -94,7 +94,7 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                         <Stack style={{ gap: '16px' }}>
                             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                    <Clock size={16} style={{ color: 'var(--accent)' }} />
+                                    <ClockIcon size={16} style={{ color: 'var(--accent)' }} />
                                     <Label style={{ fontWeight: 800 }}>Delay</Label>
                                 </Row>
                                 <Switch checked={fx.delay.enabled} onChange={(v) => updateFX('delay', { enabled: v })} />
@@ -120,7 +120,7 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                     <Card style={{ padding: '16px', gridColumn: 'span 2', background: 'rgba(255,255,255,0.02)' }}>
                         <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                             <Row style={{ alignItems: 'center', gap: '12px' }}>
-                                <Activity size={16} style={{ color: '#ec4899' }} />
+                                <WavesIcon size={16} style={{ color: '#ec4899' }} />
                                 <Label style={{ fontWeight: 800 }}>Reverb</Label>
                             </Row>
                             <Row style={{ gap: '24px', flex: 1, marginLeft: '48px', alignItems: 'center' }}>
@@ -136,7 +136,7 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                     <Card style={{ padding: '16px', gridColumn: 'span 2', background: 'rgba(255,255,255,0.02)' }}>
                         <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                             <Row style={{ alignItems: 'center', gap: '12px' }}>
-                                <Speaker size={16} />
+                                <SpeakerHighIcon size={16} />
                                 <Label style={{ fontWeight: 800 }}>Stereo Pan</Label>
                             </Row>
                             <div style={{ flex: 1, marginLeft: '48px' }}>

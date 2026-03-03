@@ -10,7 +10,7 @@
     },
     "dependencies": {
         "@knadh/oat": "^0.3.0",
-        "lucide-react": "^0.574.0"
+        "@phosphor-icons/react": "^2.1.10"
     },
     "devDependencies": {
         "@live-looper/types": "workspace:*",
