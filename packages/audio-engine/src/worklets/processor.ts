@@ -218,9 +218,13 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                     const track = this.tracks[trackId];
                     if (!track) return;
 
+                    const layerBuf = new Float32Array(buffer);
                     const sd = getOrCreateSectionData(track, sectionIndex, buffer.length);
-                    sd.layers = [{ buffer: new Float32Array(buffer) }];
-                    sd.masterBuffer.set(buffer);
+                    sd.layers.push({ buffer: layerBuf });
+                    // Accumulate into master (same as live recording commit)
+                    for (let s = 0; s < sd.masterBuffer.length; s++) {
+                        sd.masterBuffer[s] += layerBuf[s];
+                    }
                     track.state = 'PLAYING';
 
                     const waveformData = computeWaveformData(sd.masterBuffer);
@@ -228,7 +232,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                         type: 'RECORD_STOP',
                         trackId,
                         sectionIndex,
-                        layerCount: 1,
+                        layerCount: sd.layers.length,
                         waveformData
                     });
                     break;
