@@ -3,7 +3,7 @@ import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectReco
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 import { modeController } from '@live-looper/mode-controller';
 import { db, projectService, exportService } from '@live-looper/storage';
-
+import { uiAlert } from './useDialogStore';
 interface LooperStore extends EngineState {
     projectList: ProjectRecord[];
     currentProject: ProjectRecord | null;
@@ -116,7 +116,6 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
             db.projects.update(currentProject.id, { settings: newSettings, updatedAt: Date.now() });
         }
     },
-
     fetchProjects: async () => {
         const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
         set({ projectList: projects });
@@ -192,7 +191,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 audioEngine.enterLiveMode(snapshot);
             }
         } else if (error) {
-            alert(error);
+            uiAlert(error);
         }
     },
 
@@ -314,8 +313,10 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 audioEngine.setLatencyCompensation(event.samples);
                 break;
             case 'RTL_TIMEOUT':
-                set({ isCalibratingLatency: false });
-                alert('Latency Calibration Timed Out. Ensure Output is looped to Input.');
+                set({
+                    isCalibratingLatency: false
+                });
+                uiAlert('Latency Calibration Timed Out. Ensure Output is looped to Input.');
                 break;
             case 'PROJECT_LOADED': {
                 const { project, tracks, sections, layerCounts, waveformDataMap } = event.payload;

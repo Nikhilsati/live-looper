@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { db } from '@live-looper/storage';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
+import { uiConfirm } from '../store/useDialogStore';
 import type {
     ProjectRecord,
     TrackRecord,
@@ -657,8 +658,9 @@ export const DevInspector: React.FC = () => {
                                                                         </td>
                                                                         <td style={{ padding: '5px 8px' }}>
                                                                             <button
-                                                                                onClick={() => {
-                                                                                    if (confirm(`Are you sure you want to PERMANENTLY delete layer ${layer.id} and its audio blob?`)) {
+                                                                                onClick={async () => {
+                                                                                    const confirmed = await uiConfirm(`Are you sure you want to PERMANENTLY delete layer ${layer.id} and its audio blob? This cannot be undone.`, 'Permanent Deletion', { danger: true, confirmText: 'Delete' });
+                                                                                    if (confirmed) {
                                                                                         useLooperStore.getState().deleteLayer(layer.id);
                                                                                     }
                                                                                 }}
@@ -703,6 +705,7 @@ export const DevInspector: React.FC = () => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };
