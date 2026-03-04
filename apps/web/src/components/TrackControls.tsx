@@ -1,9 +1,11 @@
-import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon } from '@phosphor-icons/react';
+import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon, StackIcon, XIcon } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Stack, Row, Button, ButtonGroup, Label, ValueText, Badge, Heading, Grid, Switch, Waveform, Modal } from '@live-looper/ui';
 import { TrackFX } from './TrackFX';
+import { db } from '@live-looper/storage';
+import type { LayerRecord } from '@live-looper/types';
 
 const ICON_SIZE = 22;
 const MAX_LAYER_INDICATOR_BARS = 4;
@@ -54,23 +56,36 @@ const TRACK_COLORS = [
     },
 ] as const;
 
-// ─── Layer Indicator ──────────────────────────────────────────────────────────
-const LayerIndicator = ({ count, accent }: { count: number; accent: string }) => {
+// ─── Layer Indicator (clickable toggle) ──────────────────────────────────────
+const LayerIndicator = ({ count, accent, onClick }: { count: number; accent: string; onClick: () => void }) => {
     if (count === 0) return null;
     return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column-reverse',
-            gap: 3,
-            alignItems: 'center',
-            padding: '5px 3px',
-            background: 'rgba(255,255,255,0.04)',
-            borderRadius: 4,
-            border: '1px solid rgba(255,255,255,0.06)',
-            pointerEvents: 'none',
-            marginLeft: 4,
-            transition: 'all 0.2s ease'
-        }}>
+        <button
+            onClick={onClick}
+            title={`View ${count} layer${count !== 1 ? 's' : ''}`}
+            style={{
+                display: 'flex',
+                flexDirection: 'column-reverse',
+                gap: 3,
+                alignItems: 'center',
+                padding: '5px 3px',
+                background: 'rgba(255,255,255,0.04)',
+                borderRadius: 4,
+                border: `1px solid ${accent}40`,
+                marginLeft: 4,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                outline: 'none',
+            }}
+            onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = `${accent}18`;
+                (e.currentTarget as HTMLElement).style.borderColor = `${accent}80`;
+            }}
+            onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
+                (e.currentTarget as HTMLElement).style.borderColor = `${accent}40`;
+            }}
+        >
             {Array.from({ length: MAX_LAYER_INDICATOR_BARS }).map((_, i) => (
                 <div key={i} style={{
                     width: 7,
@@ -81,14 +96,212 @@ const LayerIndicator = ({ count, accent }: { count: number; accent: string }) =>
                     transition: 'all 0.2s ease'
                 }} />
             ))}
-            {MAX_LAYER_INDICATOR_BARS > 8 && <span style={{ fontSize: 9, color: accent, fontWeight: 900, marginTop: -2 }}>+</span>}
+            {count > MAX_LAYER_INDICATOR_BARS && <span style={{ fontSize: 9, color: accent, fontWeight: 900, marginTop: -2 }}>+</span>}
+        </button>
+    );
+};
+
+// ─── Layers Drawer (inline, expands at the bottom of the track card) ──────────
+interface LayerEntry {
+    record: LayerRecord;
+    waveform: number[];
+}
+
+const MiniWaveform = ({ data, accent }: { data: number[]; accent: string }) => {
+    if (!data.length) return <div style={{ height: 32, background: 'rgba(255,255,255,0.04)', borderRadius: 6 }} />;
+    const max = Math.max(...data, 0.01);
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 1, height: 32, flex: 1 }}>
+            {data.map((v, i) => (
+                <div
+                    key={i}
+                    style={{
+                        flex: 1,
+                        height: `${Math.max(6, (v / max) * 100)}%`,
+                        background: accent,
+                        opacity: 0.5 + (v / max) * 0.5,
+                        borderRadius: 1,
+                    }}
+                />
+            ))}
+        </div>
+    );
+};
+
+const LayersDrawer = ({
+    trackId,
+    accent,
+    onClose,
+}: {
+    trackId: number;
+    accent: string;
+    onClose: () => void;
+}) => {
+    const { currentProject, sections, currentSectionIndex } = useLooperStore();
+    const [layers, setLayers] = useState<LayerEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const sectionName = sections[currentSectionIndex]?.name ?? 'Section';
+
+    const loadLayers = useCallback(async () => {
+        if (!currentProject?.id) { setLoading(false); return; }
+        setLoading(true);
+        try {
+            const trackRecord = await db.tracks
+                .where({ projectId: currentProject.id })
+                .filter((t: any) => t.order === trackId)
+                .first();
+            if (!trackRecord) { setLoading(false); return; }
+
+            const sectionRecord = await db.sections
+                .where({ projectId: currentProject.id })
+                .filter((s: any) => s.order === currentSectionIndex)
+                .first();
+            if (!sectionRecord) { setLoading(false); return; }
+
+            const rawLayers = await db.layers
+                .where({ projectId: currentProject.id, trackId: trackRecord.id, sectionId: sectionRecord.id })
+                .filter((l: any) => !l.deletedAt)
+                .sortBy('order');
+
+            const ctx: BaseAudioContext = audioEngine.context ?? new AudioContext();
+            const entries: LayerEntry[] = await Promise.all(
+                rawLayers.map(async (layer): Promise<LayerEntry> => {
+                    try {
+                        const blobRecord = await db.audioBlobs.get(layer.audioBlobId);
+                        if (!blobRecord) return { record: layer, waveform: [] };
+                        const ab = await blobRecord.blob.arrayBuffer();
+                        const decoded = await ctx.decodeAudioData(ab);
+                        const raw = decoded.getChannelData(0);
+                        const points = 60;
+                        const step = Math.max(1, Math.floor(raw.length / points));
+                        const waveform: number[] = [];
+                        for (let p = 0; p < points; p++) {
+                            const start = p * step;
+                            let sum = 0;
+                            for (let s = start; s < start + step && s < raw.length; s++) sum += raw[s] * raw[s];
+                            waveform.push(Math.sqrt(sum / step));
+                        }
+                        return { record: layer, waveform };
+                    } catch {
+                        return { record: layer, waveform: [] };
+                    }
+                })
+            );
+            setLayers(entries);
+        } catch (e) {
+            console.error('LayersDrawer: error loading layers', e);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentProject?.id, trackId, currentSectionIndex]);
+
+    useEffect(() => { loadLayers(); }, [loadLayers]);
+
+
+    return (
+        <div style={{
+            marginTop: 4,
+            borderTop: `1px solid ${accent}25`,
+            paddingTop: 10,
+            animation: 'fadeIn 0.18s ease',
+        }}>
+            {/* Drawer header row */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StackIcon size={13} color={accent} weight="fill" />
+                    <span style={{
+                        fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
+                        color: accent, textTransform: 'uppercase',
+                    }}>
+                        {loading ? 'Loading…' : `${layers.length} Layer${layers.length !== 1 ? 's' : ''}`}
+                    </span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 600, letterSpacing: '0.04em' }}>
+                        · {sectionName}
+                    </span>
+                </div>
+                <button
+                    onClick={onClose}
+                    style={{
+                        background: 'transparent', border: 'none',
+                        color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
+                        padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center',
+                        transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+                    title="Collapse layers"
+                >
+                    <XIcon size={13} weight="bold" />
+                </button>
+            </div>
+
+            {/* Layer rows — newest on top */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {loading ? (
+                    <div style={{
+                        height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'rgba(255,255,255,0.25)', fontSize: 11,
+                    }}>
+                        Decoding audio…
+                    </div>
+                ) : layers.length === 0 ? (
+                    <div style={{
+                        height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'rgba(255,255,255,0.25)', fontSize: 11, gap: 6,
+                    }}>
+                        <StackIcon size={14} color="rgba(255,255,255,0.2)" />
+                        No layers
+                    </div>
+                ) : (
+                    [...layers].reverse().map((entry, revIdx) => {
+                        const layerNum = layers.length - revIdx;
+                        return (
+                            <div
+                                key={entry.record.id}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '6px 8px',
+                                    background: 'rgba(255,255,255,0.025)',
+                                    border: '1px solid rgba(255,255,255,0.06)',
+                                    borderRadius: 10,
+                                }}
+                            >
+                                {/* Layer number badge */}
+                                <div style={{
+                                    width: 22, height: 22, borderRadius: 6,
+                                    background: 'rgba(255,255,255,0.07)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 10, fontWeight: 900,
+                                    color: 'rgba(255,255,255,0.4)',
+                                    flexShrink: 0,
+                                }}>
+                                    {layerNum}
+                                </div>
+
+                                {/* Waveform */}
+                                <MiniWaveform
+                                    data={entry.waveform}
+                                    accent={accent}
+                                />
+                            </div>
+                        );
+                    })
+                )}
+            </div>
         </div>
     );
 };
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
 const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: number) => void }) => {
-    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, mode, toggleTrackRecording, setSolo } = useLooperStore();
+    const { tracks, sectionProgress, bpm, sections, currentSectionIndex, isPlaying, lastHitOffset, mode, toggleTrackRecording, setSolo, showLayers, setShowLayers } = useLooperStore();
     const track = tracks[trackId];
     const isLive = mode === 'live';
     const [showHit, setShowHit] = useState(false);
@@ -108,6 +321,36 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
         }
         prevIsArmed.current = track.isArmed;
     }, [track.isArmed]);
+
+    // Section-scoped layer count — queried from DB so it's always accurate
+    // regardless of the stale across-all-sections total in the Zustand store.
+    const [sectionLayerCount, setSectionLayerCount] = useState(0);
+    useEffect(() => {
+        const { currentProject } = useLooperStore.getState();
+        if (!currentProject?.id) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const trackRecord = await db.tracks
+                    .where({ projectId: currentProject.id })
+                    .filter((t: any) => t.order === trackId)
+                    .first();
+                if (!trackRecord || cancelled) return;
+                const sectionRecord = await db.sections
+                    .where({ projectId: currentProject.id })
+                    .filter((s: any) => s.order === currentSectionIndex)
+                    .first();
+                if (!sectionRecord || cancelled) return;
+                const count = await db.layers
+                    .where({ projectId: currentProject.id, trackId: trackRecord.id, sectionId: sectionRecord.id })
+                    .filter((l: any) => !l.deletedAt)
+                    .count();
+                if (!cancelled) setSectionLayerCount(count);
+            } catch { /* ignore */ }
+        })();
+        return () => { cancelled = true; };
+        // Re-run when section changes, or when a recording completes (layerCount tick in store)
+    }, [trackId, currentSectionIndex, track.layerCount, track.hasAudio]);
 
     const handleArm = () => {
         toggleTrackRecording(trackId);
@@ -292,7 +535,11 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                         </div>
                     )}
 
-                    <LayerIndicator count={track.layerCount} accent={palette.accent} />
+                    <LayerIndicator
+                        count={sectionLayerCount}
+                        accent={palette.accent}
+                        onClick={() => setShowLayers(true)}
+                    />
                 </div>
             </Row>
 
@@ -418,6 +665,15 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
             {!isLive && !track.hasAudio && (
                 <Waveform data={track.waveformData} progress={sectionProgress} height={40} bars={sections[currentSectionIndex]?.lengthInBars} />
             )}
+
+            {/* Layers Drawer — expands inline at the bottom of the card */}
+            {showLayers && (
+                <LayersDrawer
+                    trackId={trackId}
+                    accent={palette.accent}
+                    onClose={() => setShowLayers(false)}
+                />
+            )}
         </Card>
     );
 };
@@ -517,13 +773,13 @@ const SectionNavigator = () => {
 
 // ─── Metronome Button ──────────────────────────────────────────────────────────
 const MetronomeButton = () => {
-    const [on, setOn] = useState(true);
+    const { metronomeOn, setMetronomeOn } = useLooperStore();
     return (
         <Button
-            onClick={() => { audioEngine.toggleMetronome(); setOn(p => !p); }}
+            onClick={() => { audioEngine.toggleMetronome(); setMetronomeOn(!metronomeOn); }}
             size="sm"
-            variant={on ? 'accent' : 'outline'}
-            title={on ? 'Mute Metronome' : 'Unmute Metronome'}
+            variant={metronomeOn ? 'accent' : 'outline'}
+            title={metronomeOn ? 'Mute Metronome' : 'Unmute Metronome'}
         >
             <MetronomeIcon size={ICON_SIZE} />
         </Button>
@@ -810,7 +1066,7 @@ const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
 
 // ─── Global Action Bar ────────────────────────────────────────────────────────
 export const GlobalActionBar = () => {
-    const { isPlaying, sections, bpm, currentSectionIndex, queuedSectionIndex, mode } = useLooperStore();
+    const { isPlaying, sections, bpm, currentSectionIndex, queuedSectionIndex, mode, showLayers, setShowLayers } = useLooperStore();
     const [showBpmPopup, setShowBpmPopup] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const isLive = mode === 'live';
@@ -916,7 +1172,26 @@ export const GlobalActionBar = () => {
                         ))}
                     </Row>
 
-                    {/* ── Settings gear — replaces Load Demo in bar ── */}
+                    {/* ── Layers toggle ── */}
+                    <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,0.08)' }} />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowLayers(!showLayers)}
+                        title={showLayers ? 'Hide layers' : 'Show layers'}
+                        style={{
+                            width: 36, height: 36, padding: 0, borderRadius: 10,
+                            opacity: showLayers ? 1 : 0.5,
+                            background: showLayers ? 'rgba(167,139,250,0.15)' : 'transparent',
+                            border: showLayers ? '1px solid rgba(167,139,250,0.4)' : '1px solid transparent',
+                            color: showLayers ? '#a78bfa' : 'inherit',
+                            transition: 'all 0.2s ease',
+                        }}
+                    >
+                        <StackIcon size={18} />
+                    </Button>
+
+                    {/* ── Settings gear ── */}
                     <div style={{ position: 'relative' }}>
                         <Button
                             variant="ghost"

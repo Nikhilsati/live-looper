@@ -43,6 +43,11 @@ interface LooperStore extends EngineState {
     refreshDevices: () => Promise<void>;
     setInputDevice: (deviceId: string) => Promise<void>;
     setOutputDevice: (deviceId: string) => Promise<void>;
+    // UI State
+    showLayers: boolean;
+    setShowLayers: (v: boolean) => void;
+    metronomeOn: boolean;
+    setMetronomeOn: (v: boolean) => void;
 }
 
 const defaultTrack = (): TrackState => ({
@@ -86,6 +91,31 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     availableOutputs: [],
     inputDeviceId: null,
     outputDeviceId: null,
+    // UI State
+    showLayers: false,
+    setShowLayers: (v) => {
+        const { currentProject } = get();
+        const newSettings = { ...(currentProject?.settings ?? {}), showLayers: v };
+        set({
+            showLayers: v,
+            currentProject: currentProject ? { ...currentProject, settings: newSettings } : null,
+        });
+        if (currentProject?.id) {
+            db.projects.update(currentProject.id, { settings: newSettings, updatedAt: Date.now() });
+        }
+    },
+    metronomeOn: true,
+    setMetronomeOn: (v) => {
+        const { currentProject } = get();
+        const newSettings = { ...(currentProject?.settings ?? {}), metronomeOn: v };
+        set({
+            metronomeOn: v,
+            currentProject: currentProject ? { ...currentProject, settings: newSettings } : null,
+        });
+        if (currentProject?.id) {
+            db.projects.update(currentProject.id, { settings: newSettings, updatedAt: Date.now() });
+        }
+    },
 
     fetchProjects: async () => {
         const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
@@ -289,16 +319,21 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 break;
             case 'PROJECT_LOADED': {
                 const { project, tracks, sections, layerCounts, waveformDataMap } = event.payload;
+                const savedSettings = project.settings ?? {};
+                const metronomeOn = savedSettings.metronomeOn ?? true;
+                const showLayers = savedSettings.showLayers ?? false;
+
                 set({
                     bpm: project.bpm,
                     sections,
                     currentProject: project,
+                    metronomeOn,
+                    showLayers,
                     tracks: tracks.map((t: any, i: number) => {
                         const count = layerCounts?.[i] || 0;
                         return {
                             ...defaultTrack(),
                             isMuted: t.muted ?? false,
-                            // solo field may be absent on old records — default to false
                             isSoloed: t.solo ?? false,
                             fx: t.fx || defaultTrack().fx,
                             hasAudio: count > 0,
@@ -307,6 +342,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                         };
                     })
                 });
+                // Restore saved metronome state — setMetronome is idempotent (no-op if unchanged).
+                audioEngine.setMetronome(metronomeOn);
                 // Re-apply any persisted solo isolation to the audio engine
                 const newTracks = get().tracks;
                 const soloedIds = newTracks.map((t, i) => t.isSoloed ? i : -1).filter(i => i !== -1);

@@ -104,6 +104,10 @@ export interface ProjectRecord {
     masterLengthSamples: number;
     schemaVersion: number;
     appVersion: string;
+    settings?: {
+        metronomeOn?: boolean;
+        showLayers?: boolean;
+    };
 }
 
 export interface TrackRecord {

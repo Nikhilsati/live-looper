@@ -24,6 +24,8 @@ class AudioEngine {
     /** Shadow of each track's current mute state inside the worklet. Used by applySolo/setMute
      *  to determine whether a MUTE_TRACK toggle is actually needed. */
     private _workletMuteState: boolean[] = [false, false, false, false];
+    /** Shadow of the metronome's current on/off state in the worklet. Defaults to true (on). */
+    private _metronomeOn: boolean = true;
 
     // Storage Context
     private currentProjectId: string | null = null;
@@ -269,7 +271,14 @@ class AudioEngine {
         }
     }
 
+    setMetronome(on: boolean) {
+        if (this._metronomeOn === on) return;
+        this._metronomeOn = on;
+        this.workletNode?.port.postMessage({ type: 'MUTE_METRONOME' });
+    }
+
     toggleMetronome() {
+        this._metronomeOn = !this._metronomeOn;
         this.workletNode?.port.postMessage({ type: 'MUTE_METRONOME' });
     }
 
