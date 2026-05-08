@@ -1,9 +1,9 @@
 import type { SectionConfig, FXState, Mode, FrozenProjectSnapshot, EngineEvent, WorkletEvent, WorkletMessage } from '@live-looper/types';
 
 const DEFAULT_SECTIONS: SectionConfig[] = [
-    { index: 0, name: 'Verse', lengthInBars: 4, trackLinks: [true, true, true, true] },
-    { index: 1, name: 'Chorus', lengthInBars: 8, trackLinks: [true, true, true, true] },
-    { index: 2, name: 'Bridge', lengthInBars: 4, trackLinks: [true, true, true, true] },
+    { id: 'default-1', index: 0, name: 'Verse', lengthInBars: 4, trackLinks: [true, true, true, true] },
+    { id: 'default-2', index: 1, name: 'Chorus', lengthInBars: 8, trackLinks: [true, true, true, true] },
+    { id: 'default-3', index: 2, name: 'Bridge', lengthInBars: 4, trackLinks: [true, true, true, true] },
 ];
 
 const DEFAULT_BPM = 100;
@@ -590,10 +590,11 @@ class AudioEngine {
                 bars = 4; // safe default for brand-new sections
             }
             return {
+                id: s.id,
                 index: s.order,
                 name: s.name,
                 lengthInBars: bars,
-                trackLinks: [true, true, true, true]
+                trackLinks: s.trackLinks ?? [true, true, true, true]
             };
         });
 

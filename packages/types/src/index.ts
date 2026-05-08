@@ -2,6 +2,7 @@
 
 
 export interface SectionConfig {
+    id: string;
     index: number;
     name: string;
     lengthInBars: number;
@@ -178,6 +179,7 @@ export interface SectionRecord {
     order: number;
     lengthSamples: number;
     lengthInBars?: number; // Preferred source of truth; lengthSamples is a fallback
+    trackLinks?: boolean[]; // length 4 — which tracks play in this section
 }
 
 export interface LayerRecord {

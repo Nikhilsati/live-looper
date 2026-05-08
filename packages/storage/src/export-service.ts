@@ -118,28 +118,35 @@ export class ExportService {
                 await db.sections.add({ ...s, id: newSectionId, projectId: newProjectId });
             }
 
+            const blobIdMap = new Map<string, string>(); // oldBlobId -> newBlobId
+
             for (const l of oldLayers) {
                 // Skip deleted layers — they shouldn't be imported.
                 if (l.deletedAt) continue;
 
                 const newLayerId = uuidv4();
                 const oldAudioBlobId = l.audioBlobId;
-                const newAudioBlobId = uuidv4();
+                let newAudioBlobId = blobIdMap.get(oldAudioBlobId);
 
-                // Import audio blob
-                const blobData = await zip.file(`audio/${oldAudioBlobId}.wav`)?.async('blob');
-                if (blobData) {
-                    const oldMeta = oldAudioBlobs.find(b => b.id === oldAudioBlobId);
+                if (!newAudioBlobId) {
+                    newAudioBlobId = uuidv4();
+                    blobIdMap.set(oldAudioBlobId, newAudioBlobId);
 
-                    const audioBlob: AudioBlobRecord = {
-                        id: newAudioBlobId,
-                        projectId: newProjectId,
-                        blob: blobData,
-                        sampleRate: oldMeta?.sampleRate || 44100,
-                        channels: oldMeta?.channels || 1,
-                        lengthSamples: oldMeta?.lengthSamples || 0
-                    };
-                    await db.audioBlobs.add(audioBlob);
+                    // Import audio blob
+                    const blobData = await zip.file(`audio/${oldAudioBlobId}.wav`)?.async('blob');
+                    if (blobData) {
+                        const oldMeta = oldAudioBlobs.find(b => b.id === oldAudioBlobId);
+
+                        const audioBlob: AudioBlobRecord = {
+                            id: newAudioBlobId,
+                            projectId: newProjectId,
+                            blob: blobData,
+                            sampleRate: oldMeta?.sampleRate || 44100,
+                            channels: oldMeta?.channels || 1,
+                            lengthSamples: oldMeta?.lengthSamples || 0
+                        };
+                        await db.audioBlobs.add(audioBlob);
+                    }
                 }
 
                 await db.layers.add({

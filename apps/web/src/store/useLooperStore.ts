@@ -30,6 +30,11 @@ interface LooperStore extends EngineState {
     setQueuedSection: (index: number | null) => void;
     setSections: (sections: SectionConfig[]) => void;
     setBpm: (bpm: number) => void;
+    addSection: (name: string) => Promise<void>;
+    renameSection: (sectionId: string, newName: string) => Promise<void>;
+    deleteSection: (sectionId: string) => Promise<void>;
+    reorderSections: (sectionIds: string[]) => Promise<void>;
+    carryForwardTrack: (trackIndex: number, fromSectionId: string, toSectionId: string, enabled: boolean) => Promise<void>;
     setTrackFX: (trackId: number, fx: Partial<FXState>) => void;
     // Latency Actions
     calibrateLatency: () => void;
@@ -211,6 +216,41 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         const id = await exportService.importProject(file);
         await get().fetchProjects();
         await get().loadProject(id);
+    },
+
+    addSection: async (name: string) => {
+        const { currentProject, loadProject } = get();
+        if (!currentProject?.id) return;
+        await projectService.addSection(currentProject.id, name);
+        await loadProject(currentProject.id);
+    },
+
+    renameSection: async (sectionId: string, newName: string) => {
+        const { currentProject, loadProject } = get();
+        if (!currentProject?.id) return;
+        await projectService.updateSectionName(currentProject.id, sectionId, newName);
+        await loadProject(currentProject.id);
+    },
+
+    deleteSection: async (sectionId: string) => {
+        const { currentProject, loadProject } = get();
+        if (!currentProject?.id) return;
+        await projectService.deleteSection(sectionId);
+        await loadProject(currentProject.id);
+    },
+
+    reorderSections: async (sectionIds: string[]) => {
+        const { currentProject, loadProject } = get();
+        if (!currentProject?.id) return;
+        await projectService.reorderSections(currentProject.id, sectionIds);
+        await loadProject(currentProject.id);
+    },
+
+    carryForwardTrack: async (trackIndex: number, fromSectionId: string, toSectionId: string, enabled: boolean) => {
+        const { currentProject, loadProject } = get();
+        if (!currentProject?.id) return;
+        await projectService.carryForwardTrack(currentProject.id, trackIndex, fromSectionId, toSectionId, enabled);
+        await loadProject(currentProject.id);
     },
 
     setMode: async (targetMode) => {

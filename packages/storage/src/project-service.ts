@@ -180,6 +180,110 @@ export class ProjectService {
         });
     }
 
+    async addSection(projectId: string, name: string): Promise<string> {
+        const id = uuidv4();
+        await db.transaction('rw', [db.projects, db.sections], async () => {
+            const count = await db.sections.where({ projectId }).count();
+            const section: SectionRecord = {
+                id,
+                projectId,
+                name,
+                order: count,
+                lengthSamples: 0,
+                lengthInBars: 4,
+                trackLinks: [true, true, true, true]
+            };
+            await db.sections.add(section);
+            await db.projects.update(projectId, { updatedAt: Date.now() });
+        });
+        return id;
+    }
+
+    async deleteSection(sectionId: string): Promise<void> {
+        const section = await db.sections.get(sectionId);
+        if (!section) return;
+
+        await db.transaction('rw', [db.projects, db.sections, db.layers], async () => {
+            await db.sections.delete(sectionId);
+
+            // Fetch and delete all layers for this section. (Audioblobs are kept to avoid deleting them if shared, or we can leave them orphaned. Wait, we should probably clean up orphaned blobs later. Leaving them for now as per layer deletion standards).
+            // Usually deleteLayer deletes audioBlobId if deleted independently, but for section wipe, let's keep it simple.
+            const layers = await db.layers.where({ sectionId }).toArray();
+            await db.layers.bulkDelete(layers.map(l => l.id));
+
+            // Reorder remaining sections
+            const remaining = await db.sections.where({ projectId: section.projectId }).sortBy('order');
+            for (let i = 0; i < remaining.length; i++) {
+                if (remaining[i].order !== i) {
+                    await db.sections.update(remaining[i].id, { order: i });
+                }
+            }
+            await db.projects.update(section.projectId, { updatedAt: Date.now() });
+        });
+    }
+
+    async reorderSections(projectId: string, sectionIds: string[]): Promise<void> {
+        await db.transaction('rw', [db.projects, db.sections], async () => {
+            for (let i = 0; i < sectionIds.length; i++) {
+                await db.sections.update(sectionIds[i], { order: i });
+            }
+            await db.projects.update(projectId, { updatedAt: Date.now() });
+        });
+    }
+
+    async carryForwardTrack(projectId: string, trackIndex: number, fromSectionId: string, toSectionId: string, enabled: boolean): Promise<void> {
+        await db.transaction('rw', [db.projects, db.sections, db.tracks, db.layers], async () => {
+            // Get trackId by order
+            const track = await db.tracks.where({ projectId, order: trackIndex }).first();
+            if (!track) return;
+            const trackId = track.id;
+
+            // Update the trackLinks field on the target section
+            const targetSection = await db.sections.get(toSectionId);
+            if (targetSection) {
+                targetSection.trackLinks = targetSection.trackLinks || [true, true, true, true];
+                targetSection.trackLinks[trackIndex] = enabled;
+                await db.sections.put(targetSection);
+            }
+
+            if (enabled) {
+                // Duplicate active layers from `fromSectionId` to `toSectionId`
+                const sourceLayers = await db.layers
+                    .where({ projectId, trackId, sectionId: fromSectionId })
+                    .filter(l => !l.deletedAt)
+                    .sortBy('order');
+
+                for (const layer of sourceLayers) {
+                    const newLayer: LayerRecord = {
+                        ...layer,
+                        id: uuidv4(),
+                        sectionId: toSectionId,
+                        // Re-use the existing audio blobs!
+                        audioBlobId: layer.audioBlobId,
+                        rawAudioBlobId: layer.rawAudioBlobId,
+                    };
+                    await db.layers.add(newLayer);
+                }
+            } else {
+                // Remove all layers for this track in the `toSectionId`
+                const targetLayers = await db.layers
+                    .where({ projectId, trackId, sectionId: toSectionId })
+                    .toArray();
+
+                await db.layers.bulkDelete(targetLayers.map(l => l.id));
+            }
+
+            await db.projects.update(projectId, { updatedAt: Date.now() });
+        });
+    }
+
+    async updateSectionName(projectId: string, sectionId: string, newName: string): Promise<void> {
+        await db.transaction('rw', [db.projects, db.sections], async () => {
+            await db.sections.update(sectionId, { name: newName });
+            await db.projects.update(projectId, { updatedAt: Date.now() });
+        });
+    }
+
     async deleteProject(projectId: string): Promise<void> {
         await db.transaction('rw', [db.projects, db.tracks, db.sections, db.layers, db.audioBlobs], async () => {
             await db.projects.delete(projectId);

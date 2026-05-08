@@ -5,6 +5,7 @@ import {
 } from '@live-looper/ui';
 import { TrackControls, HeaderIndications, GlobalActionBar } from './TrackControls';
 
+import { SongPlanner } from './SongPlanner';
 import { KeyboardCheatSheet } from './KeyboardCheatSheet';
 import { DevInspector } from './DevInspector';
 import { ModeSwitcher } from './ModeSwitcher';
@@ -75,6 +76,8 @@ export const LooperWorkspace: React.FC = () => {
 
             {/* Main Content Area */}
             <Stack style={{ gap: isLive ? 20 : 32, transition: 'gap 0.3s ease' }}>
+                <SongPlanner />
+
                 {/* Track Pads — always visible, same grid layout across all modes */}
                 <TrackControls />
 

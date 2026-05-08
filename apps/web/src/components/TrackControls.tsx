@@ -14,7 +14,7 @@ const ERASE_HOLD_MS = 600;
 
 // ─── Per-Track Color Palette ──────────────────────────────────────────────────
 // Each track gets a distinct hue so your eyes can find it in < 100ms.
-const TRACK_COLORS = [
+export const TRACK_COLORS = [
     // Track 0 — Violet (purple)
     {
         idle: 'rgba(124, 58, 237, 0.10)',
