@@ -4,7 +4,7 @@ import {
     Stack, Row, Heading, Text, Button, StatusDot
 } from '@live-looper/ui';
 import { TrackControls, HeaderIndications, GlobalActionBar } from './TrackControls';
-import { LatencyMonitor } from './LatencyMonitor';
+
 import { KeyboardCheatSheet } from './KeyboardCheatSheet';
 import { DevInspector } from './DevInspector';
 import { ModeSwitcher } from './ModeSwitcher';
@@ -82,10 +82,7 @@ export const LooperWorkspace: React.FC = () => {
                 <DevInspector />
             </Stack>
 
-            {/* Sticky Performance Widget — Planning only */}
-            {!isLive && !isPractice && (
-                <LatencyMonitor />
-            )}
+
 
             {/* Global Action Bar — fixed at bottom */}
             <GlobalActionBar />

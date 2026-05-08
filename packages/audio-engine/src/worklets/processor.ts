@@ -7,10 +7,11 @@ interface LayerMeta {
 
 interface Track {
     id: number;
-    state: 'IDLE' | 'ARMED' | 'RECORDING' | 'PLAYING';
+    state: 'IDLE' | 'ARMED' | 'RECORDING' | 'POST_ROLL' | 'PLAYING';
     // Per-section buffers: sectionIndex → { masterBuffer, layers, recordBuffer }
     sections: Map<number, SectionData>;
     isMuted: boolean;
+    postRollSamplesRemaining: number;
 }
 
 interface SectionData {
@@ -87,11 +88,18 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     private queuedSectionIndex: number | null = null;
     private sectionSampleOffset: number = 0; // currentSample at start of this section loop
 
+    // Smart Snap (Pre/Post Roll)
+    private inputHistory: Float32Array = new Float32Array(0);
+    private inputHistoryWriteIdx: number = 0;
+    private smartSnapWindowSamples: number = 0;
+    private smartSnapEnabled: boolean = false;
+    private quantization: { snapToGrid: boolean; gridResolution: number } | null = null;
+
     constructor() {
         super();
 
         for (let id = 0; id < 4; id++) {
-            this.tracks.push({ id, state: 'IDLE', sections: new Map(), isMuted: false });
+            this.tracks.push({ id, state: 'IDLE', sections: new Map(), isMuted: false, postRollSamplesRemaining: 0 });
         }
 
         // Default: one section, 8 bars
@@ -116,7 +124,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                     break;
 
                 case 'CONFIG': {
-                    const { sampleRate, bpm, sections, latencySamples } = payload;
+                    const { sampleRate, bpm, sections, latencySamples, smartSnapEnabled, quantization } = payload;
                     this.sampleRate = sampleRate;
                     this.samplesPerBeat = (sampleRate * 60) / bpm;
                     if (sections && sections.length > 0) {
@@ -125,8 +133,25 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                     if (typeof latencySamples === 'number') {
                         this.latencySamples = latencySamples;
                     }
+                    if (typeof smartSnapEnabled === 'boolean') {
+                        this.smartSnapEnabled = smartSnapEnabled;
+                        console.log(`[AudioWorklet] CONFIG received. smartSnapEnabled=${smartSnapEnabled}`);
+                    }
+                    if (quantization) {
+                        this.quantization = quantization;
+                    }
+                    // Initialize the pre-roll / post-roll window size (e.g. 250ms)
+                    this.smartSnapWindowSamples = Math.floor((this.sampleRate * 250) / 1000);
+                    if (this.inputHistory.length !== this.smartSnapWindowSamples) {
+                        this.inputHistory = new Float32Array(this.smartSnapWindowSamples);
+                        this.inputHistoryWriteIdx = 0;
+                    }
                     break;
                 }
+
+                case 'SET_SMART_SNAP':
+                    this.smartSnapEnabled = payload.enabled;
+                    break;
 
                 case 'RTL_TEST':
                     this.rtlTestActive = true;
@@ -142,9 +167,25 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                     this.queuedSectionIndex = payload.sectionIndex;
                     break;
 
-                case 'SET_BPM':
-                    this.samplesPerBeat = (this.sampleRate * 60) / payload.bpm;
+                case 'SET_BPM': {
+                    const newBpm = payload.bpm;
+                    const oldSamplesPerBeat = this.samplesPerBeat;
+                    const newSamplesPerBeat = (this.sampleRate * 60) / newBpm;
+
+                    if (oldSamplesPerBeat > 0 && Math.abs(newSamplesPerBeat - oldSamplesPerBeat) > 0.001) {
+                        const ratio = newSamplesPerBeat / oldSamplesPerBeat;
+
+                        this.stretchAllSections(newSamplesPerBeat, ratio);
+
+                        // 4. Adjust playhead proportionally
+                        const currentSectionRelative = this.currentSample - this.sectionSampleOffset;
+                        const newSectionRelative = Math.floor(currentSectionRelative * ratio);
+                        this.sectionSampleOffset = this.currentSample - newSectionRelative;
+                    }
+
+                    this.samplesPerBeat = newSamplesPerBeat;
                     break;
+                }
 
                 case 'ARM_TRACK': {
                     const { trackId } = payload;
@@ -161,7 +202,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
 
                 case 'MUTE_TRACK': {
                     const track = this.tracks[payload.trackId];
-                    if (track) track.isMuted = !track.isMuted;
+                    if (track) track.isMuted = payload.muted ?? !track.isMuted;
                     break;
                 }
 
@@ -247,6 +288,313 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         return Math.floor(this.samplesPerBeat * 4 * sec.lengthInBars);
     }
 
+    private commitLayerStandard(track: Track, sectionLen: number) {
+        const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
+        const reqSize = sectionLen + 2 * this.smartSnapWindowSamples;
+        const expandedBuffer = sd.recordBuffer;
+
+        const compensatedBuffer = new Float32Array(reqSize);
+        if (this.latencySamples > 0 && this.latencySamples < reqSize) {
+            for (let s = 0; s < reqSize; s++) {
+                if (s + this.latencySamples < reqSize) {
+                    compensatedBuffer[s] = expandedBuffer[s + this.latencySamples];
+                } else {
+                    compensatedBuffer[s] = 0;
+                }
+            }
+        } else {
+            compensatedBuffer.set(expandedBuffer);
+        }
+
+        const layerBuf = new Float32Array(sectionLen);
+        for (let s = 0; s < sectionLen; s++) {
+            const readIdx = this.smartSnapWindowSamples + s;
+            if (readIdx >= 0 && readIdx < reqSize) {
+                layerBuf[s] = compensatedBuffer[readIdx];
+            }
+        }
+
+        sd.layers.push({ buffer: layerBuf });
+        for (let s = 0; s < sectionLen; s++) sd.masterBuffer[s] += layerBuf[s];
+        track.state = 'PLAYING';
+
+        const waveformData = computeWaveformData(sd.masterBuffer);
+        this.port.postMessage({
+            type: 'RECORD_STOP',
+            trackId: track.id,
+            sectionIndex: this.currentSectionIndex,
+            layerCount: sd.layers.length,
+            waveformData,
+            buffer: layerBuf
+        });
+    }
+
+    private detectOnsets(buffer: Float32Array): number[] {
+        const onsets: number[] = [];
+        const winSize = Math.floor(this.sampleRate * 0.01); // 10ms
+        const hop = Math.floor(winSize / 2);
+        let lastEnergy = 0;
+
+        const threshold = 0.05; // min energy
+        let cooldown = 0;
+
+        for (let i = 0; i < buffer.length - winSize; i += hop) {
+            let energy = 0;
+            for (let j = 0; j < winSize; j++) {
+                energy += Math.abs(buffer[i + j]);
+            }
+            energy /= winSize;
+
+            if (energy > threshold && energy > lastEnergy * 2.5 && cooldown <= 0) {
+                let maxE = 0;
+                let maxIdx = i;
+                for (let j = 0; j < winSize; j++) {
+                    if (Math.abs(buffer[i + j]) > maxE) {
+                        maxE = Math.abs(buffer[i + j]);
+                        maxIdx = i + j;
+                    }
+                }
+
+                let onsetIdx = maxIdx;
+                while (onsetIdx > i && Math.abs(buffer[onsetIdx]) > maxE * 0.1) {
+                    onsetIdx--;
+                }
+
+                onsets.push(onsetIdx);
+                cooldown = Math.floor(this.sampleRate * 0.1); // 100ms
+            }
+            lastEnergy = energy;
+            if (cooldown > 0) cooldown -= hop;
+        }
+        return onsets;
+    }
+
+    private stretchAllSections(newSamplesPerBeat: number, ratio: number) {
+        for (const track of this.tracks) {
+            track.sections.forEach((sd, sectionIndex) => {
+                const secConfig = this.sections.find(s => s.index === sectionIndex);
+                if (!secConfig) return;
+
+                const newSectionLen = Math.floor(newSamplesPerBeat * 4 * secConfig.lengthInBars);
+                if (newSectionLen === 0) return;
+
+                // 1. Stretch masterBuffer
+                const stretchedMaster = this.fastResampleLinear(sd.masterBuffer, ratio);
+                const newMaster = new Float32Array(newSectionLen);
+                newMaster.set(stretchedMaster.subarray(0, Math.min(newSectionLen, stretchedMaster.length)));
+                sd.masterBuffer = newMaster;
+
+                // 2. Stretch all layers
+                for (const layer of sd.layers) {
+                    const stretchedLayer = this.fastResampleLinear(layer.buffer, ratio);
+                    const newLayerBuf = new Float32Array(newSectionLen);
+                    newLayerBuf.set(stretchedLayer.subarray(0, Math.min(newSectionLen, stretchedLayer.length)));
+                    layer.buffer = newLayerBuf;
+                }
+
+                // 3. Resize recordBuffer
+                const reqSize = newSectionLen + 2 * this.smartSnapWindowSamples;
+                sd.recordBuffer = new Float32Array(reqSize);
+            });
+        }
+    }
+
+    /**
+     * Extremely fast O(N) linear resampling time-stretch.
+     * Alters pitch but runs in <1ms, avoiding audio thread crashes for massive lengths.
+     */
+    private fastResampleLinear(source: Float32Array, ratio: number): Float32Array {
+        if (ratio === 1) return source.slice();
+        if (ratio < 0.1 || ratio > 10) return source.slice(); // safety limits
+
+        const outLength = Math.floor(source.length * ratio);
+        const output = new Float32Array(outLength);
+
+        for (let i = 0; i < outLength; i++) {
+            const srcPos = i / ratio;
+            const idx1 = Math.floor(srcPos);
+            const idx2 = Math.min(idx1 + 1, source.length - 1);
+            const frac = srcPos - idx1;
+
+            if (idx1 >= source.length) break;
+
+            output[i] = source[idx1] * (1 - frac) + source[idx2] * frac;
+        }
+
+        return output;
+    }
+
+    private wsolaStretch(source: Float32Array, ratio: number): Float32Array {
+        if (ratio === 1) return source.slice();
+        if (ratio < 0.1 || ratio > 10) return source.slice(); // safety limits
+
+        const outLength = Math.floor(source.length * ratio);
+        const output = new Float32Array(outLength);
+
+        // Standard 40ms window
+        const winSize = Math.floor(this.sampleRate * 0.04);
+        const halfWin = Math.floor(winSize / 2);
+        const hopOut = halfWin;
+        const hopIn = hopOut / ratio;
+
+        // Create Hanning window
+        const window = new Float32Array(winSize);
+        for (let i = 0; i < winSize; i++) {
+            window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (winSize - 1)));
+        }
+
+        // Search boundaries a ±15ms neighborhood for best cross-correlation
+        const searchMaxOffset = Math.floor(this.sampleRate * 0.015);
+
+        let inPos = 0;
+        let outPos = 0;
+
+        // First frame is a direct copy to output
+        for (let i = 0; i < winSize && i < source.length && i < outLength; i++) {
+            output[i] += source[i] * window[i];
+        }
+
+        outPos += hopOut;
+        inPos += hopIn;
+
+        while (outPos + winSize < outLength && inPos + winSize < source.length) {
+            let bestOffset = Math.floor(inPos);
+            let maxCorrelation = -Infinity;
+
+            // To ensure phase alignment, we cross-correlate the tail of the audio 
+            // ALREADY written to output, with the start of the CANDIDATE windows in the source.
+            // We search around the theoretical next inPos.
+            const idealNextInPos = Math.floor(inPos);
+            const searchStart = Math.max(0, idealNextInPos - searchMaxOffset);
+            const searchEnd = Math.min(source.length - winSize, idealNextInPos + searchMaxOffset);
+
+            for (let offset = searchStart; offset <= searchEnd; offset++) {
+                let correlation = 0;
+
+                // Correlate the first half of the candidate window with the overlapping portion of already written output 
+                for (let i = 0; i < halfWin; i++) {
+                    const outSample = output[outPos + i]; // Already written audio
+                    const srcSample = source[offset + i]; // Candidate audio overlap
+                    correlation += outSample * srcSample;
+                }
+
+                if (correlation > maxCorrelation) {
+                    maxCorrelation = correlation;
+                    bestOffset = offset;
+                }
+            }
+
+            // Fallback if cross-correlation failed (e.g., pure silence)
+            if (maxCorrelation === -Infinity) {
+                bestOffset = idealNextInPos;
+            }
+
+            // Now apply overlap-add using the perfectly aligned phase offset
+            for (let i = 0; i < winSize; i++) {
+                output[outPos + i] += source[bestOffset + i] * window[i];
+            }
+
+            outPos += hopOut;
+            inPos += hopIn;
+        }
+
+        return output;
+    }
+
+    private commitLayerWithSmartSnap(track: Track, sectionLen: number) {
+        const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
+        const reqSize = sectionLen + 2 * this.smartSnapWindowSamples;
+        const expandedBuffer = sd.recordBuffer;
+
+        const compensatedBuffer = new Float32Array(reqSize);
+        if (this.latencySamples > 0 && this.latencySamples < reqSize) {
+            for (let s = 0; s < reqSize; s++) {
+                if (s + this.latencySamples < reqSize) {
+                    compensatedBuffer[s] = expandedBuffer[s + this.latencySamples];
+                } else {
+                    compensatedBuffer[s] = 0;
+                }
+            }
+        } else {
+            compensatedBuffer.set(expandedBuffer);
+        }
+
+        // --- Full Layer Auto Time Sync (WSOLA) ---
+        const rawOnsets = this.detectOnsets(compensatedBuffer);
+
+        // Add start and end boundaries to onsets list
+        const validOnsets = rawOnsets.filter(o => o > this.smartSnapWindowSamples && o < this.smartSnapWindowSamples + sectionLen);
+        const onsets = [this.smartSnapWindowSamples, ...validOnsets, this.smartSnapWindowSamples + sectionLen];
+
+        // Quantize onsets to nearest grid point
+        const quantizedOnsets = onsets.map(onset => {
+            const relativeOffset = onset - this.smartSnapWindowSamples;
+            const gridRes = this.quantization?.gridResolution || 16;
+            const samplesPerGrid = this.samplesPerBeat * (4 / gridRes);
+
+            const gridIndex = Math.round(relativeOffset / samplesPerGrid);
+            let quantizedIdx = this.smartSnapWindowSamples + gridIndex * samplesPerGrid;
+
+            if (quantizedIdx < this.smartSnapWindowSamples) quantizedIdx = this.smartSnapWindowSamples;
+            if (quantizedIdx > this.smartSnapWindowSamples + sectionLen) quantizedIdx = this.smartSnapWindowSamples + sectionLen;
+
+            return quantizedIdx;
+        });
+
+        // Stretch and stitch
+        const stretchedBuffer = new Float32Array(sectionLen);
+
+        for (let i = 0; i < onsets.length - 1; i++) {
+            const startSrc = onsets[i];
+            const endSrc = onsets[i + 1];
+            const startTgt = quantizedOnsets[i];
+            const endTgt = quantizedOnsets[i + 1];
+
+            const srcLength = endSrc - startSrc;
+            const tgtLength = endTgt - startTgt;
+
+            if (srcLength > 0 && tgtLength > 0) {
+                const ratio = tgtLength / srcLength;
+                const sourceSegment = compensatedBuffer.slice(Math.floor(startSrc), Math.floor(endSrc));
+                const stretchedSegment = this.wsolaStretch(sourceSegment, ratio);
+
+                const writeStart = Math.floor(startTgt - this.smartSnapWindowSamples);
+                for (let s = 0; s < stretchedSegment.length; s++) {
+                    if (writeStart + s >= 0 && writeStart + s < sectionLen) {
+                        stretchedBuffer[writeStart + s] += stretchedSegment[s];
+                    }
+                }
+            }
+        }
+
+        // Apply slight crossfade at the boundaries to prevent clicks
+        const xfadeSamples = Math.floor(this.sampleRate * 0.005); // 5ms fade
+        for (let s = 0; s < xfadeSamples; s++) {
+            if (s < sectionLen) {
+                const fade = Math.sin((s / xfadeSamples) * Math.PI / 2); // 0 to 1
+                stretchedBuffer[s] = stretchedBuffer[s] * fade;
+                stretchedBuffer[sectionLen - 1 - s] = stretchedBuffer[sectionLen - 1 - s] * fade;
+            }
+        }
+
+        sd.layers.push({ buffer: stretchedBuffer });
+        for (let s = 0; s < sectionLen; s++) {
+            sd.masterBuffer[s] += stretchedBuffer[s];
+        }
+        track.state = 'PLAYING';
+
+        const waveformData = computeWaveformData(sd.masterBuffer);
+        this.port.postMessage({
+            type: 'RECORD_STOP',
+            trackId: track.id,
+            sectionIndex: this.currentSectionIndex,
+            layerCount: sd.layers.length,
+            waveformData,
+            buffer: stretchedBuffer,
+            rawBuffer: compensatedBuffer
+        });
+    }
+
     process(inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>) {
         const currentTime = (globalThis as any).currentTime;
         const delta = this.lastProcessTime ? (currentTime - this.lastProcessTime) : 0;
@@ -263,6 +611,16 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         const outputCount = outputs[0][0].length;
 
         for (let i = 0; i < outputCount; i++) {
+            // Update global input history
+            if (this.smartSnapWindowSamples > 0) {
+                if (inputChannel) {
+                    this.inputHistory[this.inputHistoryWriteIdx] = inputChannel[i];
+                } else {
+                    this.inputHistory[this.inputHistoryWriteIdx] = 0;
+                }
+                this.inputHistoryWriteIdx = (this.inputHistoryWriteIdx + 1) % this.smartSnapWindowSamples;
+            }
+
             this.currentSample++;
             const sectionRelative = this.currentSample - this.sectionSampleOffset;
             const sectionSample = sectionLen > 0 ? (sectionRelative % sectionLen) : 0;
@@ -341,45 +699,55 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                 if (track.state === 'ARMED' && sectionSample === 1) {
                     track.state = 'RECORDING';
                     const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
-                    sd.recordBuffer.fill(0);
+
+                    const reqSize = sectionLen + 2 * this.smartSnapWindowSamples;
+                    if (sd.recordBuffer.length !== reqSize) {
+                        sd.recordBuffer = new Float32Array(reqSize);
+                    } else {
+                        sd.recordBuffer.fill(0);
+                    }
+
+                    // Copy pre-roll from inputHistory to the start of recordBuffer
+                    for (let s = 0; s < this.smartSnapWindowSamples; s++) {
+                        const readIdx = (this.inputHistoryWriteIdx + s) % this.smartSnapWindowSamples;
+                        sd.recordBuffer[s] = this.inputHistory[readIdx];
+                    }
                 }
 
                 if (track.state === 'RECORDING' && inputChannel) {
                     const recIdx = (sectionRelative - 1 + sectionLen) % sectionLen;
                     const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
-                    sd.recordBuffer[recIdx] += inputChannel[i];
+
+                    if (this.smartSnapWindowSamples + recIdx < sd.recordBuffer.length) {
+                        sd.recordBuffer[this.smartSnapWindowSamples + recIdx] += inputChannel[i];
+                    }
                 }
 
-                // End of section: commit layer
+                // End of section: wait for post-roll
                 if (track.state === 'RECORDING' && sectionSample === 0) {
-                    const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
-                    const layerBuf = new Float32Array(sectionLen);
+                    track.state = 'POST_ROLL';
+                    track.postRollSamplesRemaining = this.smartSnapWindowSamples;
+                }
 
-                    // --- LATENCY COMPENSATION ---
-                    // The audio we just recorded is "late" by latencySamples.
-                    // We need to shift it left (early) to align.
-                    if (this.latencySamples > 0 && this.latencySamples < sectionLen) {
-                        for (let s = 0; s < sectionLen; s++) {
-                            const sourceIdx = (s + this.latencySamples) % sectionLen;
-                            layerBuf[s] = sd.recordBuffer[sourceIdx];
+                if (track.state === 'POST_ROLL') {
+                    if (inputChannel) {
+                        const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
+                        const postRollIdx = this.smartSnapWindowSamples - track.postRollSamplesRemaining;
+                        const writeIdx = this.smartSnapWindowSamples + sectionLen + postRollIdx;
+                        if (writeIdx >= 0 && writeIdx < sd.recordBuffer.length) {
+                            sd.recordBuffer[writeIdx] += inputChannel[i];
                         }
-                    } else {
-                        layerBuf.set(sd.recordBuffer);
                     }
 
-                    sd.layers.push({ buffer: layerBuf });
-                    for (let s = 0; s < sectionLen; s++) sd.masterBuffer[s] += layerBuf[s];
-                    track.state = 'PLAYING';
+                    track.postRollSamplesRemaining--;
 
-                    const waveformData = computeWaveformData(sd.masterBuffer);
-                    this.port.postMessage({
-                        type: 'RECORD_STOP',
-                        trackId: track.id,
-                        sectionIndex: this.currentSectionIndex,
-                        layerCount: sd.layers.length,
-                        waveformData,
-                        buffer: layerBuf // Send the actual buffer for storage
-                    });
+                    if (track.postRollSamplesRemaining <= 0) {
+                        if (this.smartSnapEnabled) {
+                            this.commitLayerWithSmartSnap(track, sectionLen);
+                        } else {
+                            this.commitLayerStandard(track, sectionLen);
+                        }
+                    }
                 }
             }
 
@@ -407,8 +775,9 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         }
 
         // ── Tick ─────────────────────────────────────────────────────────────
-        const beatDuration = Math.floor(this.samplesPerBeat);
-        if (beatDuration > 0 && this.currentSample % beatDuration === 0) {
+        // Send UI updates at a fixed interval independent of BPM to avoid skipped updates at odd BPMs.
+        // 1024 samples at 44.1kHz / 48kHz provides a stable ~43-46Hz UI loop.
+        if (this.currentSample % 1024 === 0 && this.samplesPerBeat > 0) {
             const sectionRelative = this.currentSample - this.sectionSampleOffset;
             const sectionLen2 = this.currentSectionLen();
             const sectionBeat = Math.floor(sectionRelative / this.samplesPerBeat);

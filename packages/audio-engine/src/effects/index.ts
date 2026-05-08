@@ -1,0 +1,11 @@
+export { BaseEffect } from './BaseEffect';
+export { NoiseGateEffect } from './NoiseGateEffect';
+export { EQEffect } from './EQEffect';
+export { CompressorEffect } from './CompressorEffect';
+export { DriveEffect } from './DriveEffect';
+export { ChorusEffect } from './ChorusEffect';
+export { PhaserEffect } from './PhaserEffect';
+export { TremoloEffect } from './TremoloEffect';
+export { DelayEffect } from './DelayEffect';
+export { ReverbEffect } from './ReverbEffect';
+export { PanEffect } from './PanEffect';

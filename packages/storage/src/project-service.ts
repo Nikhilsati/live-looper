@@ -8,6 +8,7 @@ import type {
     LayerRecord,
     AudioBlobRecord
 } from '@live-looper/types';
+import { FXBuilder } from '@live-looper/types';
 
 export class ProjectService {
     async createProject(name: string, bpm: number): Promise<string> {
@@ -23,7 +24,12 @@ export class ProjectService {
             timeSignature: '4/4',
             masterLengthSamples: 0,
             schemaVersion: 1,
-            appVersion: '0.1.0'
+            appVersion: '0.1.0',
+            settings: {
+                metronomeOn: true,
+                showLayers: true,
+                smartSnapEnabled: true
+            }
         };
 
         await db.transaction('rw', [db.projects, db.tracks, db.sections], async () => {
@@ -64,14 +70,25 @@ export class ProjectService {
         trackId: string;
         sectionId: string;
         audioData: Float32Array;
+        rawAudioData?: Float32Array;
         sampleRate: number;
         gain?: number;
     }): Promise<void> {
-        const { projectId, trackId, sectionId, audioData, sampleRate, gain = 1 } = params;
+        const { projectId, trackId, sectionId, audioData, rawAudioData, sampleRate, gain = 1 } = params;
 
         const wavBlob = encodePCM16WAV(audioData, sampleRate);
         const audioBlobId = uuidv4();
         const layerId = uuidv4();
+
+        console.log(`[ProjectService] Saving layer: has rawAudioData? ${!!rawAudioData}`, rawAudioData ? rawAudioData.length : 0);
+
+        let rawAudioBlobId: string | undefined;
+        let rawWavBlob: Blob | undefined;
+
+        if (rawAudioData) {
+            rawWavBlob = encodePCM16WAV(rawAudioData, sampleRate);
+            rawAudioBlobId = uuidv4();
+        }
 
         await db.transaction('rw', [db.layers, db.audioBlobs, db.projects], async () => {
             const audioBlob: AudioBlobRecord = {
@@ -83,6 +100,18 @@ export class ProjectService {
                 lengthSamples: audioData.length
             };
             await db.audioBlobs.add(audioBlob);
+
+            if (rawWavBlob && rawAudioBlobId && rawAudioData) {
+                const rawAudioBlob: AudioBlobRecord = {
+                    id: rawAudioBlobId,
+                    projectId,
+                    blob: rawWavBlob,
+                    sampleRate,
+                    channels: 1,
+                    lengthSamples: rawAudioData.length
+                };
+                await db.audioBlobs.add(rawAudioBlob);
+            }
 
             // Only count active (non-deleted) layers for the order field.
             const activeLayerCount = await db.layers
@@ -96,6 +125,7 @@ export class ProjectService {
                 trackId,
                 sectionId,
                 audioBlobId,
+                rawAudioBlobId,
                 gain,
                 order: activeLayerCount,
                 deletedAt: null,
@@ -166,14 +196,7 @@ export class ProjectService {
     }
 
     private getDefaultFX() {
-        return {
-            eq: { low: 0, mid: 0, midFreq: 1000, high: 0 },
-            compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 },
-            drive: { amount: 0, enabled: false },
-            delay: { time: 0.5, feedback: 0.3, mix: 0, enabled: false },
-            reverb: { mix: 0, enabled: false },
-            pan: 0,
-        };
+        return new FXBuilder().build();
     }
 }
 

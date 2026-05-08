@@ -11,12 +11,19 @@ const DEFAULT_BPM = 100;
 import { TrackFXChain } from './TrackFXChain';
 import { MasterBus } from './MasterBus';
 import { db, projectService } from '@live-looper/storage';
+import { FXBuilder } from '@live-looper/types';
 
 class AudioEngine {
     context: AudioContext | null = null;
     workletNode: AudioWorkletNode | null = null;
     trackFX: TrackFXChain[] = [];
+    liveTrackFX: TrackFXChain | null = null;
     masterBus: MasterBus | null = null;
+    performerBus: GainNode | null = null;
+    performerDestination: MediaStreamAudioDestinationNode | null = null;
+    performerContext: AudioContext | null = null;
+    performerSource: MediaStreamAudioSourceNode | null = null;
+    private dualOutputEnabled: boolean = false;
 
     private currentStream: MediaStream | null = null;
     private currentInputNode: MediaStreamAudioSourceNode | null = null;
@@ -32,6 +39,7 @@ class AudioEngine {
     private trackIdMap: string[] = []; // index 0-3 -> UUID
     private sectionIdMap: string[] = []; // index 0-N -> UUID
     private savedProjectId: string | null = null;
+    private smartSnapEnabled: boolean = true;
 
     private listeners: ((event: EngineEvent) => void)[] = [];
     private static instance: AudioEngine;
@@ -64,9 +72,16 @@ class AudioEngine {
 
         // @ts-ignore
         const processorUrl = new URL('./worklets/processor.ts', import.meta.url).href;
+        // @ts-ignore
+        const gateUrl = new URL('./worklets/noise-gate-processor.ts', import.meta.url).href;
+
+        const bustedUrl = processorUrl + '?t=' + Date.now();
+        const bustedGateUrl = gateUrl + '?t=' + Date.now();
 
         try {
-            await this.context.audioWorklet.addModule(processorUrl);
+            await this.context.audioWorklet.addModule(bustedUrl);
+            await this.context.audioWorklet.addModule(bustedGateUrl);
+
             this.workletNode = new AudioWorkletNode(this.context, 'live-looper-processor', {
                 numberOfInputs: 1,
                 numberOfOutputs: 5,
@@ -75,20 +90,51 @@ class AudioEngine {
 
             this.masterBus = new MasterBus(this.context);
 
+            this.performerDestination = this.context.createMediaStreamDestination();
+            this.performerBus = this.context.createGain();
+            this.performerBus.connect(this.performerDestination);
+
+            // Create secondary audio context for zero-latency performer loopback
+            this.performerContext = new AudioContext({ latencyHint: 'interactive', sampleRate: this.context.sampleRate });
+            this.performerSource = this.performerContext.createMediaStreamSource(this.performerDestination.stream);
+            this.performerSource.connect(this.performerContext.destination);
+
             for (let i = 0; i < 4; i++) {
                 const chain = new TrackFXChain(this.context);
                 this.trackFX.push(chain);
+
+                // Audience Mix (with FX)
                 this.workletNode.connect(chain.input, i);
                 chain.output.connect(this.masterBus.input);
+
+                // Performer Mix (raw track audio - bypass MasterBus for zero latency)
+                this.workletNode.connect(this.performerBus, i);
             }
 
-            // Metronome (output 4) directly to master bus for now
-            this.workletNode.connect(this.masterBus.input, 4);
+            // Live Track FX Chain
+            this.liveTrackFX = new TrackFXChain(this.context);
+            // Connect Live Track directly to Master, and also into Performer Bus
+            this.liveTrackFX.output.connect(this.masterBus.input);
+            this.liveTrackFX.output.connect(this.performerBus);
+
+            // Metronome (output 4) routing based on dual output mode
+            if (this.dualOutputEnabled) {
+                this.workletNode.connect(this.performerBus, 4);
+                // Context will be resumed in start() 
+            } else {
+                this.workletNode.connect(this.masterBus.input, 4);
+                this.performerContext.suspend();
+            }
 
             this.workletNode.port.onmessage = (event) => {
                 const data = event.data as WorkletEvent;
                 this.handleMessage(data);
                 this.notify(data);
+            };
+
+            this.workletNode.onprocessorerror = (e) => {
+                console.error("AudioWorklet Processor Crashed:", e);
+                this.notify({ type: 'ENGINE_CRASHED' });
             };
 
             const savedLatency = localStorage.getItem('looper_rtl_samples');
@@ -100,7 +146,8 @@ class AudioEngine {
                     sampleRate: this.context.sampleRate,
                     bpm,
                     sections,
-                    latencySamples
+                    latencySamples,
+                    smartSnapEnabled: this.smartSnapEnabled
                 },
             });
 
@@ -117,7 +164,14 @@ class AudioEngine {
         const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
         this.workletNode.port.postMessage({
             type: 'CONFIG',
-            payload: { sampleRate: this.context.sampleRate, bpm, sections, latencySamples }
+            payload: {
+                sampleRate: this.context.sampleRate,
+                bpm,
+                sections,
+                latencySamples,
+                smartSnapEnabled: this.smartSnapEnabled,
+                quantization: { snapToGrid: false, gridResolution: 16 } // Initial fallback
+            }
         });
     }
 
@@ -170,6 +224,7 @@ class AudioEngine {
             const source = this.context.createMediaStreamSource(stream);
             this.currentInputNode = source;
             if (this.workletNode) source.connect(this.workletNode);
+            if (this.liveTrackFX) source.connect(this.liveTrackFX.input);
             console.log('Microphone connected', deviceId ?? '(default)');
         } catch (e) {
             console.error('Error accessing microphone', e);
@@ -200,6 +255,40 @@ class AudioEngine {
         }
     }
 
+    /** Route the performer audio element to a specific device. */
+    async setPerformerOutputDevice(deviceId: string) {
+        if (!this.performerContext) return;
+        try {
+            await (this.performerContext as any).setSinkId(deviceId);
+            console.log('Performer output device set to', deviceId);
+        } catch (e: any) {
+            if (e?.name === 'NotSupportedError') {
+                console.warn('setSinkId not supported in this browser.');
+            } else {
+                console.error('Failed to set performer output device', e);
+            }
+        }
+    }
+
+    setDualOutputMode(enabled: boolean) {
+        this.dualOutputEnabled = enabled;
+        if (!this.context || !this.workletNode || !this.masterBus || !this.performerBus || !this.performerContext) return;
+
+        try {
+            this.workletNode.disconnect(4); // Disconnect metronome from its current bus
+        } catch (e) {
+            // Might throw if not connected, safe to ignore
+        }
+
+        if (enabled) {
+            this.workletNode.connect(this.performerBus, 4);
+            if (this.performerContext.state === 'suspended') this.performerContext.resume();
+        } else {
+            this.workletNode.connect(this.masterBus.input, 4);
+            this.performerContext.suspend();
+        }
+    }
+
     /** List available audio input and output devices. */
     async enumerateDevices(): Promise<{ inputs: MediaDeviceInfo[]; outputs: MediaDeviceInfo[] }> {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -211,6 +300,7 @@ class AudioEngine {
 
     start() {
         if (this.context?.state === 'suspended') this.context.resume();
+        if (this.dualOutputEnabled && this.performerContext?.state === 'suspended') this.performerContext.resume();
         this.initInput();
         this.workletNode?.port.postMessage({ type: 'START' });
     }
@@ -256,7 +346,7 @@ class AudioEngine {
 
             const current = this._workletMuteState[i] ?? false;
             if (effectiveMuted !== current) {
-                this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId: i } });
+                this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId: i, muted: effectiveMuted } });
                 this._workletMuteState[i] = effectiveMuted;
             }
         }
@@ -266,7 +356,7 @@ class AudioEngine {
     setMute(trackId: number, muted: boolean) {
         const current = this._workletMuteState[trackId] ?? false;
         if (muted !== current) {
-            this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId } });
+            this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId, muted } });
             this._workletMuteState[trackId] = muted;
         }
     }
@@ -305,6 +395,25 @@ class AudioEngine {
         }
     }
 
+    updateLiveTrackFX(fxState: FXState, bpm: number) {
+        if (this.liveTrackFX) {
+            this.liveTrackFX.update(fxState, bpm);
+        }
+    }
+
+    setLiveTrackMute(muted: boolean) {
+        if (this.liveTrackFX) {
+            // Disconnect if muted, connect if unmuted.
+            // But an easier way is to just control the gain of the output node.
+            this.liveTrackFX.output.gain.setTargetAtTime(muted ? 0 : 1, this.context!.currentTime, 0.05);
+        }
+    }
+
+    setSmartSnapEnabled(enabled: boolean) {
+        this.smartSnapEnabled = enabled;
+        this.workletNode?.port.postMessage({ type: 'SET_SMART_SNAP', payload: { enabled } });
+    }
+
     setBpm(bpm: number) {
         this.workletNode?.port.postMessage({ type: 'SET_BPM', payload: { bpm } });
     }
@@ -328,6 +437,9 @@ class AudioEngine {
         snapshot.tracks.forEach((track, i) => {
             this.updateFX(i, track.fx, snapshot.bpm);
         });
+
+        this.updateLiveTrackFX(snapshot.liveTrack.fx, snapshot.bpm);
+        this.setLiveTrackMute(snapshot.liveTrack.isMuted);
 
         // Pre-allocate or lock structures in worklet
         this.workletNode?.port.postMessage({
@@ -416,9 +528,10 @@ class AudioEngine {
                     trackId,
                     sectionId,
                     audioData: data.buffer,
+                    rawAudioData: data.rawBuffer,
                     sampleRate: this.context!.sampleRate
                 });
-                console.log('Layer saved to IndexedDB');
+                console.log('Layer saved to IndexedDB' + (data.rawBuffer ? ' (with raw snap data)' : ''));
             }
         }
 
@@ -484,15 +597,29 @@ class AudioEngine {
             };
         });
 
+        const projectSmartSnap = project.settings?.smartSnapEnabled ?? true;
+        this.smartSnapEnabled = projectSmartSnap;
+
         // Sync worklet with the resolved section config
         this.workletNode?.port.postMessage({
             type: 'CONFIG',
-            payload: { sampleRate, bpm: project.bpm, sections: sectionConfigs, latencySamples }
+            payload: {
+                sampleRate,
+                bpm: project.bpm,
+                sections: sectionConfigs,
+                latencySamples,
+                smartSnapEnabled: projectSmartSnap,
+                quantization: { snapToGrid: true, gridResolution: 16 } // We could let store manage this later, hardcoding for now so WSOLA uses 1/16th.
+            }
         });
 
         // Apply FX per track
         tracks.forEach((t: any, i: number) => {
-            if (t.fx) this.updateFX(i, t.fx, project.bpm);
+            if (t.fx) {
+                // Ensure all legacy properties (e.g. noiseGate) are patched
+                const mergedFX = new FXBuilder(t.fx).build();
+                this.updateFX(i, mergedFX, project.bpm);
+            }
         });
 
         // Restore persisted mute state — worklet starts all tracks unmuted after
@@ -501,7 +628,7 @@ class AudioEngine {
         tracks.forEach((t: any, i: number) => {
             const shouldBeMuted = t.muted ?? false;
             if (shouldBeMuted) {
-                this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId: i } });
+                this.workletNode?.port.postMessage({ type: 'MUTE_TRACK', payload: { trackId: i, muted: true } });
                 this._workletMuteState[i] = true;
             }
         });
@@ -540,11 +667,21 @@ class AudioEngine {
             }
         }
 
+        // Default live track state if not present in saved settings
+        const loadedLiveTrack = project.settings?.liveTrack;
+        const liveTrackState = loadedLiveTrack ? {
+            ...loadedLiveTrack,
+            fx: new FXBuilder(loadedLiveTrack.fx).build()
+        } : {
+            isMuted: false,
+            fx: new FXBuilder().build()
+        };
+
         // Notify the UI store — pass the same SectionConfig[] the worklet received,
         // plus waveform data so the UI shows previews without a second async cycle.
         this.notify({
             type: 'PROJECT_LOADED',
-            payload: { project, tracks, sections: sectionConfigs, layerCounts, waveformDataMap }
+            payload: { project, tracks, sections: sectionConfigs, layerCounts, waveformDataMap, liveTrack: liveTrackState }
         });
     }
 

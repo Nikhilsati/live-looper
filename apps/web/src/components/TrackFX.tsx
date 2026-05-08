@@ -1,179 +1,426 @@
+import React from 'react';
 import { useLooperStore } from '../store/useLooperStore';
-import { Card, Stack, Row, Label, ValueText, Slider, Button, Grid, Heading, Switch } from '@live-looper/ui';
-import { XIcon, WaveformIcon, LightningIcon, ClockIcon, SpeakerHighIcon, SlidersIcon, WavesIcon } from '@phosphor-icons/react';
+import { Card, Row, Heading, Switch, Button, Knob } from '@live-looper/ui';
+import {
+    XIcon, SlidersIcon, SpeakerSlashIcon, WaveformIcon,
+    SpeakerHighIcon, LightningIcon, ClockIcon, WavesIcon,
+    WaveTriangleIcon, CirclesFourIcon, ActivityIcon
+} from '@phosphor-icons/react';
 import type { FXState } from '@live-looper/types';
 
 interface TrackFXProps {
-    trackId: number;
+    trackId: number | 'live';
     onClose: () => void;
 }
 
+// ─── Per-module color palette ─────────────────────────────────────────────────
+const COLORS = {
+    noiseGate: '#4ade80',   // green
+    eq: '#818cf8',   // indigo
+    compressor: '#facc15',   // yellow
+    drive: '#f97316',   // orange
+    chorus: '#c084fc',   // violet
+    phaser: '#34d399',   // emerald
+    tremolo: '#fbbf24',  // amber
+    delay: '#38bdf8',   // sky
+    reverb: '#f472b6',   // pink
+    pan: '#94a3b8',   // slate
+} as const;
+
 export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
-    const track = useLooperStore(state => state.tracks[trackId]);
+    const isLive = trackId === 'live';
+    const track = useLooperStore(state => isLive ? state.liveTrack : state.tracks[trackId as number]);
     const setTrackFX = useLooperStore(state => state.setTrackFX);
+    const setLiveTrackState = useLooperStore(state => state.setLiveTrackState);
 
     if (!track) return null;
 
     const { fx } = track;
 
     const updateFX = (section: keyof FXState, params: any) => {
-        setTrackFX(trackId, { [section]: { ...(fx as any)[section], ...params } });
+        if (isLive) {
+            setLiveTrackState({ fx: { ...fx, [section]: { ...(fx as any)[section], ...params } } });
+        } else {
+            setTrackFX(trackId as number, { [section]: { ...(fx as any)[section], ...params } });
+        }
+    };
+
+    const updatePan = (val: number) => {
+        if (isLive) setLiveTrackState({ fx: { ...fx, pan: val } });
+        else setTrackFX(trackId as number, { pan: val });
     };
 
     return (
         <Card className="fx-panel" style={{
             position: 'relative',
             width: '100%',
-            maxWidth: '640px',
-            padding: '28px',
+            maxWidth: '1060px',
+            padding: '20px 20px 16px',
             background: 'var(--background)',
             border: '1px solid var(--border)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-            boxSizing: 'border-box'
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
+            boxSizing: 'border-box',
         }}>
-            <Stack style={{ gap: '28px' }}>
-                <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Row style={{ alignItems: 'center', gap: '16px' }}>
-                        <div style={{ background: 'var(--secondary)', padding: '10px', borderRadius: '12px', display: 'flex' }}>
-                            <SlidersIcon size={20} style={{ color: 'var(--primary)' }} />
-                        </div>
-                        <Heading style={{ fontSize: '22px', margin: 0 }}>Track {trackId + 1} Master FX</Heading>
-                    </Row>
-                    <Button onClick={onClose} variant="ghost" style={{ padding: '8px', borderRadius: '50%', width: 44, height: 44 }}>
-                        <XIcon size={20} />
-                    </Button>
+            {/* Header */}
+            <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <Row style={{ alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.06)', padding: '8px', borderRadius: '10px', display: 'flex' }}>
+                        <SlidersIcon size={16} style={{ color: 'var(--primary)' }} />
+                    </div>
+                    <Heading style={{ fontSize: '14px', margin: 0, letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.9 }}>
+                        {isLive ? 'Live Track' : `Track ${(trackId as number) + 1}`} · Effects Chain
+                    </Heading>
                 </Row>
+                <Button onClick={onClose} variant="ghost" style={{ padding: '6px', borderRadius: '50%', width: 36, height: 36 }}>
+                    <XIcon size={16} />
+                </Button>
+            </Row>
 
-                <Grid cols="1fr 1fr" style={{ gap: '24px' }}>
-                    {/* EQ Section */}
-                    <Card style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
-                        <Stack style={{ gap: '16px' }}>
-                            <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                <WaveformIcon size={16} style={{ color: 'var(--primary)' }} />
-                                <Label style={{ fontWeight: 800 }}>EQ (3-Band)</Label>
-                            </Row>
-                            <Stack style={{ gap: '14px' }}>
-                                <ControlSlider label="Low" value={fx.eq.low} min={-12} max={12} step={0.1} unit="dB" onChange={(v: number) => updateFX('eq', { low: v })} />
-                                <ControlSlider label="Mid" value={fx.eq.mid} min={-12} max={12} step={0.1} unit="dB" onChange={(v: number) => updateFX('eq', { mid: v })} />
-                                <ControlSlider label="High" value={fx.eq.high} min={-12} max={12} step={0.1} unit="dB" onChange={(v: number) => updateFX('eq', { high: v })} />
-                            </Stack>
-                        </Stack>
-                    </Card>
+            {/* Rack */}
+            <div className="fx-rack">
 
-                    {/* Compressor Section */}
-                    <Card style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
-                        <Stack style={{ gap: '16px' }}>
-                            <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                <SpeakerHighIcon size={16} style={{ color: 'var(--success)' }} />
-                                <Label style={{ fontWeight: 800 }}>Dynamics (Comp)</Label>
-                            </Row>
-                            <Stack style={{ gap: '14px' }}>
-                                <ControlSlider label="Thresh" value={fx.compressor.threshold} min={-60} max={0} step={1} unit="dB" onChange={(v: number) => updateFX('compressor', { threshold: v })} />
-                                <ControlSlider label="Ratio" value={fx.compressor.ratio} min={1} max={20} step={0.1} unit=":1" onChange={(v: number) => updateFX('compressor', { ratio: v })} />
-                                <ControlSlider label="Gain" value={fx.compressor.gain} min={0} max={24} step={1} unit="dB" onChange={(v: number) => updateFX('compressor', { gain: v })} />
-                            </Stack>
-                        </Stack>
-                    </Card>
+                {/* ── Noise Gate — single column ── */}
+                <FxModule
+                    name="Noise GT"
+                    color={COLORS.noiseGate}
+                    enabled={fx.noiseGate.enabled}
+                    onToggle={v => updateFX('noiseGate', { enabled: v })}
+                    icon={<SpeakerSlashIcon size={10} />}
+                    cols="1fr"
+                    moduleWidth={96}
+                    knobGap={12}
+                >
+                    <Knob color={COLORS.noiseGate} size={52} label="Thresh" unit="dB"
+                        value={fx.noiseGate.threshold} min={-80} max={0} step={1}
+                        onChange={v => updateFX('noiseGate', { threshold: v })} />
+                    <Knob color={COLORS.noiseGate} size={52} label="Atk" unit="s"
+                        value={fx.noiseGate.attack} min={0.001} max={0.5} step={0.001}
+                        onChange={v => updateFX('noiseGate', { attack: v })} />
+                    <Knob color={COLORS.noiseGate} size={52} label="Rel" unit="s"
+                        value={fx.noiseGate.release} min={0.01} max={2.0} step={0.01}
+                        onChange={v => updateFX('noiseGate', { release: v })} />
+                </FxModule>
 
-                    {/* Drive Section */}
-                    <Card style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
-                        <Stack style={{ gap: '16px' }}>
-                            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                    <LightningIcon size={16} style={{ color: 'var(--warning)' }} />
-                                    <Label style={{ fontWeight: 800 }}>Drive</Label>
-                                </Row>
-                                <Switch checked={fx.drive.enabled} onChange={(v) => updateFX('drive', { enabled: v })} />
-                            </Row>
-                            <ControlSlider label="Amount" value={fx.drive.amount} min={0} max={1} step={0.01} unit="" onChange={(v: number) => updateFX('drive', { amount: v })} />
-                        </Stack>
-                    </Card>
+                {/* ── EQ 3-Band — single column ── */}
+                <FxModule
+                    name="EQ 3B"
+                    color={COLORS.eq}
+                    enabled={true}
+                    alwaysOn
+                    icon={<WaveformIcon size={10} />}
+                    cols="1fr"
+                    moduleWidth={96}
+                    knobGap={12}
+                >
+                    <Knob color={COLORS.eq} size={52} label="Low" unit="dB"
+                        value={fx.eq.low} min={-12} max={12} step={0.1}
+                        onChange={v => updateFX('eq', { low: v })} />
+                    <Knob color={COLORS.eq} size={52} label="Mid" unit="dB"
+                        value={fx.eq.mid} min={-12} max={12} step={0.1}
+                        onChange={v => updateFX('eq', { mid: v })} />
+                    <Knob color={COLORS.eq} size={52} label="High" unit="dB"
+                        value={fx.eq.high} min={-12} max={12} step={0.1}
+                        onChange={v => updateFX('eq', { high: v })} />
+                </FxModule>
 
-                    {/* Delay Section */}
-                    <Card style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
-                        <Stack style={{ gap: '16px' }}>
-                            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Row style={{ alignItems: 'center', gap: '8px' }}>
-                                    <ClockIcon size={16} style={{ color: 'var(--accent)' }} />
-                                    <Label style={{ fontWeight: 800 }}>Delay</Label>
-                                </Row>
-                                <Switch checked={fx.delay.enabled} onChange={(v) => updateFX('delay', { enabled: v })} />
-                            </Row>
-                            <Stack style={{ gap: '12px' }}>
-                                <ControlSlider label="Feedback" value={fx.delay.feedback} min={0} max={0.9} step={0.01} unit="" onChange={(v: number) => updateFX('delay', { feedback: v })} />
-                                <ControlSlider label="Mix" value={fx.delay.mix} min={0} max={1} step={0.01} unit="" onChange={(v: number) => updateFX('delay', { mix: v })} />
-                                <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Label style={{ fontSize: '11px', opacity: 0.7 }}>SYNC</Label>
-                                    <Row style={{ gap: '4px' }}>
-                                        {[0.25, 0.5, 0.75, 1].map(t => (
-                                            <Button key={t} size="sm" variant={fx.delay.time === t ? 'primary' : 'ghost'} style={{ padding: '4px 8px', fontSize: '10px', minWidth: 36 }} onClick={() => updateFX('delay', { time: t })}>
-                                                {t === 0.25 ? '1/4' : t === 0.5 ? '1/2' : t === 0.75 ? '3/4' : '1n'}
-                                            </Button>
-                                        ))}
-                                    </Row>
-                                </Row>
-                            </Stack>
-                        </Stack>
-                    </Card>
+                {/* ── Compressor — single column (vertical, per user request) ── */}
+                <FxModule
+                    name="Comp"
+                    color={COLORS.compressor}
+                    enabled={true}
+                    alwaysOn
+                    icon={<SpeakerHighIcon size={10} />}
+                    cols="1fr"
+                    moduleWidth={96}
+                    knobGap={12}
+                >
+                    <Knob color={COLORS.compressor} size={52} label="Thresh" unit="dB"
+                        value={fx.compressor.threshold} min={-60} max={0} step={1}
+                        onChange={v => updateFX('compressor', { threshold: v })} />
+                    <Knob color={COLORS.compressor} size={52} label="Ratio" unit=":1"
+                        value={fx.compressor.ratio} min={1} max={20} step={0.1}
+                        onChange={v => updateFX('compressor', { ratio: v })} />
+                    <Knob color={COLORS.compressor} size={52} label="Gain" unit="dB"
+                        value={fx.compressor.gain} min={0} max={24} step={1}
+                        onChange={v => updateFX('compressor', { gain: v })} />
+                </FxModule>
 
-                    {/* Reverb Section */}
-                    <Card style={{ padding: '16px', gridColumn: 'span 2', background: 'rgba(255,255,255,0.02)' }}>
-                        <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Row style={{ alignItems: 'center', gap: '12px' }}>
-                                <WavesIcon size={16} style={{ color: '#ec4899' }} />
-                                <Label style={{ fontWeight: 800 }}>Reverb</Label>
-                            </Row>
-                            <Row style={{ gap: '24px', flex: 1, marginLeft: '48px', alignItems: 'center' }}>
-                                <div style={{ flex: 1 }}>
-                                    <ControlSlider label="" value={fx.reverb.mix} min={0} max={1} step={0.01} unit="Mix" onChange={(v: number) => updateFX('reverb', { mix: v })} />
-                                </div>
-                                <Switch checked={fx.reverb.enabled} onChange={(v) => updateFX('reverb', { enabled: v })} />
-                            </Row>
-                        </Row>
-                    </Card>
+                {/* ── Drive — single column, 2 params ── */}
+                <FxModule
+                    name="Drive"
+                    color={COLORS.drive}
+                    enabled={fx.drive.enabled}
+                    onToggle={v => updateFX('drive', { enabled: v })}
+                    icon={<LightningIcon size={10} />}
+                    cols="1fr"
+                    moduleWidth={96}
+                    knobGap={12}
+                >
+                    <Knob color={COLORS.drive} size={52} label="Amt"
+                        value={fx.drive.amount} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('drive', { amount: v })} />
+                    <Knob color={COLORS.drive} size={52} label="Tone"
+                        value={fx.drive.tone} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('drive', { tone: v })} />
+                </FxModule>
 
-                    {/* Pan & Utiltiy */}
-                    <Card style={{ padding: '16px', gridColumn: 'span 2', background: 'rgba(255,255,255,0.02)' }}>
-                        <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Row style={{ alignItems: 'center', gap: '12px' }}>
-                                <SpeakerHighIcon size={16} />
-                                <Label style={{ fontWeight: 800 }}>Stereo Pan</Label>
-                            </Row>
-                            <div style={{ flex: 1, marginLeft: '48px' }}>
-                                <ControlSlider label="" value={fx.pan} min={-1} max={1} step={0.01} unit="" onChange={(v: number) => setTrackFX(trackId, { pan: v })} />
+                {/* ── Chorus / Doubler — 2-col ── */}
+                <FxModule
+                    name="Chorus"
+                    color={COLORS.chorus}
+                    enabled={fx.chorus?.enabled ?? false}
+                    onToggle={v => updateFX('chorus', { enabled: v })}
+                    icon={<WaveTriangleIcon size={10} />}
+                    cols="1fr 1fr"
+                    moduleWidth={152}
+                    knobGap={14}
+                    footer={
+                        <div className="fx-module-footer">
+                            <span className="fx-mini-label">Mode</span>
+                            <div className="fx-mini-btn-row">
+                                {([1, 2] as const).map(v => (
+                                    <button key={v}
+                                        className={`fx-mini-btn${(fx.chorus?.voices ?? 1) === v ? ' active' : ''}`}
+                                        style={{ '--module-color': COLORS.chorus } as React.CSSProperties}
+                                        onClick={() => updateFX('chorus', { voices: v })}>
+                                        {v === 1 ? 'CHR' : 'DBL'}
+                                    </button>
+                                ))}
                             </div>
-                            <Row style={{ width: '60px', justifyContent: 'center' }}>
-                                <ValueText style={{ fontSize: '12px', fontWeight: 'bold' }}>
-                                    {fx.pan < 0 ? `L${Math.abs(Math.round(fx.pan * 100))}` : fx.pan > 0 ? `R${Math.round(fx.pan * 100)}` : 'C'}
-                                </ValueText>
-                            </Row>
-                        </Row>
-                    </Card>
-                </Grid>
-            </Stack>
+                        </div>
+                    }
+                >
+                    <Knob color={COLORS.chorus} size={50} label="Rate" unit="Hz"
+                        value={fx.chorus?.rate ?? 0.5} min={0.1} max={5} step={0.05}
+                        onChange={v => updateFX('chorus', { rate: v })} />
+                    <Knob color={COLORS.chorus} size={50} label="Depth"
+                        value={fx.chorus?.depth ?? 0.4} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('chorus', { depth: v })} />
+                    <Knob color={COLORS.chorus} size={50} label="Mix"
+                        value={fx.chorus?.mix ?? 0.5} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('chorus', { mix: v })} />
+                </FxModule>
+
+                {/* ── Phaser — 2-col ── */}
+                <FxModule
+                    name="Phaser"
+                    color={COLORS.phaser}
+                    enabled={fx.phaser?.enabled ?? false}
+                    onToggle={v => updateFX('phaser', { enabled: v })}
+                    icon={<CirclesFourIcon size={10} />}
+                    cols="1fr 1fr"
+                    moduleWidth={152}
+                    knobGap={14}
+                    footer={
+                        <div className="fx-module-footer">
+                            <span className="fx-mini-label">Stages</span>
+                            <div className="fx-mini-btn-row">
+                                {([2, 4] as const).map(s => (
+                                    <button key={s}
+                                        className={`fx-mini-btn${(fx.phaser?.stages ?? 4) === s ? ' active' : ''}`}
+                                        style={{ '--module-color': COLORS.phaser } as React.CSSProperties}
+                                        onClick={() => updateFX('phaser', { stages: s })}>
+                                        {s}st
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    }
+                >
+                    <Knob color={COLORS.phaser} size={50} label="Rate" unit="Hz"
+                        value={fx.phaser?.rate ?? 0.5} min={0.1} max={5} step={0.05}
+                        onChange={v => updateFX('phaser', { rate: v })} />
+                    <Knob color={COLORS.phaser} size={50} label="Depth"
+                        value={fx.phaser?.depth ?? 0.5} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('phaser', { depth: v })} />
+                    <Knob color={COLORS.phaser} size={50} label="Fdbk"
+                        value={fx.phaser?.feedback ?? 0.5} min={0} max={0.9} step={0.01}
+                        onChange={v => updateFX('phaser', { feedback: v })} />
+                </FxModule>
+
+                {/* ── Tremolo — 2-col ── */}
+                <FxModule
+                    name="Tremolo"
+                    color={COLORS.tremolo}
+                    enabled={fx.tremolo?.enabled ?? false}
+                    onToggle={v => updateFX('tremolo', { enabled: v })}
+                    icon={<ActivityIcon size={10} />}
+                    cols="1fr 1fr"
+                    moduleWidth={160}
+                    knobGap={14}
+                    footer={
+                        <div className="fx-module-footer">
+                            <span className="fx-mini-label">Mode</span>
+                            <div className="fx-mini-btn-row">
+                                <button className={`fx-mini-btn${!(fx.tremolo?.sync) ? ' active' : ''}`}
+                                    style={{ '--module-color': COLORS.tremolo } as React.CSSProperties}
+                                    onClick={() => updateFX('tremolo', { sync: false })}>
+                                    FREE
+                                </button>
+                                <button className={`fx-mini-btn${fx.tremolo?.sync ? ' active' : ''}`}
+                                    style={{ '--module-color': COLORS.tremolo } as React.CSSProperties}
+                                    onClick={() => updateFX('tremolo', { sync: true, rate: 0.25 })}>
+                                    SYNC
+                                </button>
+                            </div>
+                        </div>
+                    }
+                >
+                    {fx.tremolo?.sync ? (
+                        <Knob color={COLORS.tremolo} size={50} label="Rate" unit=""
+                            value={fx.tremolo?.rate ?? 0.25} min={0.25} max={1} step={0.25}
+                            onChange={v => updateFX('tremolo', { rate: v })} />
+                    ) : (
+                        <Knob color={COLORS.tremolo} size={50} label="Rate" unit="Hz"
+                            value={fx.tremolo?.rate ?? 5.0} min={0.1} max={20} step={0.1}
+                            onChange={v => updateFX('tremolo', { rate: v })} />
+                    )}
+                    <Knob color={COLORS.tremolo} size={50} label="Depth"
+                        value={fx.tremolo?.depth ?? 0.5} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('tremolo', { depth: v })} />
+                </FxModule>
+
+                {/* ── Delay — 3-col, wide with generous gap (user: keep layout, more gap) ── */}
+                <FxModule
+                    name="Delay"
+                    color={COLORS.delay}
+                    enabled={fx.delay.enabled}
+                    onToggle={v => updateFX('delay', { enabled: v })}
+                    icon={<ClockIcon size={10} />}
+                    cols="1fr 1fr 1fr"
+                    moduleWidth={192}
+                    knobGap={18}
+                    footer={
+                        <div className="fx-module-footer">
+                            <span className="fx-mini-label">Mode</span>
+                            <div className="fx-mini-btn-row">
+                                {(['mono', 'pingpong'] as const).map(m => (
+                                    <button key={m}
+                                        className={`fx-mini-btn${fx.delay.mode === m ? ' active' : ''}`}
+                                        style={{ '--module-color': COLORS.delay } as React.CSSProperties}
+                                        onClick={() => updateFX('delay', { mode: m })}>
+                                        {m === 'mono' ? 'MNO' : 'PNG'}
+                                    </button>
+                                ))}
+                            </div>
+                            <span className="fx-mini-label" style={{ marginTop: 4 }}>Sync</span>
+                            <div className="fx-mini-btn-row">
+                                {[0.25, 0.5, 0.75, 1].map(t => (
+                                    <button key={t}
+                                        className={`fx-mini-btn${fx.delay.time === t ? ' active' : ''}`}
+                                        style={{ '--module-color': COLORS.delay } as React.CSSProperties}
+                                        onClick={() => updateFX('delay', { time: t })}>
+                                        {t === 0.25 ? '¼' : t === 0.5 ? '½' : t === 0.75 ? '¾' : '1'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    }
+                >
+                    <Knob color={COLORS.delay} size={52} label="Time" unit="s"
+                        value={fx.delay.time} min={0.125} max={2} step={0.001}
+                        onChange={v => updateFX('delay', { time: v })} />
+                    <Knob color={COLORS.delay} size={52} label="Fdbk"
+                        value={fx.delay.feedback} min={0} max={0.9} step={0.01}
+                        onChange={v => updateFX('delay', { feedback: v })} />
+                    <Knob color={COLORS.delay} size={52} label="Filt"
+                        value={fx.delay.filter} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('delay', { filter: v })} />
+                    <Knob color={COLORS.delay} size={52} label="Mix"
+                        value={fx.delay.mix} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('delay', { mix: v })} />
+                </FxModule>
+
+                {/* ── Reverb — 2-col (Mix|Size / PreD|Damp) ── */}
+                <FxModule
+                    name="Reverb"
+                    color={COLORS.reverb}
+                    enabled={fx.reverb.enabled}
+                    onToggle={v => updateFX('reverb', { enabled: v })}
+                    icon={<WavesIcon size={10} />}
+                    cols="1fr 1fr"
+                    moduleWidth={152}
+                    knobGap={14}
+                >
+                    <Knob color={COLORS.reverb} size={50} label="Mix"
+                        value={fx.reverb.mix} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('reverb', { mix: v })} />
+                    <Knob color={COLORS.reverb} size={50} label="Size" unit="s"
+                        value={fx.reverb.size} min={0.1} max={5} step={0.1}
+                        onChange={v => updateFX('reverb', { size: v })} />
+                    <Knob color={COLORS.reverb} size={50} label="PreD" unit="ms"
+                        value={fx.reverb.predelay} min={0} max={100} step={1}
+                        onChange={v => updateFX('reverb', { predelay: v })} />
+                    <Knob color={COLORS.reverb} size={50} label="Damp"
+                        value={fx.reverb.damping} min={0} max={1} step={0.01}
+                        onChange={v => updateFX('reverb', { damping: v })} />
+                </FxModule>
+
+            </div>
+
+            {/* Pan footer */}
+            <div className="fx-pan-row">
+                <Knob color={COLORS.pan} size={50} label="Pan"
+                    value={fx.pan} min={-1} max={1} step={0.01}
+                    onChange={updatePan} />
+                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>
+                    {fx.pan < -0.005 ? `L${Math.abs(Math.round(fx.pan * 100))}` : fx.pan > 0.005 ? `R${Math.round(fx.pan * 100)}` : 'CENTER'}
+                </span>
+            </div>
         </Card>
     );
 };
 
-interface ControlSliderProps {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    step: number;
-    unit: string;
-    onChange: (val: number) => void;
+// ─── FxModule helper ─────────────────────────────────────────────────────────
+
+interface FxModuleProps {
+    name: string;
+    color: string;
+    enabled: boolean;
+    children: React.ReactNode;
+    onToggle?: (v: boolean) => void;
+    alwaysOn?: boolean;
+    icon?: React.ReactNode;
+    footer?: React.ReactNode;
+    /** CSS grid-template-columns value e.g. "1fr" or "1fr 1fr" */
+    cols?: string;
+    /** Module card width in px */
+    moduleWidth?: number;
+    /** Gap between knobs in px */
+    knobGap?: number;
 }
 
-const ControlSlider = ({ label, value, min, max, step, unit, onChange }: ControlSliderProps) => (
-    <Stack style={{ gap: '6px' }}>
-        <Row style={{ justifyContent: 'space-between' }}>
-            <Label style={{ fontSize: '11px', opacity: 0.6 }}>{label}</Label>
-            <ValueText style={{ fontSize: '11px', fontWeight: 600 }}>
-                {typeof value === 'number' ? value.toFixed(unit === ':1' || label === 'Amount' || label === 'Mix' ? 2 : 1) : value}
-                <span style={{ opacity: 0.5, marginLeft: 2 }}>{unit}</span>
-            </ValueText>
-        </Row>
-        <Slider value={value} min={min} max={max} step={step} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(parseFloat(e.target.value))} />
-    </Stack>
-);
+const FxModule = ({ name, color, enabled, children, onToggle, alwaysOn, icon, footer, cols = '1fr', moduleWidth = 120, knobGap = 10 }: FxModuleProps) => {
+    const isOn = alwaysOn || enabled;
+    return (
+        <div
+            className={`fx-module ${isOn ? 'enabled' : 'disabled'}`}
+            style={{ '--module-color': color, flex: `0 0 ${moduleWidth}px` } as React.CSSProperties}
+        >
+            {/* Header row */}
+            <div className="fx-module-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color, opacity: isOn ? 0.85 : 0.4 }}>{icon}</span>
+                    <span className="fx-module-name">{name}</span>
+                </div>
+                {!alwaysOn && onToggle && (
+                    <Switch checked={enabled} onChange={onToggle} />
+                )}
+            </div>
+
+            {/* Knob grid — layout driven by cols prop */}
+            <div
+                className="fx-knob-grid"
+                style={{
+                    gridTemplateColumns: cols,
+                    gap: knobGap,
+                }}
+            >
+                {children}
+            </div>
+
+            {/* Optional footer (mode/sync buttons) */}
+            {footer}
+        </div>
+    );
+};

@@ -1,9 +1,10 @@
-import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon, StackIcon, XIcon } from '@phosphor-icons/react';
+import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon, StackIcon, XIcon, HeadphonesIcon, PulseIcon, BugIcon } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Stack, Row, Button, ButtonGroup, Label, ValueText, Badge, Heading, Grid, Switch, Waveform, Modal } from '@live-looper/ui';
 import { TrackFX } from './TrackFX';
+import { LatencyMonitor } from './LatencyMonitor';
 import { db } from '@live-looper/storage';
 import type { LayerRecord } from '@live-looper/types';
 
@@ -681,9 +682,16 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
 
 // ─── Section Progress Ring ─────────────────────────────────────────────────────
 const ProgressRing = ({ progress, bar, beat }: { progress: number; bar: number; beat: number }) => {
+    const { sections, currentSectionIndex } = useLooperStore();
+    const sectionLengthInBars = sections[currentSectionIndex]?.lengthInBars || 4;
+    const totalBeats = sectionLengthInBars * 4;
+
+    // Ticking behavior: snap the progress circle to the current beat to match the metronome
+    const tickedProgress = totalBeats > 0 ? ((bar - 1) * 4 + (beat - 1)) / totalBeats : progress;
+
     const r = 54;
     const circ = 2 * Math.PI * r;
-    const dash = circ * progress;
+    const dash = circ * tickedProgress;
     return (
         <div style={{ position: 'relative', width: 160, height: 160, flexShrink: 0 }}>
             <svg width="160" height="160" style={{ transform: 'rotate(-90deg)' }}>
@@ -924,9 +932,15 @@ const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
         availableOutputs,
         inputDeviceId,
         outputDeviceId,
+        performerOutputDeviceId,
         refreshDevices,
         setInputDevice,
         setOutputDevice,
+        setPerformerOutputDevice,
+        smartSnapEnabled,
+        setSmartSnapEnabled,
+        dualOutputMode,
+        setDualOutputMode
     } = useLooperStore();
 
     const deviceChangeRegistered = useRef(false);
@@ -986,6 +1000,30 @@ const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
                 <CloudArrowDownIcon size={16} />
                 Load Demo
             </Button>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />
+
+            {/* Application Settings (Smart Snap) */}
+            <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <SlidersIcon size={13} style={{ color: 'var(--accent, #a78bfa)' }} weight="fill" />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.04em' }}>Options</span>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Smart Snap (Auto-align)</span>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                        <input
+                            type="checkbox"
+                            checked={smartSnapEnabled}
+                            onChange={(e) => setSmartSnapEnabled(e.target.checked)}
+                            style={{ cursor: 'pointer', accentColor: '#a78bfa' }}
+                        />
+                    </label>
+                </div>
+            </div>
 
             {/* Divider */}
             <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />
@@ -1057,6 +1095,42 @@ const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
                             ))}
                         </select>
                     )}
+                    {/* Dual Output Toggle */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <HeadphonesIcon size={11} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                            <span style={{ fontSize: 9, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Separate Cue Mix</span>
+                        </div>
+                        <input
+                            type="checkbox"
+                            checked={dualOutputMode}
+                            onChange={(e) => setDualOutputMode(e.target.checked)}
+                            style={{ cursor: 'pointer', accentColor: '#a78bfa' }}
+                        />
+                    </div>
+
+                    {/* Performer Output */}
+                    {dualOutputMode && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <HeadphonesIcon size={11} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                                <span style={{ fontSize: 9, opacity: 0.45, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Performer Output</span>
+                            </div>
+                            {!supportsOutputSelection ? (
+                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Output selection requires Chrome</span>
+                            ) : availableOutputs.length === 0 ? (
+                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>No output devices found</span>
+                            ) : (
+                                <select style={selectStyle} value={performerOutputDeviceId ?? ''} onChange={e => setPerformerOutputDevice(e.target.value)}>
+                                    {availableOutputs.map(d => (
+                                        <option key={d.deviceId} value={d.deviceId}>
+                                            {d.label || `Speaker (${d.deviceId.slice(0, 8)}…)`}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -1066,9 +1140,10 @@ const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
 
 // ─── Global Action Bar ────────────────────────────────────────────────────────
 export const GlobalActionBar = () => {
-    const { isPlaying, sections, bpm, currentSectionIndex, queuedSectionIndex, mode, showLayers, setShowLayers } = useLooperStore();
+    const { isPlaying, sections, bpm, currentSectionIndex, queuedSectionIndex, mode, showLayers, setShowLayers, showDevInspector, setShowDevInspector } = useLooperStore();
     const [showBpmPopup, setShowBpmPopup] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showPerformance, setShowPerformance] = useState(false);
     const isLive = mode === 'live';
 
     const handleStart = async () => {
@@ -1191,6 +1266,44 @@ export const GlobalActionBar = () => {
                         <StackIcon size={18} />
                     </Button>
 
+                    {/* ── Performance toggle ── */}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowPerformance(p => !p)}
+                        title={showPerformance ? 'Hide Performance' : 'Show Performance'}
+                        style={{
+                            width: 36, height: 36, padding: 0, borderRadius: 10,
+                            opacity: showPerformance ? 1 : 0.5,
+                            background: showPerformance ? 'rgba(74,222,128,0.12)' : 'transparent',
+                            border: showPerformance ? '1px solid rgba(74,222,128,0.35)' : '1px solid transparent',
+                            color: showPerformance ? '#4ade80' : 'inherit',
+                            transition: 'all 0.2s ease',
+                        }}
+                    >
+                        <PulseIcon size={18} />
+                    </Button>
+
+                    {/* ── Dev Inspector toggle ── */}
+                    {mode === 'planning' && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowDevInspector(!showDevInspector)}
+                            title={showDevInspector ? 'Hide Dev Inspector' : 'Show Dev Inspector'}
+                            style={{
+                                width: 36, height: 36, padding: 0, borderRadius: 10,
+                                opacity: showDevInspector ? 1 : 0.5,
+                                background: showDevInspector ? 'rgba(99,102,241,0.15)' : 'transparent',
+                                border: showDevInspector ? '1px solid rgba(99,102,241,0.4)' : '1px solid transparent',
+                                color: showDevInspector ? '#a5b4fc' : 'inherit',
+                                transition: 'all 0.2s ease',
+                            }}
+                        >
+                            <BugIcon size={18} />
+                        </Button>
+                    )}
+
                     {/* ── Settings gear ── */}
                     <div style={{ position: 'relative' }}>
                         <Button
@@ -1207,19 +1320,85 @@ export const GlobalActionBar = () => {
                 </Row>
             </div>
             {showBpmPopup && <BpmEditPopup onClose={() => setShowBpmPopup(false)} />}
+            {showPerformance && <LatencyMonitor />}
         </>
     );
 };
 
 
 
-// ─── 4-column Track Horizontal Grid ─────────────────────────────────────────
+// ─── Live Track Pad ────────────────────────────────────────────────────────
+const LiveTrackPad = ({ onOpenFX }: { onOpenFX: (id: 'live') => void }) => {
+    const { mode, liveTrack, setLiveTrackState, isPlaying } = useLooperStore();
+    const isLive = mode === 'live';
+
+    return (
+        <Card style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            height: 96,
+            padding: '16px 20px',
+            position: 'relative',
+            background: isLive ? 'rgba(0,0,0,0.4)' : undefined,
+            border: isLive ? `1px solid rgba(234, 179, 8, 0.4)` : '1px solid rgba(234, 179, 8, 0.1)',
+            boxShadow: liveTrack.isMuted ? 'none' : '0 0 12px rgba(234, 179, 8, 0.15)',
+        }}>
+            <Row style={{ justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
+                <Row style={{ alignItems: 'center', gap: 16 }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: 24,
+                        background: liveTrack.isMuted ? 'rgba(255,255,255,0.05)' : 'rgba(234, 179, 8, 0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: `1px solid ${liveTrack.isMuted ? 'rgba(255,255,255,0.1)' : 'rgba(234, 179, 8, 0.5)'}`,
+                        transition: 'all 0.2s ease',
+                    }}>
+                        <MicrophoneIcon size={24} style={{ color: liveTrack.isMuted ? 'rgba(255,255,255,0.3)' : '#eab308' }} weight={liveTrack.isMuted ? 'regular' : 'fill'} />
+                    </div>
+                    <Stack style={{ gap: 2 }}>
+                        <Label style={{
+                            fontSize: 16,
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            color: liveTrack.isMuted ? 'rgba(255,255,255,0.4)' : '#eab308',
+                        }}>LIVE INPUT</Label>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>
+                            {liveTrack.isMuted ? 'MUTED' : (isPlaying ? 'MONITORING' : 'IDLE')}
+                        </span>
+                    </Stack>
+                </Row>
+
+                <Row style={{ gap: 12 }}>
+                    {!isLive && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onOpenFX('live')}
+                            style={{ height: 48, padding: '0 16px', borderRadius: 12 }}
+                        >
+                            <SlidersIcon size={20} />
+                        </Button>
+                    )}
+                    <Button
+                        onClick={() => setLiveTrackState({ isMuted: !liveTrack.isMuted })}
+                        variant={liveTrack.isMuted ? 'active-warning' : 'ghost'}
+                        style={{ height: 48, padding: '0 24px', borderRadius: 12, fontSize: 13, fontWeight: 800 }}
+                    >
+                        MUTE
+                    </Button>
+                </Row>
+            </Row>
+        </Card>
+    );
+};
+
+// ─── TrackControls (4 Columns + Live Track) ─────────────────────────────────
 export const TrackControls = () => {
     const [activeFXTrack, setActiveFXTrack] = useState<number | null>(null);
 
     return (
         <div style={{ position: 'relative', width: '100%' }}>
-            <Grid cols="repeat(4, 1fr)" style={{ width: '100%', gap: 16 }}>
+            <Grid cols="repeat(4, 1fr)" style={{ width: '100%', gap: 16, marginBottom: 16 }}>
                 {[0, 1, 2, 3].map(id => (
                     <TrackPad
                         key={id}
@@ -1229,10 +1408,13 @@ export const TrackControls = () => {
                 ))}
             </Grid>
 
+            {/* Live Track spans full width below the 4 columns */}
+            <LiveTrackPad onOpenFX={(id) => setActiveFXTrack(id as unknown as number)} />
+
             {activeFXTrack !== null && (
                 <Modal onClose={() => setActiveFXTrack(null)}>
                     <TrackFX
-                        trackId={activeFXTrack}
+                        trackId={activeFXTrack === 'live' as unknown as number ? 'live' : activeFXTrack}
                         onClose={() => setActiveFXTrack(null)}
                     />
                 </Modal>

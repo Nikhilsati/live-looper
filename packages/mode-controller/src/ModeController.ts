@@ -38,6 +38,7 @@ export class ModeController {
             const snapshot: FrozenProjectSnapshot = {
                 sections: [...currentState.sections],
                 tracks: JSON.parse(JSON.stringify(currentState.tracks)), // Deep copy for immutability
+                liveTrack: JSON.parse(JSON.stringify(currentState.liveTrack)), // Deep copy for immutability
                 bpm: currentState.bpm,
                 quantization: {
                     snapToGrid: true,

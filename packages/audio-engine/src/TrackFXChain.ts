@@ -1,231 +1,148 @@
 import type { FXState } from '@live-looper/types';
+import {
+    BaseEffect,
+    NoiseGateEffect,
+    EQEffect,
+    CompressorEffect,
+    DriveEffect,
+    ChorusEffect,
+    PhaserEffect,
+    TremoloEffect,
+    DelayEffect,
+    ReverbEffect,
+    PanEffect,
+} from './effects';
 
+/**
+ * TrackFXChain — thin orchestrator for the serial audio effect chain.
+ *
+ * Responsibilities:
+ *   1. Instantiate each effect.
+ *   2. Wire them in order: this.input → effects[0] → … → effects[n] → this.output
+ *   3. Delegate update() calls to each effect's own handler.
+ *
+ * Adding, removing, or reordering effects is O(n) — call reorder() with a
+ * new array of the same effect instances and the chain rewires itself.
+ */
 export class TrackFXChain {
-    private context: AudioContext;
+    /** Chain-level input trim. Connect the audio source here. */
     public input: GainNode;
+
+    /** Chain-level output. Connect this to the next destination. */
     public output: GainNode;
 
-    // Nodes
-    private eqLow: BiquadFilterNode;
-    private eqMid: BiquadFilterNode;
-    private eqHigh: BiquadFilterNode;
-    private compressor: DynamicsCompressorNode;
-    private drive: WaveShaperNode;
-    private driveGain: GainNode;
-    private delay: DelayNode;
-    private delayFeedback: GainNode;
-    private delayMix: GainNode;
-    private reverb: ConvolverNode;
-    private reverbMix: GainNode;
-    private panner: StereoPannerNode;
+    // ── Effect instances ────────────────────────────────────────────────────
+    public readonly noiseGate: NoiseGateEffect;
+    public readonly eq: EQEffect;
+    public readonly compressor: CompressorEffect;
+    public readonly drive: DriveEffect;
+    public readonly chorus: ChorusEffect;
+    public readonly phaser: PhaserEffect;
+    public readonly tremolo: TremoloEffect;
+    public readonly delay: DelayEffect;
+    public readonly reverb: ReverbEffect;
+    public readonly pan: PanEffect;
+
+    /** Ordered effect array — the serial processing chain. */
+    private effects: BaseEffect[];
 
     constructor(context: AudioContext) {
-        this.context = context;
         this.input = context.createGain();
         this.output = context.createGain();
 
-        // EQ
-        this.eqLow = context.createBiquadFilter();
-        this.eqLow.type = 'lowshelf';
-        this.eqMid = context.createBiquadFilter();
-        this.eqMid.type = 'peaking';
-        this.eqHigh = context.createBiquadFilter();
-        this.eqHigh.type = 'highshelf';
+        // Instantiate effects
+        this.noiseGate = new NoiseGateEffect(context);
+        this.eq = new EQEffect(context);
+        this.compressor = new CompressorEffect(context);
+        this.drive = new DriveEffect(context);
+        this.chorus = new ChorusEffect(context);
+        this.phaser = new PhaserEffect(context);
+        this.tremolo = new TremoloEffect(context);
+        this.delay = new DelayEffect(context);
+        this.reverb = new ReverbEffect(context);
+        this.pan = new PanEffect(context);
 
-        // Compressor
-        this.compressor = context.createDynamicsCompressor();
+        // Default signal chain order
+        this.effects = [
+            this.noiseGate,
+            this.eq,
+            this.compressor,
+            this.drive,
+            this.chorus,
+            this.phaser,
+            this.tremolo,
+            this.delay,
+            this.reverb,
+            this.pan,
+        ];
 
-        // Drive (WaveShaper)
-        this.drive = context.createWaveShaper();
-        this.drive.curve = this.makeDistortionCurve(0);
-        this.driveGain = context.createGain();
-
-        // Delay
-        this.delay = context.createDelay(2.0);
-        this.delayFeedback = context.createGain();
-        this.delayMix = context.createGain();
-        this.delayMix.gain.value = 0;
-
-        // Reverb
-        this.reverb = context.createConvolver();
-        this.reverb.buffer = this.createImpulseResponse(1.5, 4.0);
-        this.reverbMix = context.createGain();
-        this.reverbMix.gain.value = 0;
-
-        // Panner
-        this.panner = context.createStereoPanner();
-
-        // Routing: input -> EQ Low -> EQ Mid -> EQ High -> Compressor -> Drive Gain -> Panner -> Output
-        // Parallel paths for Delay and Reverb handled within the chain
-
-        this.input.connect(this.eqLow);
-        this.eqLow.connect(this.eqMid);
-        this.eqMid.connect(this.eqHigh);
-        this.eqHigh.connect(this.compressor);
-
-        // Sub-chain: Drive
-        this.compressor.connect(this.drive);
-        this.drive.connect(this.driveGain);
-        this.driveGain.connect(this.panner);
-
-        // Sub-chain: Delay (Parallel Wet)
-        this.compressor.connect(this.delay);
-        this.delay.connect(this.delayFeedback);
-        this.delayFeedback.connect(this.delay);
-        this.delay.connect(this.delayMix);
-        this.delayMix.connect(this.panner);
-
-        // Sub-chain: Reverb (Parallel Wet)
-        this.panner.connect(this.reverb); // Reverb is usually after delay/pan or before pan? PRD says before pan.
-        // Let's follow PRD order: Drive -> Delay -> Reverb -> Pan
-
-        // Wait, current routing is a bit messy. Let's fix to match PRD:
-        // EQ -> Compressor -> Drive -> Delay -> Reverb -> Pan -> Track Gain
-
-        this.rebuildRouting();
-
-        this.panner.connect(this.output);
+        this.wireChain();
     }
 
-    private rebuildRouting() {
-        // Disconnect everything first
+    /**
+     * Wire the effects array serially:
+     *   this.input → effects[0].input → effects[0].output → effects[1].input → … → this.output
+     *
+     * Call after any reorder().
+     */
+    private wireChain(): void {
+        // Disconnect existing wiring
         this.input.disconnect();
-        this.eqLow.disconnect();
-        this.eqMid.disconnect();
-        this.eqHigh.disconnect();
-        this.compressor.disconnect();
-        this.drive.disconnect();
-        this.driveGain.disconnect();
-        this.delay.disconnect();
-        this.delayFeedback.disconnect();
-        this.delayMix.disconnect();
-        this.reverb.disconnect();
-        this.reverbMix.disconnect();
-        this.panner.disconnect();
-
-        // Linear Chain
-        this.input.connect(this.eqLow);
-        this.eqLow.connect(this.eqMid);
-        this.eqMid.connect(this.eqHigh);
-        this.eqHigh.connect(this.compressor);
-
-        // Drive stage (Always in line, amount 0 = clean)
-        this.compressor.connect(this.drive);
-        this.drive.connect(this.driveGain);
-
-        // Delay (Parallel Mix)
-        this.driveGain.connect(this.panner); // Dry
-
-        // Delay Path
-        this.driveGain.connect(this.delay);
-        this.delay.connect(this.delayFeedback);
-        this.delayFeedback.connect(this.delay);
-        this.delay.connect(this.delayMix);
-        this.delayMix.connect(this.panner); // Wet delay
-
-        // Reverb Path (Connected after panner or before? PRD says Reverb then Pan)
-        // Let's do Reverb before Pan as per PRD diagram.
-
-        // Wait, PRD Diagram:
-        // Drive -> Modulation -> Delay -> Reverb -> Pan
-
-        // Let's re-route:
-        this.input.disconnect();
-        this.input.connect(this.eqLow);
-        this.eqLow.connect(this.eqMid);
-        this.eqMid.connect(this.eqHigh);
-        this.eqHigh.connect(this.compressor);
-        this.compressor.connect(this.drive);
-        this.drive.connect(this.driveGain);
-
-        // Delay stage
-        const beforeDelay = this.driveGain;
-        const afterDelay = this.context.createGain(); // Intermediate junction
-        beforeDelay.connect(afterDelay); // Dry
-        beforeDelay.connect(this.delay);
-        this.delay.connect(this.delayFeedback);
-        this.delayFeedback.connect(this.delay);
-        this.delay.connect(this.delayMix);
-        this.delayMix.connect(afterDelay); // Wet
-
-        // Reverb stage
-        const beforeReverb = afterDelay;
-        const afterReverb = this.context.createGain(); // Intermediate junction
-        beforeReverb.connect(afterReverb); // Dry
-        beforeReverb.connect(this.reverb);
-        this.reverb.connect(this.reverbMix);
-        this.reverbMix.connect(afterReverb); // Wet
-
-        // Final Pan and Output
-        afterReverb.connect(this.panner);
-        this.panner.connect(this.output);
-    }
-
-    update(state: FXState, bpm: number) {
-        const t = this.context.currentTime + 0.05;
-
-        // EQ
-        this.eqLow.gain.setTargetAtTime(state.eq.low, t, 0.02);
-        this.eqMid.gain.setTargetAtTime(state.eq.mid, t, 0.02);
-        this.eqMid.frequency.setTargetAtTime(state.eq.midFreq, t, 0.02);
-        this.eqHigh.gain.setTargetAtTime(state.eq.high, t, 0.02);
-
-        // Compressor
-        this.compressor.threshold.setTargetAtTime(state.compressor.threshold, t, 0.02);
-        this.compressor.ratio.setTargetAtTime(state.compressor.ratio, t, 0.02);
-        this.compressor.attack.setTargetAtTime(state.compressor.attack, t, 0.02);
-        this.compressor.release.setTargetAtTime(state.compressor.release, t, 0.02);
-        // Note: DynamicsCompressorNode doesn't have a makeup gain parameter directly, 
-        // we'd need a gain node after it if we want makeup gain.
-
-        // Drive
-        if (state.drive.enabled) {
-            this.drive.curve = this.makeDistortionCurve(state.drive.amount);
-            this.driveGain.gain.setTargetAtTime(1, t, 0.02);
-        } else {
-            this.driveGain.gain.setTargetAtTime(1, t, 0.02);
-            this.drive.curve = this.makeDistortionCurve(0);
+        for (const effect of this.effects) {
+            effect.disconnectOutput();
         }
 
-        // Delay
-        const secondsPerBeat = 60 / bpm;
-        const delayTime = state.delay.time * secondsPerBeat;
-        this.delay.delayTime.setTargetAtTime(delayTime, t, 0.02);
-        this.delayFeedback.gain.setTargetAtTime(state.delay.feedback, t, 0.02);
-        this.delayMix.gain.setTargetAtTime(state.delay.enabled ? state.delay.mix : 0, t, 0.02);
+        if (this.effects.length === 0) {
+            this.input.connect(this.output);
+            return;
+        }
 
-        // Reverb
-        this.reverbMix.gain.setTargetAtTime(state.reverb.enabled ? state.reverb.mix : 0, t, 0.02);
+        // Chain input → first effect
+        this.input.connect(this.effects[0].input);
 
-        // Pan
-        this.panner.pan.setTargetAtTime(state.pan, t, 0.02);
+        // Connect each effect to the next
+        for (let i = 0; i < this.effects.length - 1; i++) {
+            this.effects[i].connectTo(this.effects[i + 1]);
+        }
+
+        // Last effect → chain output
+        this.effects[this.effects.length - 1].connectTo(this.output);
     }
 
-    private makeDistortionCurve(amount: number) {
-        const k = amount * 100;
-        const n_samples = 44100;
-        const curve = new Float32Array(n_samples);
-        const deg = Math.PI / 180;
-        for (let i = 0; i < n_samples; i++) {
-            const x = (i * 2) / n_samples - 1;
-            curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
-        }
-        return curve;
+    /**
+     * Reorder the effects in the chain.
+     *
+     * Pass a new ordering of the same effect instances.  The chain is
+     * fully rewired without allocating any new nodes.
+     *
+     * @example
+     * // Move reverb before delay
+     * chain.reorder([
+     *   chain.noiseGate, chain.eq, chain.compressor, chain.drive,
+     *   chain.chorus, chain.phaser, chain.reverb, chain.delay, chain.pan,
+     * ]);
+     */
+    reorder(newOrder: BaseEffect[]): void {
+        this.effects = newOrder;
+        this.wireChain();
     }
 
-    private createImpulseResponse(duration: number, decay: number) {
-        const sampleRate = this.context.sampleRate;
-        const length = sampleRate * duration;
-        const impulse = this.context.createBuffer(2, length, sampleRate);
-        const leftArr = impulse.getChannelData(0);
-        const rightArr = impulse.getChannelData(1);
-
-        for (let i = 0; i < length; i++) {
-            const n = i / length;
-            const envelope = Math.pow(1 - n, decay);
-            leftArr[i] = (Math.random() * 2 - 1) * envelope;
-            rightArr[i] = (Math.random() * 2 - 1) * envelope;
-        }
-        return impulse;
+    /**
+     * Apply FX state to every effect in the chain.
+     * Each effect's update() handles its own parameter scheduling;
+     * effects that need structural rewiring (Delay mode, Phaser stages)
+     * do so internally without touching the chain.
+     */
+    update(state: FXState, bpm: number): void {
+        this.noiseGate.update(state.noiseGate, bpm);
+        this.eq.update(state.eq, bpm);
+        this.compressor.update(state.compressor, bpm);
+        this.drive.update(state.drive, bpm);
+        this.chorus.update(state.chorus, bpm);
+        this.phaser.update(state.phaser, bpm);
+        this.tremolo.update(state.tremolo, bpm);
+        this.delay.update(state.delay, bpm);
+        this.reverb.update(state.reverb, bpm);
+        this.pan.update(state.pan, bpm);
     }
 }

@@ -5,7 +5,7 @@ export class MasterBus {
     private glueCompressor: DynamicsCompressorNode;
     private limiter: DynamicsCompressorNode;
 
-    constructor(context: AudioContext) {
+    constructor(context: AudioContext, destination?: AudioNode) {
         this.input = context.createGain();
         this.output = context.createGain();
 
@@ -27,7 +27,11 @@ export class MasterBus {
         this.input.connect(this.glueCompressor);
         this.glueCompressor.connect(this.limiter);
         this.limiter.connect(this.output);
-        this.output.connect(context.destination);
+        if (destination) {
+            this.output.connect(destination);
+        } else {
+            this.output.connect(context.destination);
+        }
     }
 
     update() {

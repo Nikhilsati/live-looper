@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectRecord, EngineEvent } from '@live-looper/types';
+import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectRecord, EngineEvent, LiveTrackState } from '@live-looper/types';
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 import { modeController } from '@live-looper/mode-controller';
 import { db, projectService, exportService } from '@live-looper/storage';
@@ -12,6 +12,7 @@ interface LooperStore extends EngineState {
     availableOutputs: MediaDeviceInfo[];
     inputDeviceId: string | null;
     outputDeviceId: string | null;
+    performerOutputDeviceId: string | null;
     // Actions
     fetchProjects: () => Promise<void>;
     createNewProject: (name: string) => Promise<string>;
@@ -43,12 +44,24 @@ interface LooperStore extends EngineState {
     refreshDevices: () => Promise<void>;
     setInputDevice: (deviceId: string) => Promise<void>;
     setOutputDevice: (deviceId: string) => Promise<void>;
-    // UI State
+    setPerformerOutputDevice: (deviceId: string) => Promise<void>;
     showLayers: boolean;
     setShowLayers: (v: boolean) => void;
+    showDevInspector: boolean;
+    setShowDevInspector: (v: boolean) => void;
     metronomeOn: boolean;
     setMetronomeOn: (v: boolean) => void;
+    smartSnapEnabled: boolean;
+    setSmartSnapEnabled: (v: boolean) => void;
+    dualOutputMode: boolean;
+    setDualOutputMode: (v: boolean) => void;
+    liveTrack: LiveTrackState;
+    setLiveTrackState: (state: Partial<LiveTrackState>) => void;
+    engineCrashed: boolean;
+    setEngineCrashed: (v: boolean) => void;
 }
+
+import { FXBuilder } from '@live-looper/types';
 
 const defaultTrack = (): TrackState => ({
     isMuted: false,
@@ -58,14 +71,7 @@ const defaultTrack = (): TrackState => ({
     hasAudio: false,
     layerCount: 0,
     waveformData: [],
-    fx: {
-        eq: { low: 0, mid: 0, midFreq: 1000, high: 0 },
-        compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 },
-        drive: { amount: 0, enabled: false },
-        delay: { time: 0.5, feedback: 0.3, mix: 0, enabled: false },
-        reverb: { mix: 0, enabled: false },
-        pan: 0,
-    }
+    fx: new FXBuilder().build()
 });
 
 export const useLooperStore = create<LooperStore>((set, get) => ({
@@ -79,6 +85,10 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     queuedSectionIndex: null,
     sections: DEFAULT_SECTIONS,
     tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+    liveTrack: {
+        isMuted: false,
+        fx: defaultTrack().fx,
+    },
     latencyMeasuredSamples: 0,
     latencyCompensationSamples: 0,
     isCalibratingLatency: false,
@@ -91,8 +101,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     availableOutputs: [],
     inputDeviceId: null,
     outputDeviceId: null,
+    performerOutputDeviceId: null,
+    engineCrashed: false,
+    setEngineCrashed: (v) => set({ engineCrashed: v }),
     // UI State
-    showLayers: false,
+    showLayers: true,
     setShowLayers: (v) => {
         const { currentProject } = get();
         const newSettings = { ...(currentProject?.settings ?? {}), showLayers: v };
@@ -104,6 +117,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
             db.projects.update(currentProject.id, { settings: newSettings, updatedAt: Date.now() });
         }
     },
+    showDevInspector: false,
+    setShowDevInspector: (v) => set({ showDevInspector: v }),
     metronomeOn: true,
     setMetronomeOn: (v) => {
         const { currentProject } = get();
@@ -115,6 +130,23 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         if (currentProject?.id) {
             db.projects.update(currentProject.id, { settings: newSettings, updatedAt: Date.now() });
         }
+    },
+    smartSnapEnabled: true,
+    setSmartSnapEnabled: (v) => {
+        const { currentProject } = get();
+        const newSettings = { ...(currentProject?.settings ?? {}), smartSnapEnabled: v };
+        set({
+            smartSnapEnabled: v,
+            currentProject: currentProject ? { ...currentProject, settings: newSettings } : null,
+        });
+        if (currentProject?.id) {
+            db.projects.update(currentProject.id, { settings: newSettings, updatedAt: Date.now() });
+        }
+    },
+    dualOutputMode: localStorage.getItem('looper_dual_output') === 'true',
+    setDualOutputMode: (v) => {
+        localStorage.setItem('looper_dual_output', String(v));
+        set({ dualOutputMode: v });
     },
     fetchProjects: async () => {
         const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
@@ -257,6 +289,31 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         });
     },
 
+    setLiveTrackState: (state) => {
+        set(prev => {
+            const newLiveTrack = { ...prev.liveTrack, ...state };
+            if (state.isMuted !== undefined) {
+                audioEngine.setLiveTrackMute(state.isMuted);
+            }
+            if (state.fx !== undefined) {
+                audioEngine.updateLiveTrackFX(state.fx, prev.bpm);
+            }
+
+            // Persist
+            const projectId = prev.currentProject?.id;
+            if (projectId) {
+                db.projects.update(projectId, {
+                    settings: {
+                        ...(prev.currentProject?.settings ?? {}),
+                        liveTrack: newLiveTrack
+                    }
+                });
+            }
+
+            return { liveTrack: newLiveTrack };
+        });
+    },
+
     calibrateLatency: () => {
         if (get().mode === 'live') return;
         set({ isCalibratingLatency: true });
@@ -298,6 +355,10 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                     layerCount: event.layerCount ?? 1,
                 });
                 break;
+            case 'ENGINE_CRASHED':
+                set({ engineCrashed: true });
+                uiAlert("Audio Engine Crashed. Please reload the page.");
+                break;
             case 'TRACK_CLEARED':
                 setTrackState(event.trackId, { isRecording: false, hasAudio: false, waveformData: [], layerCount: 0 });
                 break;
@@ -322,7 +383,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 const { project, tracks, sections, layerCounts, waveformDataMap } = event.payload;
                 const savedSettings = project.settings ?? {};
                 const metronomeOn = savedSettings.metronomeOn ?? true;
-                const showLayers = savedSettings.showLayers ?? false;
+                const showLayers = savedSettings.showLayers ?? true;
+                const smartSnapEnabled = savedSettings.smartSnapEnabled ?? true;
 
                 set({
                     bpm: project.bpm,
@@ -330,13 +392,15 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                     currentProject: project,
                     metronomeOn,
                     showLayers,
+                    smartSnapEnabled,
+                    liveTrack: event.payload.liveTrack,
                     tracks: tracks.map((t: any, i: number) => {
                         const count = layerCounts?.[i] || 0;
                         return {
                             ...defaultTrack(),
                             isMuted: t.muted ?? false,
                             isSoloed: t.solo ?? false,
-                            fx: t.fx || defaultTrack().fx,
+                            fx: new FXBuilder(t.fx).build(),
                             hasAudio: count > 0,
                             layerCount: count,
                             waveformData: waveformDataMap?.[i] ?? [],
@@ -350,6 +414,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 const soloedIds = newTracks.map((t, i) => t.isSoloed ? i : -1).filter(i => i !== -1);
                 if (soloedIds.length > 0) {
                     audioEngine.applySolo(soloedIds, newTracks.map(t => t.isMuted));
+                }
+
+                // Re-apply persisted Live Track mute state
+                if (event.payload.liveTrack) {
+                    audioEngine.setLiveTrackMute(event.payload.liveTrack.isMuted);
                 }
                 break;
             }
@@ -448,6 +517,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         await audioEngine.setOutputDevice(deviceId);
         set({ outputDeviceId: deviceId });
     },
+
+    setPerformerOutputDevice: async (deviceId: string) => {
+        await audioEngine.setPerformerOutputDevice(deviceId);
+        set({ performerOutputDeviceId: deviceId });
+    },
 }));
 
 // Initialize compensation from localStorage
@@ -462,11 +536,23 @@ if (lastProjectId) {
     useLooperStore.getState().loadProject(lastProjectId);
 }
 
-// Subscribe to store changes to update the audio engine
+// Initialize dual output from state
+audioEngine.setDualOutputMode(useLooperStore.getState().dualOutputMode);
+
 useLooperStore.subscribe((state, prevState) => {
     // Sync BPM
     if (state.bpm !== prevState.bpm) {
         audioEngine.setBpm(state.bpm);
+    }
+
+    // Sync Smart Snap
+    if (state.smartSnapEnabled !== prevState.smartSnapEnabled) {
+        audioEngine.setSmartSnapEnabled(state.smartSnapEnabled);
+    }
+
+    // Sync Dual Output Mode
+    if (state.dualOutputMode !== prevState.dualOutputMode) {
+        audioEngine.setDualOutputMode(state.dualOutputMode);
     }
 
     // Sync Section config (lengthInBars, name) to DB

@@ -280,3 +280,200 @@ oat-dialog::part(panel) {
 .ui-btn-group>button:active:not(:disabled) {
     transform: none;
 }
+
+/* ─── Rotary Knob ─────────────────────────────────────────────────────────── */
+.ui-knob-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+}
+
+.ui-knob-svg {
+    cursor: ns-resize;
+    display: block;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+    transition: filter 0.15s ease;
+    touch-action: none;
+}
+
+.ui-knob-svg:hover {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
+}
+
+.ui-knob-svg:active,
+.ui-knob-svg.dragging {
+    filter: drop-shadow(0 2px 12px var(--knob-glow, rgba(251, 146, 60, 0.6)));
+    cursor: ns-resize;
+}
+
+.ui-knob-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: center;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.ui-knob-value {
+    font-size: 8px;
+    font-family: var(--font-mono, monospace);
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+    letter-spacing: 0.05em;
+    margin-top: -2px;
+}
+
+/* ─── FX Rack Layout ──────────────────────────────────────────────────────── */
+.fx-rack {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 4px 2px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.fx-rack::-webkit-scrollbar {
+    height: 4px;
+}
+
+.fx-rack::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fx-rack::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+}
+
+.fx-module {
+    flex: 0 0 146px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 8px 10px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    border-top: 2px solid var(--module-color, rgba(255, 255, 255, 0.1));
+    transition: opacity 0.2s ease, border-top-color 0.2s ease;
+    position: relative;
+}
+
+.fx-module.enabled {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    border-top-color: var(--module-color, rgba(255, 255, 255, 0.3));
+    box-shadow: 0 0 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.fx-module.disabled {
+    opacity: 0.48;
+}
+
+.fx-module-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Shrink the toggle switch to feel lighter in the compact module header */
+.fx-module-header label {
+    transform: scale(0.78);
+    transform-origin: right center;
+}
+
+
+.fx-module-name {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--module-color, rgba(255, 255, 255, 0.7));
+}
+
+.fx-knob-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px 4px;
+    justify-items: center;
+}
+
+.fx-knob-grid.single-col {
+    grid-template-columns: 1fr;
+}
+
+.fx-knob-grid.two-col {
+    grid-template-columns: 1fr 1fr;
+}
+
+.fx-module-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.fx-mini-btn-row {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    flex-wrap: wrap;
+}
+
+.fx-mini-btn {
+    flex: 1;
+    padding: 3px 4px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+    min-width: 22px;
+}
+
+.fx-mini-btn:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.fx-mini-btn.active {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--module-color, rgba(255, 255, 255, 0.3));
+    color: var(--module-color, white);
+    box-shadow: 0 0 8px var(--module-color-glow, rgba(255, 255, 255, 0.1));
+}
+
+.fx-mini-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* ─── Pan footer ──────────────────────────────────────────────────────────── */
+.fx-pan-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 8px 0 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 4px;
+}
