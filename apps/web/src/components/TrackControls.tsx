@@ -1,11 +1,13 @@
-import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon, StackIcon, XIcon, HeadphonesIcon, PulseIcon, BugIcon } from '@phosphor-icons/react';
+import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon, StackIcon, XIcon, HeadphonesIcon, PulseIcon, BugIcon, FloppyDiskIcon } from '@phosphor-icons/react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
+import { useSessionStore } from '../store/useSessionStore';
 import { Card, Stack, Row, Button, ButtonGroup, Label, ValueText, Badge, Heading, Grid, Switch, Waveform, Modal } from '@live-looper/ui';
 import { TrackFX } from './TrackFX';
 import { LatencyMonitor } from './LatencyMonitor';
 import { db } from '@live-looper/storage';
+import { SessionManager } from './SessionManager';
 import type { LayerRecord } from '@live-looper/types';
 
 const ICON_SIZE = 22;
@@ -1140,20 +1142,15 @@ const SettingsPopover = ({ onClose }: { onClose: () => void }) => {
 
 // ─── Global Action Bar ────────────────────────────────────────────────────────
 export const GlobalActionBar = () => {
-    const { isPlaying, sections, bpm, currentSectionIndex, queuedSectionIndex, mode, showLayers, setShowLayers, showDevInspector, setShowDevInspector } = useLooperStore();
+    const { isPlaying, mode, sections, bpm, currentSectionIndex, queuedSectionIndex, showLayers, setShowLayers, showDevInspector, setShowDevInspector } = useLooperStore();
+    const { togglePlayback } = useSessionStore();
     const [showBpmPopup, setShowBpmPopup] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showPerformance, setShowPerformance] = useState(false);
     const isLive = mode === 'live';
 
-    const handleStart = async () => {
-        await audioEngine.init(sections, bpm);
-        audioEngine.start();
-        useLooperStore.getState().setIsPlaying(true);
-    };
-    const handleStop = () => {
-        audioEngine.stop();
-        useLooperStore.getState().setIsPlaying(false);
+    const handleToggle = async () => {
+        await togglePlayback();
     };
 
     return (
@@ -1177,7 +1174,7 @@ export const GlobalActionBar = () => {
             }}>
                 {/* ── Play / Stop — dominant element ── */}
                 <Button
-                    onClick={isPlaying ? handleStop : handleStart}
+                    onClick={handleToggle}
                     variant={isPlaying ? 'danger' : 'primary'}
                     style={{
                         width: 72,

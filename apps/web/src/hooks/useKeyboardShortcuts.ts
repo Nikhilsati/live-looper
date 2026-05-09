@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { useLooperStore } from '../store/useLooperStore';
+import { useSessionStore } from '../store/useSessionStore';
 
 export const useKeyboardShortcuts = () => {
-    const togglePlayback = useLooperStore(state => state.togglePlayback);
+    const togglePlayback = useSessionStore(state => state.togglePlayback);
     const toggleTrackRecording = useLooperStore(state => state.toggleTrackRecording);
 
     useEffect(() => {

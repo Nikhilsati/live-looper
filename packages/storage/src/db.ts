@@ -4,7 +4,8 @@ import type {
     TrackRecord,
     SectionRecord,
     LayerRecord,
-    AudioBlobRecord
+    AudioBlobRecord,
+    SessionRecord
 } from '@live-looper/types';
 
 export class LiveLooperDB extends Dexie {
@@ -13,6 +14,7 @@ export class LiveLooperDB extends Dexie {
     sections!: Table<SectionRecord>;
     layers!: Table<LayerRecord>;
     audioBlobs!: Table<AudioBlobRecord>;
+    sessions!: Table<SessionRecord>;
 
     constructor() {
         super('live-looper-db');
@@ -26,6 +28,10 @@ export class LiveLooperDB extends Dexie {
         // v2: adds deletedAt index to layers for soft-delete (undo) support.
         this.version(2).stores({
             layers: 'id, projectId, trackId, sectionId, deletedAt'
+        });
+        // v3: adds sessions table
+        this.version(3).stores({
+            sessions: 'id, projectId'
         });
     }
 }

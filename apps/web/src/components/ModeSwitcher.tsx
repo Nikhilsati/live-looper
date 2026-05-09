@@ -1,11 +1,15 @@
 import React from 'react';
 import { useLooperStore } from '../store/useLooperStore';
 import { Row, Button } from '@live-looper/ui';
-import { LayoutIcon, PlayIcon, BroadcastIcon } from '@phosphor-icons/react';
+import { LayoutIcon, PlayIcon, BroadcastIcon, FloppyDiskIcon, RecordIcon } from '@phosphor-icons/react';
 import type { Mode } from '@live-looper/types';
+import { useSessionStore } from '../store/useSessionStore';
+import { SessionManager } from './SessionManager';
 
 export const ModeSwitcher: React.FC = () => {
     const { mode, setMode } = useLooperStore();
+    const { isSessionArmed, setIsSessionArmed, isSessionRecording, isSessionReplaying } = useSessionStore();
+    const [showSessions, setShowSessions] = React.useState(false);
 
     const modes: {
         id: Mode;
@@ -42,51 +46,113 @@ export const ModeSwitcher: React.FC = () => {
         ];
 
     return (
-        <Row style={{
-            gap: 6,
-            padding: '6px',
-            background: 'rgba(255,255,255,0.04)',
-            borderRadius: 14,
-            border: '1px solid rgba(255,255,255,0.07)'
-        }}>
-            {modes.map((m) => {
-                const isActive = mode === m.id;
-                const Icon = m.icon;
-                return (
+        <Row style={{ gap: 12, alignItems: 'center' }}>
+            {/* Recording / Arm Toggle */}
+            <Button
+                onClick={() => setIsSessionArmed(!isSessionArmed)}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '9px 14px',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    background: isSessionArmed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.05)',
+                    color: isSessionArmed ? '#ef4444' : 'rgba(255,255,255,0.4)',
+                    border: isSessionArmed ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.1)',
+                    transition: 'all 0.2s ease',
+                }}
+            >
+                <div style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: isSessionArmed ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                    boxShadow: isSessionArmed ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none',
+                    animation: isSessionRecording ? 'pulse 1s infinite' : 'none'
+                }} />
+                <span>REC</span>
+            </Button>
+
+            <Row style={{
+                gap: 4,
+                padding: '4px',
+                background: 'rgba(255,255,255,0.04)',
+                borderRadius: 14,
+                border: '1px solid rgba(255,255,255,0.07)'
+            }}>
+                {modes.map((m) => {
+                    const isActive = mode === m.id;
+                    const Icon = m.icon;
+                    return (
+                        <Button
+                            key={m.id}
+                            onClick={() => setMode(m.id)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 7,
+                                padding: '9px 18px',
+                                minWidth: 0,
+                                justifyContent: 'center',
+                                borderRadius: 10,
+                                fontWeight: isActive ? 700 : 400,
+                                fontSize: 13,
+                                letterSpacing: isActive ? '0.04em' : 0,
+                                background: isActive ? m.activeBg : 'transparent',
+                                color: isActive ? m.activeColor : 'rgba(255,255,255,0.45)',
+                                border: isActive
+                                    ? `1px solid ${m.activeColor}44`
+                                    : '1px solid transparent',
+                                boxShadow: isActive
+                                    ? `0 0 16px ${m.glowColor}`
+                                    : 'none',
+                                transition: 'all 0.2s ease',
+                                animation: (isActive && m.id === 'live') ? 'live-pulse 2s ease-in-out infinite' : 'none',
+                            }}
+                        >
+                            <Icon size={15} />
+                            <span>{m.label}</span>
+                        </Button>
+                    );
+                })}
+
+                <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+
+                {/* Sessions Tab-like Button */}
+                <div style={{ position: 'relative' }}>
                     <Button
-                        key={m.id}
-                        onClick={() => setMode(m.id)}
+                        onClick={() => setShowSessions(!showSessions)}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 7,
                             padding: '9px 18px',
-                            minWidth: 0,
-                            justifyContent: 'center',
                             borderRadius: 10,
-                            fontWeight: isActive ? 700 : 400,
+                            fontWeight: showSessions || isSessionReplaying ? 700 : 400,
                             fontSize: 13,
-                            letterSpacing: isActive ? '0.04em' : 0,
-                            // Active: coloured bg + shadow glow
-                            background: isActive ? m.activeBg : 'transparent',
-                            color: isActive ? m.activeColor : 'rgba(255,255,255,0.45)',
-                            border: isActive
-                                ? `1px solid ${m.activeColor}44`
-                                : '1px solid transparent',
-                            boxShadow: isActive
-                                ? `0 0 16px ${m.glowColor}`
-                                : 'none',
-                            // Smooth transitions — no layout shift between states
-                            transition: 'background 0.2s, color 0.2s, box-shadow 0.2s, border-color 0.2s',
-                            // Blink only for LIVE badge when active
-                            animation: (isActive && m.id === 'live') ? 'live-pulse 2s ease-in-out infinite' : 'none',
+                            background: showSessions || isSessionReplaying ? 'rgba(167, 139, 250, 0.15)' : 'transparent',
+                            color: showSessions || isSessionReplaying ? '#a78bfa' : 'rgba(255,255,255,0.45)',
+                            border: showSessions || isSessionReplaying ? '1px solid rgba(167, 139, 250, 0.3)' : '1px solid transparent',
+                            transition: 'all 0.2s ease',
                         }}
                     >
-                        <Icon size={15} />
-                        <span>{m.label}</span>
+                        <FloppyDiskIcon size={15} weight={showSessions || isSessionReplaying ? 'fill' : 'regular'} />
+                        <span>Sessions</span>
                     </Button>
-                );
-            })}
+                    {showSessions && (
+                        <div style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 12px)',
+                            right: 0,
+                            zIndex: 2000
+                        }}>
+                            <SessionManager onClose={() => setShowSessions(false)} />
+                        </div>
+                    )}
+                </div>
+            </Row>
         </Row>
     );
 };

@@ -34,6 +34,12 @@ class AudioEngine {
     /** Shadow of the metronome's current on/off state in the worklet. Defaults to true (on). */
     private _metronomeOn: boolean = true;
 
+    // Session Recording & Replay
+    private sessionRecorder: MediaRecorder | null = null;
+    private sessionAudioChunks: Blob[] = [];
+    private sessionAudioResolver: ((blob: Blob) => void) | null = null;
+    private sessionPlaybackSource: AudioBufferSourceNode | null = null;
+
     // Storage Context
     private currentProjectId: string | null = null;
     private trackIdMap: string[] = []; // index 0-3 -> UUID
@@ -691,6 +697,94 @@ class AudioEngine {
         const projectId = await projectService.createProject(name, DEFAULT_BPM);
         await this.loadProject(projectId);
         return projectId;
+    }
+
+    // --- Session Recording & Replay Methods ---
+
+    startLiveRecording() {
+        if (!this.currentStream) {
+            console.warn("No active stream to record for session.");
+            return;
+        }
+
+        this.sessionAudioChunks = [];
+        // Use standard WebM Opus for efficiency, we can convert or just store it as blob
+        const options = { mimeType: 'audio/webm;codecs=opus' };
+        
+        try {
+            this.sessionRecorder = new MediaRecorder(this.currentStream, options);
+        } catch (e) {
+            // Fallback if codec not supported
+            this.sessionRecorder = new MediaRecorder(this.currentStream);
+        }
+
+        this.sessionRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                this.sessionAudioChunks.push(e.data);
+            }
+        };
+
+        this.sessionRecorder.start();
+        console.log("Session live recording started");
+    }
+
+    stopLiveRecording(): Promise<Blob | null> {
+        return new Promise((resolve) => {
+            if (!this.sessionRecorder || this.sessionRecorder.state === 'inactive') {
+                resolve(null);
+                return;
+            }
+
+            this.sessionAudioResolver = resolve;
+
+            this.sessionRecorder.onstop = () => {
+                const blob = new Blob(this.sessionAudioChunks, { type: 'audio/webm;codecs=opus' });
+                this.sessionAudioChunks = [];
+                if (this.sessionAudioResolver) {
+                    this.sessionAudioResolver(blob);
+                    this.sessionAudioResolver = null;
+                }
+            };
+
+            this.sessionRecorder.stop();
+        });
+    }
+
+    async playLiveAudio(blob: Blob) {
+        if (!this.context) return;
+        
+        this.stopLiveAudio(); // Stop any existing playback
+
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+            
+            this.sessionPlaybackSource = this.context.createBufferSource();
+            this.sessionPlaybackSource.buffer = audioBuffer;
+            
+            // Connect to liveTrackFX input so it goes through the live track FX chain during replay
+            if (this.liveTrackFX) {
+                this.sessionPlaybackSource.connect(this.liveTrackFX.input);
+            } else {
+                this.sessionPlaybackSource.connect(this.context.destination);
+            }
+            
+            this.sessionPlaybackSource.start(0);
+        } catch (e) {
+            console.error("Failed to decode and play session live audio", e);
+        }
+    }
+
+    stopLiveAudio() {
+        if (this.sessionPlaybackSource) {
+            try {
+                this.sessionPlaybackSource.stop();
+            } catch (e) {
+                // Ignore if already stopped
+            }
+            this.sessionPlaybackSource.disconnect();
+            this.sessionPlaybackSource = null;
+        }
     }
 
     getLatencyMetrics() {

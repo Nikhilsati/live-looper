@@ -1,8 +1,13 @@
 import { create } from 'zustand';
-import type { EngineState, TrackState, SectionConfig, FXState, Mode, ProjectRecord, EngineEvent, LiveTrackState } from '@live-looper/types';
+import { FXBuilder } from '@live-looper/types';
+import type {
+    EngineState, TrackState, SectionConfig, FXState, Mode,
+    ProjectRecord, EngineEvent, LiveTrackState
+} from '@live-looper/types';
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 import { modeController } from '@live-looper/mode-controller';
 import { db, projectService, exportService } from '@live-looper/storage';
+import { sessionRecorder } from './SessionRecorder';
 import { uiAlert } from './useDialogStore';
 interface LooperStore extends EngineState {
     projectList: ProjectRecord[];
@@ -24,6 +29,8 @@ interface LooperStore extends EngineState {
     importProject: (file: File) => Promise<void>;
     setMode: (mode: Mode) => Promise<void>;
     setIsPlaying: (v: boolean) => void;
+    startPlayback: () => Promise<void>;
+    stopPlayback: () => void;
     updateTick: (tick: { bar: number, beat: number, sectionIndex: number, sectionProgress: number }) => void;
     setTrackState: (trackId: number, state: Partial<TrackState>) => void;
     setCurrentSection: (index: number) => void;
@@ -65,8 +72,6 @@ interface LooperStore extends EngineState {
     engineCrashed: boolean;
     setEngineCrashed: (v: boolean) => void;
 }
-
-import { FXBuilder } from '@live-looper/types';
 
 const defaultTrack = (): TrackState => ({
     isMuted: false,
@@ -272,13 +277,33 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         set({ isPlaying });
     },
 
+    startPlayback: async () => {
+        const { sections, bpm, setIsPlaying } = get();
+        if (!modeController.isActionAllowed('start-transport')) return;
+
+        sessionRecorder.logEvent('PLAY');
+
+        await audioEngine.init(sections, bpm);
+        audioEngine.start();
+        setIsPlaying(true);
+    },
+
+    stopPlayback: () => {
+        const { setIsPlaying } = get();
+        if (!modeController.isActionAllowed('stop-transport')) return;
+
+        sessionRecorder.logEvent('STOP');
+
+        audioEngine.stop();
+        setIsPlaying(false);
+    },
+
     setBpm: (bpm) => {
         if (!modeController.isActionAllowed('change-tempo')) {
-            // Re-sync with actual BPM if blocked
             return;
         }
+        sessionRecorder.logEvent('SET_BPM', { bpm });
         set({ bpm });
-        // Persist the new BPM to IndexedDB so it survives a page reload.
         const projectId = get().currentProject?.id;
         if (projectId) {
             db.projects.update(projectId, { bpm });
@@ -292,6 +317,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
     setCurrentSection: (index) => {
         if (!modeController.isActionAllowed('trigger-section')) return;
+        sessionRecorder.logEvent('SECTION_CHANGE', { index });
         set({ currentSectionIndex: index, queuedSectionIndex: null });
     },
 
@@ -305,8 +331,17 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
     setTrackState: (trackId, state) => {
         const action = state.isRecording ? 'record' : state.hasAudio === false ? 'clear-track' : 'modify-track';
-        // Allow isArmed to be set without mode check? Or maybe it's fine.
         if (state.isRecording !== undefined && !modeController.isActionAllowed(action)) return;
+
+        if (state.isArmed !== undefined) {
+            sessionRecorder.logEvent('ARM_TRACK', { trackId, isArmed: state.isArmed });
+        }
+        if (state.isMuted !== undefined) {
+            sessionRecorder.logEvent('MUTE_TRACK', { trackId, isMuted: state.isMuted });
+        }
+        if (state.hasAudio === false && state.layerCount === 0) {
+            sessionRecorder.logEvent('CLEAR_TRACK', { trackId });
+        }
 
         set(prev => {
             const newTracks = [...prev.tracks];
@@ -317,6 +352,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
     setTrackFX: (trackId, fx) => {
         if (!modeController.isActionAllowed('modify-fx-config')) return;
+        sessionRecorder.logEvent('SET_TRACK_FX', { trackId, fx });
         set(prev => {
             const newTracks = [...prev.tracks];
             if (newTracks[trackId]) {
@@ -330,6 +366,13 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     },
 
     setLiveTrackState: (state) => {
+        if (state.isMuted !== undefined) {
+            sessionRecorder.logEvent('MUTE_LIVE_TRACK', { isMuted: state.isMuted });
+        }
+        if (state.fx !== undefined) {
+            sessionRecorder.logEvent('SET_LIVE_TRACK_FX', { fx: state.fx });
+        }
+
         set(prev => {
             const newLiveTrack = { ...prev.liveTrack, ...state };
             if (state.isMuted !== undefined) {
@@ -469,6 +512,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         const { tracks } = get();
         if (!tracks[trackId]) return;
 
+        sessionRecorder.logEvent('SOLO_TRACK', { trackId, isSoloed: !tracks[trackId].isSoloed });
+
         // Simply toggle this track's solo — other tracks are unaffected
         set(prev => ({
             tracks: prev.tracks.map((t, i) => i === trackId ? { ...t, isSoloed: !t.isSoloed } : t)
@@ -524,15 +569,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     },
 
     togglePlayback: async () => {
-        const { isPlaying, setIsPlaying, sections, bpm } = get();
-        if (isPlaying) {
-            audioEngine.stop();
-            setIsPlaying(false);
-        } else {
-            await audioEngine.init(sections, bpm);
-            audioEngine.start();
-            setIsPlaying(true);
-        }
+        const { isPlaying, startPlayback, stopPlayback } = get();
+        if (isPlaying) stopPlayback();
+        else await startPlayback();
     },
 
     refreshDevices: async () => {

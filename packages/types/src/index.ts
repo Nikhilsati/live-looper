@@ -161,6 +161,36 @@ export interface ProjectRecord {
     };
 }
 
+export type SessionEventType = 
+    | 'PLAY' 
+    | 'STOP' 
+    | 'ARM_TRACK' 
+    | 'MUTE_TRACK' 
+    | 'SOLO_TRACK' 
+    | 'SECTION_CHANGE' 
+    | 'SET_BPM' 
+    | 'SET_TRACK_FX' 
+    | 'SET_LIVE_TRACK_FX'
+    | 'MUTE_LIVE_TRACK'
+    | 'CLEAR_TRACK';
+
+export interface SessionEvent {
+    timestampMs: number; // Offset from start of session
+    type: SessionEventType;
+    payload?: any;
+}
+
+export interface SessionRecord {
+    id: string;
+    projectId: string;
+    name: string;
+    createdAt: number;
+    durationMs: number;
+    events: SessionEvent[];
+    liveAudioBlobId?: string; // Reference to the raw mic audio recorded linearly
+    projectSnapshot: FrozenProjectSnapshot;
+}
+
 export interface TrackRecord {
     id: string;
     projectId: string;
