@@ -10,7 +10,8 @@ import type { FXState } from '@live-looper/types';
 
 interface TrackFXProps {
     trackId: number | 'live';
-    onClose: () => void;
+    onClose?: () => void;
+    fullSize?: boolean;
 }
 
 // ─── Per-module color palette ─────────────────────────────────────────────────
@@ -27,7 +28,7 @@ const COLORS = {
     pan: '#94a3b8',   // slate
 } as const;
 
-export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
+export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
     const isLive = trackId === 'live';
     const track = useLooperStore(state => isLive ? state.liveTrack : state.tracks[trackId as number]);
     const setTrackFX = useLooperStore(state => state.setTrackFX);
@@ -54,12 +55,15 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
         <Card className="fx-panel" style={{
             position: 'relative',
             width: '100%',
-            maxWidth: '1060px',
+            maxWidth: fullSize ? 'none' : '1060px',
+            flex: fullSize ? 1 : undefined,
             padding: '20px 20px 16px',
             background: 'var(--background)',
             border: '1px solid var(--border)',
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
             boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
         }}>
             {/* Header */}
             <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -71,13 +75,15 @@ export const TrackFX = ({ trackId, onClose }: TrackFXProps) => {
                         {isLive ? 'Live Track' : `Track ${(trackId as number) + 1}`} · Effects Chain
                     </Heading>
                 </Row>
-                <Button onClick={onClose} variant="ghost" style={{ padding: '6px', borderRadius: '50%', width: 36, height: 36 }}>
-                    <XIcon size={16} />
-                </Button>
+                {onClose && (
+                    <Button onClick={onClose} variant="ghost" style={{ padding: '6px', borderRadius: '50%', width: 36, height: 36 }}>
+                        <XIcon size={16} />
+                    </Button>
+                )}
             </Row>
 
             {/* Rack */}
-            <div className="fx-rack">
+            <div className="fx-rack" style={{ flexWrap: fullSize ? 'wrap' : undefined, flex: fullSize ? 1 : undefined, alignContent: fullSize ? 'flex-start' : undefined }}>
 
                 {/* ── Noise Gate — single column ── */}
                 <FxModule

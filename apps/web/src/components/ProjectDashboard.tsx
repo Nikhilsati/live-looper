@@ -3,7 +3,7 @@ import { useLooperStore } from '../store/useLooperStore';
 import {
     Stack, Row, Card, Button, Heading, Text, Grid
 } from '@live-looper/ui';
-import { PlusIcon, DownloadSimpleIcon, UploadSimpleIcon, TrashIcon, MusicNoteIcon, ClockIcon, VinylRecordIcon } from '@phosphor-icons/react';
+import { PlusIcon, DownloadSimpleIcon, UploadSimpleIcon, TrashIcon, MusicNoteIcon, ClockIcon, VinylRecordIcon, GuitarIcon, LightningIcon } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { uiConfirm } from '../store/useDialogStore';
 
@@ -186,7 +186,97 @@ export const ProjectDashboard: React.FC = () => {
                     </div>
                 )}
 
+                {/* ── Guitar Practice Quick Access ───────────────────── */}
+                <div
+                    id="guitar-practice-card"
+                    className="guitar-practice-card"
+                    onClick={() => navigate('/practice')}
+                    style={{
+                        position: 'relative',
+                        padding: '28px 32px',
+                        background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(8,145,178,0.08) 100%)',
+                        border: '1px solid rgba(16,185,129,0.25)',
+                        borderRadius: 24,
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 24,
+                        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                    }}
+                >
+                    {/* Background glow orbs */}
+                    <div style={{
+                        position: 'absolute', top: -40, right: 60,
+                        width: 200, height: 200,
+                        background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%)',
+                        borderRadius: '50%', pointerEvents: 'none',
+                    }} />
+                    <div style={{
+                        position: 'absolute', bottom: -30, right: 20,
+                        width: 130, height: 130,
+                        background: 'radial-gradient(circle, rgba(8,145,178,0.12) 0%, transparent 70%)',
+                        borderRadius: '50%', pointerEvents: 'none',
+                    }} />
+
+                    {/* Left: icon + text */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, zIndex: 1 }}>
+                        <div style={{
+                            width: 64, height: 64, borderRadius: 20, flexShrink: 0,
+                            background: 'linear-gradient(135deg, #10b981 0%, #0891b2 100%)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 8px 24px rgba(16,185,129,0.35)',
+                        }}>
+                            <GuitarIcon size={32} color="white" weight="fill" />
+                        </div>
+                        <div>
+                            <div style={{
+                                fontSize: 22, fontWeight: 800,
+                                letterSpacing: '-0.02em',
+                                background: 'linear-gradient(90deg, #10b981, #22d3ee)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                marginBottom: 4,
+                            }}>
+                                Guitar Practice
+                            </div>
+                            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', fontWeight: 400 }}>
+                                Plug in and play — live pass-through with the full FX rack. No project needed.
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right: feature pills + CTA */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, zIndex: 1 }}>
+                        {['EQ', 'Reverb', 'Delay', 'Drive', 'Chorus'].map(fx => (
+                            <div key={fx} style={{
+                                padding: '5px 12px',
+                                background: 'rgba(255,255,255,0.06)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: 20,
+                                fontSize: 11, fontWeight: 600,
+                                color: 'rgba(255,255,255,0.5)',
+                            }}>
+                                {fx}
+                            </div>
+                        ))}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '12px 20px',
+                            background: 'linear-gradient(135deg, #10b981, #0891b2)',
+                            borderRadius: 14,
+                            fontSize: 14, fontWeight: 700, color: 'white',
+                            boxShadow: '0 4px 16px rgba(16,185,129,0.3)',
+                        }}>
+                            <LightningIcon size={16} weight="fill" />
+                            Open
+                        </div>
+                    </div>
+                </div>
+
                 {/* Project List */}
+
                 <Grid cols="repeat(auto-fill, minmax(360px, 1fr))" style={{ gap: 30 }}>
                     {projectList.length === 0 && (
                         <div style={{
@@ -334,6 +424,11 @@ export const ProjectDashboard: React.FC = () => {
                 @keyframes fadeIn {
                     from { opacity: 0; backdrop-filter: blur(0px); }
                     to { opacity: 1; backdrop-filter: blur(8px); }
+                }
+                .guitar-practice-card:hover {
+                    transform: translateY(-4px);
+                    border-color: rgba(16, 185, 129, 0.5);
+                    box-shadow: 0 16px 40px rgba(0,0,0,0.3), 0 0 40px rgba(16,185,129,0.12);
                 }
             `}</style>
         </div>
