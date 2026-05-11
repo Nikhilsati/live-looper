@@ -5,7 +5,8 @@ import type {
     SectionRecord,
     LayerRecord,
     AudioBlobRecord,
-    SessionRecord
+    SessionRecord,
+    FXPreset
 } from '@live-looper/types';
 
 export class LiveLooperDB extends Dexie {
@@ -15,6 +16,7 @@ export class LiveLooperDB extends Dexie {
     layers!: Table<LayerRecord>;
     audioBlobs!: Table<AudioBlobRecord>;
     sessions!: Table<SessionRecord>;
+    fxPresets!: Table<FXPreset>;
 
     constructor() {
         super('live-looper-db');
@@ -32,6 +34,10 @@ export class LiveLooperDB extends Dexie {
         // v3: adds sessions table
         this.version(3).stores({
             sessions: 'id, projectId'
+        });
+        // v4: adds fxPresets table
+        this.version(4).stores({
+            fxPresets: 'id, type, name, moduleType'
         });
     }
 }

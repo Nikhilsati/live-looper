@@ -1,10 +1,13 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Row, Heading, Switch, Button, Knob } from '@live-looper/ui';
 import {
     XIcon, SlidersIcon, SpeakerSlashIcon, WaveformIcon,
     SpeakerHighIcon, LightningIcon, ClockIcon, WavesIcon,
-    WaveTriangleIcon, CirclesFourIcon, ActivityIcon
+    WaveTriangleIcon, CirclesFourIcon, ActivityIcon,
+    CaretDownIcon, FloppyDiskIcon, DownloadSimpleIcon, UploadSimpleIcon, TrashIcon, SwatchesIcon,
+    Circle, FilePlusIcon
 } from '@phosphor-icons/react';
 import type { FXState } from '@live-looper/types';
 
@@ -13,6 +16,175 @@ interface TrackFXProps {
     onClose?: () => void;
     fullSize?: boolean;
 }
+
+const PresetMenu = ({
+    type,
+    moduleType,
+    currentFxState,
+    onLoad
+}: {
+    type: 'chain' | 'module',
+    moduleType?: string,
+    currentFxState: any,
+    onLoad: (fxState: any) => void
+}) => {
+    const { fxPresets, saveFXPreset, deleteFXPreset, exportFXPreset, importFXPreset } = useLooperStore();
+    const [isOpen, setIsOpen] = React.useState(false);
+    const menuRef = React.useRef<HTMLDivElement>(null);
+    const buttonRef = React.useRef<HTMLButtonElement>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [menuPos, setMenuPos] = React.useState({ top: 0, left: 0 });
+
+    const presets = fxPresets.filter(p => p.type === type && (type === 'chain' || p.moduleType === moduleType));
+
+    const toggleMenu = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            // Default alignment is left-aligned with button. Adjust if it goes offscreen right
+            let leftPos = rect.left;
+            if (leftPos + 170 > window.innerWidth) {
+                leftPos = window.innerWidth - 180;
+            }
+            setMenuPos({ top: rect.bottom + 4, left: leftPos });
+        }
+        setIsOpen(!isOpen);
+    };
+
+    React.useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (isOpen && menuRef.current && !menuRef.current.contains(e.target as Node) && !buttonRef.current?.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        const handleScroll = () => {
+            if (isOpen) setIsOpen(false);
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            window.addEventListener('scroll', handleScroll, true); // Use capture phase to catch scrolls in any scrollable container
+            window.addEventListener('resize', handleScroll);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [isOpen]);
+
+    const handleSave = () => {
+        const name = prompt('Enter preset name:');
+        if (name) {
+            saveFXPreset(name, type, currentFxState, moduleType);
+            setIsOpen(false);
+        }
+    };
+
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            await importFXPreset(file);
+            setIsOpen(false);
+        }
+    };
+
+    return (
+        <>
+            <button
+                ref={buttonRef}
+                className="ghost small"
+                onClick={toggleMenu}
+                style={{ padding: '4px', height: 24, width: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)' }}
+                title="Presets"
+            >
+                <SwatchesIcon size={14} weight={isOpen ? "fill" : "regular"} color={isOpen ? "var(--primary, #a881ff)" : "inherit"} />
+            </button>
+
+            {isOpen && createPortal(
+                <div
+                    className="card"
+                    ref={menuRef}
+                    style={{
+                        position: 'fixed',
+                        top: menuPos.top,
+                        left: menuPos.left,
+                        width: 170,
+                        padding: '8px 4px',
+                        zIndex: 9999, // Ensure it's above everything
+                        background: 'rgba(20, 18, 24, 0.98)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        borderRadius: 8,
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                    }}
+                >
+                    {/* Top Actions Row */}
+                    <Row style={{ justifyContent: 'space-evenly', padding: '0 4px' }}>
+                        <Button variant="ghost" style={{ flexDirection: 'column', gap: 4, padding: '4px 8px', height: 'auto', background: 'transparent' }} onClick={handleSave}>
+                            <FloppyDiskIcon size={16} weight="regular" />
+                            <span style={{ fontSize: 10, opacity: 0.8, letterSpacing: '0.02em' }}>Save</span>
+                        </Button>
+                        <Button variant="ghost" style={{ flexDirection: 'column', gap: 4, padding: '4px 8px', height: 'auto', background: 'transparent' }} onClick={() => fileInputRef.current?.click()}>
+                            <UploadSimpleIcon size={16} weight="regular" />
+                            <span style={{ fontSize: 10, opacity: 0.8, letterSpacing: '0.02em' }}>Import</span>
+                        </Button>
+                        <Button variant="ghost" style={{ flexDirection: 'column', gap: 4, padding: '4px 8px', height: 'auto', background: 'transparent' }} onClick={handleSave}>
+                            <FilePlusIcon size={16} weight="regular" />
+                            <span style={{ fontSize: 10, opacity: 0.8, letterSpacing: '0.02em' }}>New</span>
+                        </Button>
+                    </Row>
+                    <input type="file" accept=".json" ref={fileInputRef} onChange={handleImport} style={{ display: 'none' }} />
+
+                    {presets.length > 0 && (
+                        <>
+                            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 10px' }} />
+                            <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                {presets.map(p => {
+                                    const isActive = JSON.stringify(p.fxState) === JSON.stringify(currentFxState);
+                                    return (
+                                        <div
+                                            key={p.id}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                padding: '6px 8px',
+                                                borderRadius: 6,
+                                                cursor: 'pointer',
+                                                transition: 'background 0.1s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                            onClick={() => { onLoad(p.fxState); setIsOpen(false); }}
+                                        >
+                                            <Row style={{ alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                                                <span style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: isActive ? '#a881ff' : 'rgba(255,255,255,0.85)' }}>
+                                                    {p.name}
+                                                </span>
+                                            </Row>
+                                            <Row style={{ gap: 2 }} onClick={e => e.stopPropagation()}>
+                                                <Button variant="ghost" style={{ padding: 4, height: 'auto', background: 'transparent' }} onClick={(e) => { e.stopPropagation(); exportFXPreset(p.id); }}>
+                                                    <DownloadSimpleIcon size={12} color="#a881ff" />
+                                                </Button>
+                                                <Button variant="ghost" style={{ padding: 4, height: 'auto', background: 'transparent' }} onClick={(e) => { e.stopPropagation(); deleteFXPreset(p.id); }}>
+                                                    <TrashIcon size={12} color="#ff6b6b" />
+                                                </Button>
+                                            </Row>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                </div>,
+                document.body
+            )}
+        </>
+    );
+};
 
 // ─── Per-module color palette ─────────────────────────────────────────────────
 const COLORS = {
@@ -75,11 +247,21 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                         {isLive ? 'Live Track' : `Track ${(trackId as number) + 1}`} · Effects Chain
                     </Heading>
                 </Row>
-                {onClose && (
-                    <Button onClick={onClose} variant="ghost" style={{ padding: '6px', borderRadius: '50%', width: 36, height: 36 }}>
-                        <XIcon size={16} />
-                    </Button>
-                )}
+                <Row style={{ alignItems: 'center', gap: 8 }}>
+                    <PresetMenu
+                        type="chain"
+                        currentFxState={fx}
+                        onLoad={(state) => {
+                            if (isLive) setLiveTrackState({ fx: state });
+                            else setTrackFX(trackId as number, state);
+                        }}
+                    />
+                    {onClose && (
+                        <Button onClick={onClose} variant="ghost" style={{ padding: '6px', borderRadius: '50%', width: 36, height: 36 }}>
+                            <XIcon size={16} />
+                        </Button>
+                    )}
+                </Row>
             </Row>
 
             {/* Rack */}
@@ -95,6 +277,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
+                    moduleType="noiseGate"
+                    currentFxState={fx.noiseGate}
+                    onLoadPreset={state => updateFX('noiseGate', state)}
                 >
                     <Knob color={COLORS.noiseGate} size={52} label="Thresh" unit="dB"
                         value={fx.noiseGate.threshold} min={-80} max={0} step={1}
@@ -117,6 +302,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
+                    moduleType="eq"
+                    currentFxState={fx.eq}
+                    onLoadPreset={state => updateFX('eq', state)}
                 >
                     <Knob color={COLORS.eq} size={52} label="Low" unit="dB"
                         value={fx.eq.low} min={-12} max={12} step={0.1}
@@ -139,6 +327,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
+                    moduleType="compressor"
+                    currentFxState={fx.compressor}
+                    onLoadPreset={state => updateFX('compressor', state)}
                 >
                     <Knob color={COLORS.compressor} size={52} label="Thresh" unit="dB"
                         value={fx.compressor.threshold} min={-60} max={0} step={1}
@@ -161,6 +352,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
+                    moduleType="drive"
+                    currentFxState={fx.drive}
+                    onLoadPreset={state => updateFX('drive', state)}
                 >
                     <Knob color={COLORS.drive} size={52} label="Amt"
                         value={fx.drive.amount} min={0} max={1} step={0.01}
@@ -180,6 +374,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr 1fr"
                     moduleWidth={152}
                     knobGap={14}
+                    moduleType="chorus"
+                    currentFxState={fx.chorus}
+                    onLoadPreset={state => updateFX('chorus', state)}
                     footer={
                         <div className="fx-module-footer">
                             <span className="fx-mini-label">Mode</span>
@@ -217,6 +414,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr 1fr"
                     moduleWidth={152}
                     knobGap={14}
+                    moduleType="phaser"
+                    currentFxState={fx.phaser}
+                    onLoadPreset={state => updateFX('phaser', state)}
                     footer={
                         <div className="fx-module-footer">
                             <span className="fx-mini-label">Stages</span>
@@ -254,6 +454,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr 1fr"
                     moduleWidth={160}
                     knobGap={14}
+                    moduleType="tremolo"
+                    currentFxState={fx.tremolo}
+                    onLoadPreset={state => updateFX('tremolo', state)}
                     footer={
                         <div className="fx-module-footer">
                             <span className="fx-mini-label">Mode</span>
@@ -296,6 +499,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr 1fr 1fr"
                     moduleWidth={192}
                     knobGap={18}
+                    moduleType="delay"
+                    currentFxState={fx.delay}
+                    onLoadPreset={state => updateFX('delay', state)}
                     footer={
                         <div className="fx-module-footer">
                             <span className="fx-mini-label">Mode</span>
@@ -347,6 +553,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     cols="1fr 1fr"
                     moduleWidth={152}
                     knobGap={14}
+                    moduleType="reverb"
+                    currentFxState={fx.reverb}
+                    onLoadPreset={state => updateFX('reverb', state)}
                 >
                     <Knob color={COLORS.reverb} size={50} label="Mix"
                         value={fx.reverb.mix} min={0} max={1} step={0.01}
@@ -394,9 +603,13 @@ interface FxModuleProps {
     moduleWidth?: number;
     /** Gap between knobs in px */
     knobGap?: number;
+    // For Presets
+    moduleType?: keyof FXState;
+    currentFxState?: any;
+    onLoadPreset?: (state: any) => void;
 }
 
-const FxModule = ({ name, color, enabled, children, onToggle, alwaysOn, icon, footer, cols = '1fr', moduleWidth = 120, knobGap = 10 }: FxModuleProps) => {
+const FxModule = ({ name, color, enabled, children, onToggle, alwaysOn, icon, footer, cols = '1fr', moduleWidth = 120, knobGap = 10, moduleType, currentFxState, onLoadPreset }: FxModuleProps) => {
     const isOn = alwaysOn || enabled;
     return (
         <div
@@ -409,9 +622,14 @@ const FxModule = ({ name, color, enabled, children, onToggle, alwaysOn, icon, fo
                     <span style={{ color, opacity: isOn ? 0.85 : 0.4 }}>{icon}</span>
                     <span className="fx-module-name">{name}</span>
                 </div>
-                {!alwaysOn && onToggle && (
-                    <Switch checked={enabled} onChange={onToggle} />
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {moduleType && currentFxState && onLoadPreset && (
+                        <PresetMenu type="module" moduleType={moduleType} currentFxState={currentFxState} onLoad={onLoadPreset} />
+                    )}
+                    {!alwaysOn && onToggle && (
+                        <Switch checked={enabled} onChange={onToggle} />
+                    )}
+                </div>
             </div>
 
             {/* Knob grid — layout driven by cols prop */}

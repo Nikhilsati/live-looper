@@ -234,6 +234,16 @@ export interface AudioBlobRecord {
     lengthSamples: number;
 }
 
+export interface FXPreset {
+    id: string;
+    name: string;
+    type: 'chain' | 'module';
+    moduleType?: keyof FXState | 'pan'; // If type is 'module'
+    fxState: Partial<FXState>;
+    createdAt: number;
+    updatedAt: number;
+}
+
 export type ConfigPayload = {
     sampleRate: number;
     bpm: number;

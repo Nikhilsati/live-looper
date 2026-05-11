@@ -2,11 +2,11 @@ import { create } from 'zustand';
 import { FXBuilder } from '@live-looper/types';
 import type {
     EngineState, TrackState, SectionConfig, FXState, Mode,
-    ProjectRecord, EngineEvent, LiveTrackState
+    ProjectRecord, EngineEvent, LiveTrackState, FXPreset
 } from '@live-looper/types';
 import { DEFAULT_SECTIONS, DEFAULT_BPM, audioEngine } from '@live-looper/audio-engine';
 import { modeController } from '@live-looper/mode-controller';
-import { db, projectService, exportService } from '@live-looper/storage';
+import { db, projectService, exportService, presetService } from '@live-looper/storage';
 import { sessionRecorder } from './SessionRecorder';
 import { uiAlert } from './useDialogStore';
 interface LooperStore extends EngineState {
@@ -27,6 +27,15 @@ interface LooperStore extends EngineState {
     deleteProject: (id: string) => Promise<void>;
     exportProject: (id: string) => Promise<void>;
     importProject: (file: File) => Promise<void>;
+    
+    // FX Presets
+    fxPresets: FXPreset[];
+    fetchFXPresets: () => Promise<void>;
+    saveFXPreset: (name: string, type: 'chain' | 'module', fxState: any, moduleType?: string) => Promise<void>;
+    deleteFXPreset: (id: string) => Promise<void>;
+    importFXPreset: (file: File) => Promise<void>;
+    exportFXPreset: (id: string) => Promise<void>;
+
     setMode: (mode: Mode) => Promise<void>;
     setIsPlaying: (v: boolean) => void;
     startPlayback: () => Promise<void>;
@@ -113,6 +122,54 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     outputDeviceId: null,
     performerOutputDeviceId: null,
     engineCrashed: false,
+    
+    fxPresets: [],
+    fetchFXPresets: async () => {
+        let presets = await db.fxPresets.toArray();
+        if (presets.length === 0) {
+            // Seed default presets
+            await presetService.savePreset('Basic Ping Pong', 'module', { time: 0.5, feedback: 0.4, mix: 0.3, mode: 'pingpong', filter: 0.8, enabled: true }, 'delay');
+            await presetService.savePreset('Slapback', 'module', { time: 0.125, feedback: 0.1, mix: 0.4, mode: 'mono', filter: 0.5, enabled: true }, 'delay');
+            await presetService.savePreset('Dream Ambient', 'module', { time: 1.0, feedback: 0.8, mix: 0.6, mode: 'pingpong', filter: 0.3, enabled: true }, 'delay');
+            
+            await presetService.savePreset('Large Hall', 'module', { mix: 0.4, size: 3.5, predelay: 20, damping: 0.4, enabled: true }, 'reverb');
+            await presetService.savePreset('Small Room', 'module', { mix: 0.2, size: 0.8, predelay: 5, damping: 0.8, enabled: true }, 'reverb');
+            await presetService.savePreset('Endless Cave', 'module', { mix: 0.8, size: 5.0, predelay: 50, damping: 0.1, enabled: true }, 'reverb');
+
+            await presetService.savePreset('Heavy Distortion', 'module', { amount: 0.8, tone: 0.7, enabled: true }, 'drive');
+            await presetService.savePreset('Light Crunch', 'module', { amount: 0.3, tone: 0.5, enabled: true }, 'drive');
+            await presetService.savePreset('Tape Crunch', 'module', { amount: 0.6, tone: 0.2, enabled: true }, 'drive');
+
+            await presetService.savePreset('Vocal Doubler', 'module', { rate: 0.5, depth: 0.2, mix: 0.5, voices: 2, enabled: true }, 'chorus');
+            await presetService.savePreset('Deep Swirl', 'module', { rate: 1.5, depth: 0.8, mix: 0.7, voices: 1, enabled: true }, 'chorus');
+            
+            await presetService.savePreset('Scooped Mids', 'module', { low: 3, mid: -5, high: 4 }, 'eq');
+            await presetService.savePreset('Bass Boost', 'module', { low: 6, mid: 0, high: 0 }, 'eq');
+            await presetService.savePreset('Airy Highs', 'module', { low: -2, mid: 0, high: 6 }, 'eq');
+            
+            await presetService.savePreset('Aggressive Squeeze', 'module', { threshold: -30, ratio: 8, gain: 6 }, 'compressor');
+            await presetService.savePreset('Subtle Polish', 'module', { threshold: -15, ratio: 2, gain: 2 }, 'compressor');
+
+            presets = await db.fxPresets.toArray();
+        }
+        set({ fxPresets: presets });
+    },
+    saveFXPreset: async (name, type, fxState, moduleType) => {
+        await presetService.savePreset(name, type, fxState, moduleType);
+        await get().fetchFXPresets();
+    },
+    deleteFXPreset: async (id) => {
+        await presetService.deletePreset(id);
+        await get().fetchFXPresets();
+    },
+    importFXPreset: async (file) => {
+        await presetService.importPreset(file);
+        await get().fetchFXPresets();
+    },
+    exportFXPreset: async (id) => {
+        await presetService.exportPreset(id);
+    },
+
     setEngineCrashed: (v) => set({ engineCrashed: v }),
     // UI State
     showLayers: true,
