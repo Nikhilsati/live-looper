@@ -244,7 +244,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                         <SlidersIcon size={16} style={{ color: 'var(--primary)' }} />
                     </div>
                     <Heading style={{ fontSize: '14px', margin: 0, letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.9 }}>
-                        {isLive ? 'Live Track' : `Track ${(trackId as number) + 1}`} · Effects Chain
+                        {isLive ? 'Live Track' : `Track ${(trackId as number) + 1}`} · Pedalboard
                     </Heading>
                 </Row>
                 <Row style={{ alignItems: 'center', gap: 8 }}>
@@ -573,15 +573,6 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
 
             </div>
 
-            {/* Pan footer */}
-            <div className="fx-pan-row">
-                <Knob color={COLORS.pan} size={50} label="Pan"
-                    value={fx.pan} min={-1} max={1} step={0.01}
-                    onChange={updatePan} />
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>
-                    {fx.pan < -0.005 ? `L${Math.abs(Math.round(fx.pan * 100))}` : fx.pan > 0.005 ? `R${Math.round(fx.pan * 100)}` : 'CENTER'}
-                </span>
-            </div>
         </Card>
     );
 };

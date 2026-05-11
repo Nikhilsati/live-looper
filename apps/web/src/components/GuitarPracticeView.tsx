@@ -4,6 +4,7 @@ import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
 import { FXBuilder } from '@live-looper/types';
 import { TrackFX } from './TrackFX';
+import { Tuner } from './Tuner';
 import {
     ArrowLeftIcon,
     MetronomeIcon,
@@ -14,6 +15,7 @@ import {
     MinusIcon,
     PlusIcon,
     MicrophoneIcon,
+    SlidersIcon,
 } from '@phosphor-icons/react';
 import { Button } from '@live-looper/ui';
 
@@ -258,7 +260,7 @@ export const GuitarPracticeView: React.FC = () => {
                                 Guitar Practice
                             </div>
                             <div style={{ fontSize: 12, opacity: 0.45, fontWeight: 500, marginTop: 2 }}>
-                                Live pass-through · All FX active
+                                Live pass-through
                             </div>
                         </div>
                     </div>
@@ -311,13 +313,10 @@ export const GuitarPracticeView: React.FC = () => {
                         justifyContent: 'space-between',
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{
-                                fontSize: 10, fontWeight: 800,
-                                letterSpacing: '0.12em', textTransform: 'uppercase',
-                                color: 'rgba(255,255,255,0.3)',
-                            }}>
-                                Effects Chain · Live Track
-                            </span>
+                            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <SlidersIcon size={14} weight="bold" />
+                                <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em' }}>LIVE PEDALBOARD</span>
+                            </div>
                         </div>
                         <button
                             onClick={() => setShowFX(v => !v)}
@@ -336,7 +335,7 @@ export const GuitarPracticeView: React.FC = () => {
 
                     {showFX && (
                         <div style={{ animation: 'fadeIn 0.2s ease', display: 'flex', flex: 1, gap: 16 }}>
-                            
+
                             {/* Vertical IN Meter */}
                             <div style={{
                                 width: 80,
@@ -351,7 +350,7 @@ export const GuitarPracticeView: React.FC = () => {
                                 gap: 20,
                             }}>
                                 <span style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.05em' }}>IN</span>
-                                
+
                                 <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', minHeight: 200, width: '100%', padding: '0 16px' }}>
                                     {hasPermission === 'denied' ? (
                                         <div style={{ writingMode: 'vertical-rl', color: '#f87171', fontSize: 10, textAlign: 'center', letterSpacing: 2 }}>DENIED</div>
@@ -359,7 +358,7 @@ export const GuitarPracticeView: React.FC = () => {
                                         <VuMeter analyser={isRunning ? analyser : null} vertical />
                                     )}
                                 </div>
-                                
+
                                 <div style={{
                                     width: 32, height: 32, borderRadius: 8,
                                     background: isRunning && hasPermission === 'granted'
@@ -376,9 +375,11 @@ export const GuitarPracticeView: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* TrackFX no longer requires an onClose prop, so no close button will render */}
-                            <TrackFX trackId="live" fullSize />
-                            
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                <Tuner analyser={isRunning ? analyser : null} />
+                                <TrackFX trackId="live" fullSize />
+                            </div>
+
                             {/* Vertical Master Fader */}
                             <div style={{
                                 width: 80,
@@ -393,7 +394,7 @@ export const GuitarPracticeView: React.FC = () => {
                                 gap: 20,
                             }}>
                                 <span style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.05em' }}>OUT</span>
-                                
+
                                 <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', minHeight: 200 }}>
                                     <input
                                         type="range"
@@ -410,10 +411,51 @@ export const GuitarPracticeView: React.FC = () => {
                                         } as any}
                                     />
                                 </div>
-                                
+
                                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
                                     {Math.round(volume * 100)}%
                                 </div>
+
+                                {/* Pan Slider placed here */}
+                                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: 8, padding: '0 12px' }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase' }}>PAN</span>
+                                    <input
+                                        type="range"
+                                        className="pan-slider"
+                                        min={-1} max={1} step={0.01}
+                                        value={liveTrack?.fx?.pan ?? 0}
+                                        onChange={(e) => setLiveTrackState({ fx: { ...liveTrack.fx, pan: parseFloat(e.target.value) } })}
+                                        onDoubleClick={() => setLiveTrackState({ fx: { ...liveTrack.fx, pan: 0 } })}
+                                    />
+                                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.6)' }}>
+                                        {liveTrack?.fx?.pan < -0.005 ? `L${Math.abs(Math.round(liveTrack.fx.pan * 100))}` : liveTrack?.fx?.pan > 0.005 ? `R${Math.round(liveTrack.fx.pan * 100)}` : 'C'}
+                                    </span>
+                                </div>
+
+                                {/* Mute Button */}
+                                <button
+                                    id="practice-mute-btn"
+                                    onClick={handleMuteToggle}
+                                    title={isMuted ? 'Unmute output' : 'Mute output'}
+                                    style={{
+                                        padding: 12,
+                                        marginTop: 8,
+                                        width: 44, height: 44,
+                                        borderRadius: 12,
+                                        border: `1px solid ${isMuted ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                                        background: isMuted ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
+                                        color: isMuted ? '#f87171' : 'rgba(255,255,255,0.6)',
+                                        cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        flexShrink: 0,
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                >
+                                    {isMuted
+                                        ? <SpeakerSlashIcon size={32} weight="fill" />
+                                        : <SpeakerHighIcon size={32} weight="fill" />
+                                    }
+                                </button>
                             </div>
                         </div>
                     )}
@@ -431,8 +473,9 @@ export const GuitarPracticeView: React.FC = () => {
                 backdropFilter: 'blur(20px)',
                 borderTop: '1px solid rgba(255,255,255,0.07)',
                 display: 'flex',
+                justifyContent: 'center',
                 alignItems: 'center',
-                gap: 12,
+                gap: 16,
                 zIndex: 100,
             }}>
 
@@ -465,34 +508,6 @@ export const GuitarPracticeView: React.FC = () => {
                         : <><GuitarIcon size={22} weight="fill" /> START PLAYING</>
                     }
                 </button>
-
-                {/* Flexible spacer to push transport controls to the right */}
-                <div style={{ flex: 1 }} />
-
-
-                {/* Mute */}
-                <button
-                    id="practice-mute-btn"
-                    onClick={handleMuteToggle}
-                    title={isMuted ? 'Unmute output' : 'Mute output'}
-                    style={{
-                        width: 64, height: 64,
-                        borderRadius: 18,
-                        border: `1px solid ${isMuted ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                        background: isMuted ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
-                        color: isMuted ? '#f87171' : 'rgba(255,255,255,0.6)',
-                        cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                        transition: 'all 0.2s ease',
-                    }}
-                >
-                    {isMuted
-                        ? <SpeakerSlashIcon size={24} weight="fill" />
-                        : <SpeakerHighIcon size={24} weight="fill" />
-                    }
-                </button>
-
 
                 {/* Divider */}
                 <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
