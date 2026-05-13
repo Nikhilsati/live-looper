@@ -150,6 +150,49 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
             await presetService.savePreset('Aggressive Squeeze', 'module', { threshold: -30, ratio: 8, gain: 6 }, 'compressor');
             await presetService.savePreset('Subtle Polish', 'module', { threshold: -15, ratio: 2, gain: 2 }, 'compressor');
 
+            // Pedalboard Presets (Chains)
+            await presetService.savePreset('Blues Lead', 'chain', new FXBuilder()
+                .withDrive({ amount: 0.3, tone: 0.6, enabled: true })
+                .withEQ({ low: 2, mid: 4, high: 2 })
+                .withReverb({ mix: 0.2, size: 1.0, enabled: true })
+                .withCompressor({ threshold: -15, ratio: 2, gain: 2 })
+                .build());
+
+            await presetService.savePreset('Dreamy Clean', 'chain', new FXBuilder()
+                .withEQ({ low: 2, mid: 0, high: 4 })
+                .withChorus({ rate: 0.4, depth: 0.5, mix: 0.4, enabled: true })
+                .withDelay({ time: 0.5, feedback: 0.4, mix: 0.3, mode: 'pingpong', enabled: true })
+                .withReverb({ mix: 0.5, size: 4.0, enabled: true })
+                .withCompressor({ threshold: -20, ratio: 3, gain: 2 })
+                .build());
+
+            await presetService.savePreset('80s Shred', 'chain', new FXBuilder()
+                .withDrive({ amount: 0.8, tone: 0.7, enabled: true })
+                .withEQ({ low: 4, mid: -6, high: 5 })
+                .withChorus({ rate: 0.5, depth: 0.3, mix: 0.3, voices: 2, enabled: true })
+                .withDelay({ time: 0.125, feedback: 0.2, mix: 0.2, mode: 'mono', enabled: true })
+                .withReverb({ mix: 0.2, size: 1.5, enabled: true })
+                .build());
+
+            await presetService.savePreset('Surf Rock', 'chain', new FXBuilder()
+                .withEQ({ low: 0, mid: 0, high: 6 })
+                .withReverb({ mix: 0.7, size: 3.0, damping: 0.8, enabled: true })
+                .withTremolo({ rate: 6, depth: 0.8, enabled: true })
+                .build());
+
+            await presetService.savePreset('Ambient Swells', 'chain', new FXBuilder()
+                .withEQ({ low: 2, mid: 0, high: 2 })
+                .withChorus({ rate: 0.2, depth: 0.6, mix: 0.4, enabled: true })
+                .withDelay({ time: 0.75, feedback: 0.7, mix: 0.5, filter: 0.4, enabled: true })
+                .withReverb({ mix: 0.8, size: 5.0, enabled: true })
+                .build());
+
+            await presetService.savePreset('Funk Rhythm', 'chain', new FXBuilder()
+                .withEQ({ low: -4, mid: -2, high: 6 })
+                .withChorus({ rate: 1.0, depth: 0.2, mix: 0.2, enabled: true })
+                .withCompressor({ threshold: -30, ratio: 8, gain: 4 })
+                .build());
+
             presets = await db.fxPresets.toArray();
         }
         set({ fxPresets: presets });

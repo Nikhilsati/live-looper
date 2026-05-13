@@ -16,8 +16,10 @@ import {
     PlusIcon,
     MicrophoneIcon,
     SlidersIcon,
+    GearIcon,
 } from '@phosphor-icons/react';
 import { Button } from '@live-looper/ui';
+import { SettingsPopover } from './SettingsPopover';
 
 // ─── VU Meter ────────────────────────────────────────────────────────────────
 const VU_BARS = 28;
@@ -104,7 +106,7 @@ function useTapTempo(onBpm: (bpm: number) => void) {
 // ─── Main View ───────────────────────────────────────────────────────────────
 export const GuitarPracticeView: React.FC = () => {
     const navigate = useNavigate();
-    const { liveTrack, setLiveTrackState, bpm, setBpm, metronomeOn, setMetronomeOn } = useLooperStore();
+    const { liveTrack, setLiveTrackState, bpm, setBpm, metronomeOn, setMetronomeOn, inputDeviceId } = useLooperStore();
 
     const [isRunning, setIsRunning] = useState(false);
     const [showFX, setShowFX] = useState(true);
@@ -112,6 +114,7 @@ export const GuitarPracticeView: React.FC = () => {
     const [showBpmEdit, setShowBpmEdit] = useState(false);
     const [hasPermission, setHasPermission] = useState<'idle' | 'granted' | 'denied'>('idle');
     const [volume, setVolume] = useState(1);
+    const [showSettings, setShowSettings] = useState(false);
 
     const analyserRef = useRef<AnalyserNode | null>(null);
     const analyserSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -128,7 +131,12 @@ export const GuitarPracticeView: React.FC = () => {
         if (!audioEngine.context) return;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false }
+                audio: { 
+                    echoCancellation: false, 
+                    autoGainControl: false, 
+                    noiseSuppression: false,
+                    ...(inputDeviceId ? { deviceId: { exact: inputDeviceId } } : {})
+                }
             });
             const ctx = audioEngine.context;
             const source = ctx.createMediaStreamSource(stream);
@@ -143,7 +151,7 @@ export const GuitarPracticeView: React.FC = () => {
         } catch {
             setHasPermission('denied');
         }
-    }, []);
+    }, [inputDeviceId]);
 
     const handleStart = useCallback(async () => {
         // Provide a dummy section with no tracks linked so the worklet doesn't process old loop data
@@ -194,6 +202,13 @@ export const GuitarPracticeView: React.FC = () => {
         setBpm(newBpm);
         if (isRunning) audioEngine.setBpm(newBpm);
     });
+
+    // Rebuild analyser if input device changes while running
+    useEffect(() => {
+        if (isRunning && hasPermission === 'granted') {
+            buildAnalyser();
+        }
+    }, [inputDeviceId, isRunning]);
 
     // Unmount safety
     useEffect(() => () => { if (isRunning) audioEngine.stop(); }, []);
@@ -594,6 +609,39 @@ export const GuitarPracticeView: React.FC = () => {
                         } as React.CSSProperties}
                     />
                 </button>
+
+                {/* Settings gear */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => setShowSettings(!showSettings)}
+                        title="Settings"
+                        style={{
+                            width: 64, height: 64,
+                            borderRadius: 18,
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: showSettings ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
+                            color: showSettings ? 'white' : 'rgba(255,255,255,0.35)',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'all 0.2s ease',
+                        }}
+                    >
+                        <GearIcon size={24} weight={showSettings ? "fill" : "regular"} />
+                    </button>
+                    {showSettings && (
+                        <SettingsPopover 
+                            onClose={() => setShowSettings(false)} 
+                            showDemoOption={false}
+                            showSmartSnap={false}
+                            style={{ 
+                                bottom: 'calc(100% + 16px)',
+                                right: 0,
+                                transform: 'none'
+                            }}
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Scoped animations */}
