@@ -11,12 +11,15 @@ interface SessionState {
     isSessionRecording: boolean;
     isSessionReplaying: boolean;
     sessions: SessionRecord[];
+    recordingDuration: number;
+    recordingStartTime: number | null;
 
     // Actions
     setIsSessionArmed: (v: boolean) => void;
     fetchSessions: (projectId: string) => Promise<void>;
     startRecording: () => Promise<void>;
     stopRecording: () => Promise<void>;
+    toggleRecording: () => Promise<void>;
     replaySession: (session: SessionRecord) => Promise<void>;
     stopReplay: () => void;
     deleteSession: (id: string) => Promise<void>;
@@ -28,6 +31,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     isSessionRecording: false,
     isSessionReplaying: false,
     sessions: [],
+    recordingDuration: 0,
+    recordingStartTime: null,
 
     setIsSessionArmed: (v) => set({ isSessionArmed: v }),
 
@@ -47,7 +52,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         };
 
         await sessionRecorder.start(snapshot);
-        set({ isSessionRecording: true });
+        set({ 
+            isSessionRecording: true, 
+            recordingStartTime: Date.now(),
+            recordingDuration: 0 
+        });
+
+        // Start duration timer
+        const timer = setInterval(() => {
+            const { recordingStartTime, isSessionRecording } = get();
+            if (!isSessionRecording || !recordingStartTime) {
+                clearInterval(timer);
+                return;
+            }
+            set({ recordingDuration: Date.now() - recordingStartTime });
+        }, 100);
     },
 
     stopRecording: async () => {
@@ -67,7 +86,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             get().fetchSessions(looperStore.currentProject.id);
         }
 
-        set({ isSessionRecording: false, isSessionArmed: false });
+        set({ 
+            isSessionRecording: false, 
+            isSessionArmed: false, 
+            recordingStartTime: null,
+            recordingDuration: 0 
+        });
+    },
+
+    toggleRecording: async () => {
+        const { isSessionRecording, startRecording, stopRecording } = get();
+        if (isSessionRecording) {
+            await stopRecording();
+        } else {
+            await startRecording();
+        }
     },
 
     replaySession: async (session) => {

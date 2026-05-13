@@ -12,6 +12,7 @@ interface Track {
     sections: Map<number, SectionData>;
     isMuted: boolean;
     postRollSamplesRemaining: number;
+    channelMode: 'mono' | 'stereo';
 }
 
 interface SectionData {
@@ -92,14 +93,17 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     private inputHistory: Float32Array = new Float32Array(0);
     private inputHistoryWriteIdx: number = 0;
     private smartSnapWindowSamples: number = 0;
-    private smartSnapEnabled: boolean = false;
     private quantization: { snapToGrid: boolean; gridResolution: number } | null = null;
+
+    // Level tracking
+    private inputSums: number[] = [0, 0, 0, 0];
+    private inputCount: number = 0;
 
     constructor() {
         super();
 
         for (let id = 0; id < 4; id++) {
-            this.tracks.push({ id, state: 'IDLE', sections: new Map(), isMuted: false, postRollSamplesRemaining: 0 });
+            this.tracks.push({ id, state: 'IDLE', sections: new Map(), isMuted: false, postRollSamplesRemaining: 0, channelMode: 'stereo' });
         }
 
         // Default: one section, 8 bars
@@ -275,6 +279,15 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                         sectionIndex,
                         layerCount: sd.layers.length,
                         waveformData
+                    });
+                    break;
+                }
+
+                case 'CONFIG_CHANNELS': {
+                    const { trackConfigs } = payload;
+                    trackConfigs.forEach((config: { trackId: number; mode: 'mono' | 'stereo' }) => {
+                        const track = this.tracks[config.trackId];
+                        if (track) track.channelMode = config.mode;
                     });
                     break;
                 }
@@ -602,8 +615,19 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
 
         if (!this.isPlaying && !this.rtlTestActive) return true;
 
-        const input = inputs[0];
-        const inputChannel = (input && input[0] && input[0].length > 0) ? input[0] : null;
+        // Collect input channels for all tracks
+        const trackInputs: (Float32Array[] | null)[] = [];
+        for (let t = 0; t < 4; t++) {
+            const input = inputs[t];
+            if (input && input.length > 0 && input[0].length > 0) {
+                trackInputs[t] = input;
+            } else {
+                trackInputs[t] = null;
+            }
+        }
+
+        // Global level monitoring (simplified: just take the first track's first channel for RTL or default)
+        const inputChannel = (trackInputs[0] && trackInputs[0][0]) ? trackInputs[0][0] : null;
 
         const sectionLen = this.currentSectionLen();
         if (sectionLen === 0 && !this.rtlTestActive) return true;
@@ -611,6 +635,17 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         const outputCount = outputs[0][0].length;
 
         for (let i = 0; i < outputCount; i++) {
+            // Level tracking
+            this.inputCount++;
+            for (let t = 0; t < 4; t++) {
+                const tInput = trackInputs[t];
+                if (tInput) {
+                    const val = (tInput.length > 1 && this.tracks[t].channelMode === 'stereo')
+                        ? (tInput[0][i] + tInput[1][i]) * 0.5
+                        : tInput[0][i];
+                    this.inputSums[t] += val * val;
+                }
+            }
             // Update global input history
             if (this.smartSnapWindowSamples > 0) {
                 if (inputChannel) {
@@ -714,23 +749,30 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                     }
                 }
 
-                if (track.state === 'RECORDING' && inputChannel) {
-                    const recIdx = (sectionRelative - 1 + sectionLen) % sectionLen;
-                    const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
+                if (track.state === 'RECORDING') {
+                    const tInput = trackInputs[track.id];
+                    if (tInput) {
+                        const recIdx = (sectionRelative - 1 + sectionLen) % sectionLen;
+                        const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
+                        // Mix down to mono for the record buffer
+                        const val = (tInput.length > 1 && track.channelMode === 'stereo')
+                            ? (tInput[0][i] + tInput[1][i]) * 0.5
+                            : tInput[0][i];
 
-                    if (this.smartSnapWindowSamples + recIdx < sd.recordBuffer.length) {
-                        sd.recordBuffer[this.smartSnapWindowSamples + recIdx] += inputChannel[i];
+                        if (this.smartSnapWindowSamples + recIdx < sd.recordBuffer.length) {
+                            sd.recordBuffer[this.smartSnapWindowSamples + recIdx] += val;
+                        }
                     }
                 }
 
-                // End of section: wait for post-roll
                 if (track.state === 'RECORDING' && sectionSample === 0) {
                     track.state = 'POST_ROLL';
                     track.postRollSamplesRemaining = this.smartSnapWindowSamples;
                 }
 
                 if (track.state === 'POST_ROLL') {
-                    if (inputChannel) {
+                    const tInput = trackInputs[track.id];
+                    if (tInput) {
                         const sd = getOrCreateSectionData(track, this.currentSectionIndex, sectionLen);
                         const postRollIdx = this.smartSnapWindowSamples - track.postRollSamplesRemaining;
                         const writeIdx = this.smartSnapWindowSamples + sectionLen + postRollIdx;
@@ -787,6 +829,10 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
             const currentBar = bar;
             const currentBeat = beat;
 
+            const inputLevels = this.inputSums.map(sum => Math.sqrt(sum / Math.max(1, this.inputCount)));
+            this.inputSums.fill(0);
+            this.inputCount = 0;
+
             // Measure jitter (time between process calls is implicit in the host, but we can check drift)
             this.port.postMessage({
                 type: 'TICK',
@@ -797,6 +843,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
                 jitter: delta, // Report the process-to-process delta
                 sectionIndex: this.currentSectionIndex,
                 sectionProgress,
+                inputLevels,
             });
         }
 

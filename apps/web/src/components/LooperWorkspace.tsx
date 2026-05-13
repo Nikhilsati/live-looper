@@ -9,7 +9,9 @@ import { SongPlanner } from './SongPlanner';
 import { KeyboardCheatSheet } from './KeyboardCheatSheet';
 import { DevInspector } from './DevInspector';
 import { ModeSwitcher } from './ModeSwitcher';
-import { ArrowLeftIcon } from '@phosphor-icons/react';
+import { 
+    ArrowLeftIcon 
+} from '@live-looper/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -26,6 +28,7 @@ export const LooperWorkspace: React.FC = () => {
         if (id && currentProject?.id !== id) {
             loadProject(id);
         }
+        useLooperStore.getState().refreshDevices();
     }, [id]);
 
     const handleBack = () => {

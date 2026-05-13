@@ -80,6 +80,12 @@ interface LooperStore extends EngineState {
     setLiveTrackState: (state: Partial<LiveTrackState>) => void;
     engineCrashed: boolean;
     setEngineCrashed: (v: boolean) => void;
+    // Multi-channel I/O
+    channelMapping: (string | null)[];
+    trackChannelConfig: { [trackId: number]: { mode: 'mono' | 'stereo' } };
+    inputLevels: number[];
+    setChannelMapping: (trackId: number, deviceId: string | null) => Promise<void>;
+    setTrackChannelMode: (trackId: number, mode: 'mono' | 'stereo') => Promise<void>;
 }
 
 const defaultTrack = (): TrackState => ({
@@ -122,6 +128,14 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     outputDeviceId: null,
     performerOutputDeviceId: null,
     engineCrashed: false,
+    channelMapping: [null, null, null, null],
+    trackChannelConfig: {
+        0: { mode: 'stereo' },
+        1: { mode: 'stereo' },
+        2: { mode: 'stereo' },
+        3: { mode: 'stereo' }
+    },
+    inputLevels: [0, 0, 0, 0],
     
     fxPresets: [],
     fetchFXPresets: async () => {
@@ -527,7 +541,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                     sectionIndex: event.sectionIndex ?? 0,
                     sectionProgress: event.sectionProgress ?? 0
                 });
-                set({ jitter: event.jitter || 0 });
+                set({ jitter: event.jitter || 0, inputLevels: event.inputLevels || [0, 0, 0, 0] });
                 break;
             case 'RECORD_STOP':
                 setTrackState(event.trackId, {
@@ -568,6 +582,13 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 const metronomeOn = savedSettings.metronomeOn ?? true;
                 const showLayers = savedSettings.showLayers ?? true;
                 const smartSnapEnabled = savedSettings.smartSnapEnabled ?? true;
+                const channelMapping = savedSettings.channelMapping ?? [null, null, null, null];
+                const trackChannelConfig = savedSettings.trackChannelConfig ?? {
+                    0: { mode: 'stereo' },
+                    1: { mode: 'stereo' },
+                    2: { mode: 'stereo' },
+                    3: { mode: 'stereo' }
+                };
 
                 set({
                     bpm: project.bpm,
@@ -576,6 +597,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                     metronomeOn,
                     showLayers,
                     smartSnapEnabled,
+                    channelMapping,
+                    trackChannelConfig,
                     liveTrack: event.payload.liveTrack,
                     tracks: tracks.map((t: any, i: number) => {
                         const count = layerCounts?.[i] || 0;
@@ -598,6 +621,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
                 if (soloedIds.length > 0) {
                     audioEngine.applySolo(soloedIds, newTracks.map(t => t.isMuted));
                 }
+
+                // Apply multi-channel input settings
+                audioEngine.initInputs(channelMapping);
+                Object.entries(trackChannelConfig).forEach(([trackId, config]) => {
+                    audioEngine.setTrackChannelMode(Number(trackId), config.mode);
+                });
 
                 // Re-apply persisted Live Track mute state
                 if (event.payload.liveTrack) {
@@ -701,7 +730,41 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         await audioEngine.setPerformerOutputDevice(deviceId);
         set({ performerOutputDeviceId: deviceId });
     },
+
+    setChannelMapping: async (trackId: number, deviceId: string | null) => {
+        const { channelMapping, currentProject } = get();
+        const newMapping = [...channelMapping];
+        newMapping[trackId] = deviceId;
+        set({ channelMapping: newMapping });
+        
+        // Update engine
+        await audioEngine.initInputs(newMapping);
+
+        // Persist to project settings
+        if (currentProject?.id) {
+            const newSettings = { ...(currentProject.settings ?? {}), channelMapping: newMapping };
+            db.projects.update(currentProject.id, { settings: newSettings });
+        }
+    },
+
+    setTrackChannelMode: async (trackId: number, mode: 'mono' | 'stereo') => {
+        const { trackChannelConfig, currentProject } = get();
+        const newConfig = { ...trackChannelConfig, [trackId]: { mode } };
+        set({ trackChannelConfig: newConfig });
+
+        // Update engine
+        audioEngine.setTrackChannelMode(trackId, mode);
+
+        // Persist to project settings
+        if (currentProject?.id) {
+            const newSettings = { ...(currentProject.settings ?? {}), trackChannelConfig: newConfig };
+            db.projects.update(currentProject.id, { settings: newSettings });
+        }
+    },
 }));
+
+(globalThis as any).looperStore = useLooperStore;
+
 
 // Initialize compensation from localStorage
 const savedComp = localStorage.getItem('looper_rtl_samples');

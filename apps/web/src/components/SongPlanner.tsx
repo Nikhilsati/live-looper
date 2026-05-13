@@ -1,7 +1,12 @@
 import React from 'react';
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Button, Row, Stack, Label, Heading, ValueText } from '@live-looper/ui';
-import { PlusIcon, TrashIcon, CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
+import { 
+    PlusIcon, 
+    TrashIcon, 
+    CaretLeftIcon, 
+    CaretRightIcon 
+} from '@live-looper/icons';
 import { TRACK_COLORS } from './TrackControls';
 
 const EditableSectionName = ({
@@ -132,7 +137,7 @@ export const SongPlanner = () => {
                 {isPlan && (
                     <Button onClick={handleAdd} size="sm" variant="ghost">
                         <Row style={{ alignItems: 'center', gap: 6 }}>
-                            <PlusIcon weight="bold" /> Add Section
+                            <PlusIcon size={14} /> Add Section
                         </Row>
                     </Button>
                 )}
@@ -182,7 +187,7 @@ export const SongPlanner = () => {
                                             disabled={idx === 0}
                                             style={{ padding: '4px 8px' }}
                                         >
-                                            <CaretLeftIcon />
+                                            <CaretLeftIcon size={16} />
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -191,7 +196,7 @@ export const SongPlanner = () => {
                                             disabled={idx === sections.length - 1}
                                             style={{ padding: '4px 8px' }}
                                         >
-                                            <CaretRightIcon />
+                                            <CaretRightIcon size={16} />
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -200,7 +205,7 @@ export const SongPlanner = () => {
                                             disabled={sections.length <= 1}
                                             style={{ padding: '4px 8px' }}
                                         >
-                                            <TrashIcon color="var(--color-danger)" />
+                                            <TrashIcon size={16} style={{ color: "var(--color-danger)" }} />
                                         </Button>
                                     </Row>
                                 )}

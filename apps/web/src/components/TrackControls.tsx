@@ -1,4 +1,25 @@
-import { PlayIcon, StopIcon, MetronomeIcon, MicrophoneIcon, RecordIcon, SpeakerHighIcon, ArrowBendUpLeftIcon, EraserIcon, CaretRightIcon, SlidersIcon, CircleIcon, ArrowsClockwiseIcon, PauseIcon, CloudArrowDownIcon, GearIcon, StackIcon, XIcon, HeadphonesIcon, PulseIcon, BugIcon, FloppyDiskIcon } from '@phosphor-icons/react';
+import { CloudArrowDownIcon } from '@phosphor-icons/react';
+import { 
+    PlayIcon, 
+    StopIcon, 
+    MetronomeIcon, 
+    MicrophoneIcon, 
+    RecordIcon, 
+    PauseIcon, 
+    HeadphonesIcon,
+    MixerIcon,
+    WaveformIcon,
+    LoopIcon,
+    UndoIcon,
+    EraserIcon,
+    CaretRightIcon,
+    XIcon,
+    LayersIcon,
+    ActivityIcon,
+    DebugIcon,
+    SettingsIcon,
+    SaveIcon
+} from '@live-looper/icons';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { audioEngine } from '@live-looper/audio-engine';
 import { useLooperStore } from '../store/useLooperStore';
@@ -8,6 +29,8 @@ import { TrackFX } from './TrackFX';
 import { LatencyMonitor } from './LatencyMonitor';
 import { db } from '@live-looper/storage';
 import { SessionManager } from './SessionManager';
+import { InputChannelSelector } from './InputChannelSelector';
+import { ChannelLevels } from './ChannelLevels';
 import type { LayerRecord } from '@live-looper/types';
 
 const ICON_SIZE = 22;
@@ -216,7 +239,7 @@ const LayersDrawer = ({
                 marginBottom: 8,
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <StackIcon size={13} color={accent} weight="fill" />
+                    <LayersIcon size={14} style={{ color: accent }} />
                     <span style={{
                         fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
                         color: accent, textTransform: 'uppercase',
@@ -239,7 +262,7 @@ const LayersDrawer = ({
                     onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
                     title="Collapse layers"
                 >
-                    <XIcon size={13} weight="bold" />
+                    <XIcon size={14} />
                 </button>
             </div>
 
@@ -257,7 +280,7 @@ const LayersDrawer = ({
                         height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: 'rgba(255,255,255,0.25)', fontSize: 11, gap: 6,
                     }}>
-                        <StackIcon size={14} color="rgba(255,255,255,0.2)" />
+                        <LayersIcon size={14} style={{ color: "rgba(255,255,255,0.2)" }} />
                         No layers
                     </div>
                 ) : (
@@ -483,6 +506,10 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                             HIT: {lastHitOffset > 0 ? '+' : ''}{Math.round(lastHitOffset)}ms
                         </div>
                     )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Per-track Input Selector (Compact) */}
+                    <InputChannelSelector trackId={trackId} />
+                    
                     {!isLive && (
                         <Button
                             variant="ghost"
@@ -490,9 +517,10 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                             onClick={() => onOpenFX(trackId)}
                             style={{ padding: '4px', opacity: 0.6 }}
                         >
-                            <SlidersIcon size={16} />
+                            <MixerIcon size={14} />
                         </Button>
                     )}
+                </div>
 
                     {/* Erase button: top-right in Live mode, separated + hold-to-fire */}
                     {isLive && (
@@ -533,7 +561,7 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                                     zIndex: 1,
                                 }}
                             >
-                                <EraserIcon size={14} weight="bold" />
+                                <EraserIcon size={14} />
                             </Button>
                         </div>
                     )}
@@ -606,14 +634,14 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                 {/* Icon — on top of waveform */}
                 <div style={{ position: 'relative', zIndex: 1 }}>
                     {track.isArmed
-                        ? <CircleIcon size={isLive ? 56 : 44} style={{ animation: 'pulse var(--anim-speed) ease-in-out infinite alternate', color: '#a78bfa', ...animationStyle } as any} />
+                        ? <RecordIcon size={isLive ? 56 : 48} style={{ animation: 'pulse var(--anim-speed) ease-in-out infinite alternate', color: '#a78bfa', ...animationStyle } as any} />
                         : isOverdubbing
-                            ? <ArrowsClockwiseIcon size={isLive ? 56 : 44} style={{ animation: 'spin var(--anim-speed) linear infinite', ...animationStyle } as any} />
+                            ? <LoopIcon size={isLive ? 56 : 48} style={{ animation: 'spin var(--anim-speed) linear infinite', ...animationStyle } as any} />
                             : isRecording
                                 ? <RecordIcon size={isLive ? 56 : 48} style={{ animation: 'pulse var(--anim-speed) ease-in-out infinite alternate', ...animationStyle } as any} />
                                 : track.hasAudio
                                     ? <PlayIcon size={isLive ? 56 : 48} />
-                                    : <MicrophoneIcon size={isLive ? 52 : 44} color="rgba(255,255,255,0.2)" />
+                                    : <MicrophoneIcon size={isLive ? 52 : 48} color="rgba(255,255,255,0.2)" />
                     }
                 </div>
             </Button>
@@ -649,7 +677,7 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                     size="md"
                     style={{ flex: 1, height: 60, borderRadius: 16, opacity: track.layerCount === 0 ? 0.2 : 1 }}
                 >
-                    <ArrowBendUpLeftIcon size={24} weight="bold" />
+                    <UndoIcon size={22} />
                 </Button>
                 {/* Erase in bottom row for non-Live modes only */}
                 {!isLive && (
@@ -659,7 +687,7 @@ const TrackPad = ({ trackId, onOpenFX }: { trackId: number, onOpenFX: (id: numbe
                         size="md"
                         style={{ flex: 0.6, height: 60, borderRadius: 16, opacity: (!track.hasAudio && !track.isRecording) ? 0.2 : 0.6 }}
                     >
-                        <EraserIcon size={24} weight="bold" />
+                        <EraserIcon size={22} />
                     </Button>
                 )}
             </Row>
@@ -791,7 +819,7 @@ const MetronomeButton = () => {
             variant={metronomeOn ? 'accent' : 'outline'}
             title={metronomeOn ? 'Mute Metronome' : 'Unmute Metronome'}
         >
-            <MetronomeIcon size={ICON_SIZE} />
+            <MetronomeIcon size={20} />
         </Button>
     );
 };
@@ -934,8 +962,22 @@ import { SettingsPopover } from './SettingsPopover';
 
 // ─── Global Action Bar ────────────────────────────────────────────────────────
 export const GlobalActionBar = () => {
-    const { isPlaying, mode, sections, bpm, currentSectionIndex, queuedSectionIndex, showLayers, setShowLayers, showDevInspector, setShowDevInspector } = useLooperStore();
-    const { togglePlayback } = useSessionStore();
+    const { 
+        isPlaying, mode, sections, bpm, 
+        currentSectionIndex, queuedSectionIndex, 
+        showLayers, setShowLayers, 
+        showDevInspector, setShowDevInspector 
+    } = useLooperStore();
+
+    const { 
+        isSessionArmed, 
+        setIsSessionArmed, 
+        isSessionRecording, 
+        recordingDuration,
+        togglePlayback,
+        toggleRecording 
+    } = useSessionStore();
+    
     const [showBpmPopup, setShowBpmPopup] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showPerformance, setShowPerformance] = useState(false);
@@ -943,6 +985,21 @@ export const GlobalActionBar = () => {
 
     const handleToggle = async () => {
         await togglePlayback();
+    };
+
+    const handleRecordClick = async () => {
+        if (isPlaying) {
+            await toggleRecording();
+        } else {
+            setIsSessionArmed(!isSessionArmed);
+        }
+    };
+
+    const formatMs = (ms: number) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -962,8 +1019,62 @@ export const GlobalActionBar = () => {
                 borderRadius: 28,
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
-                minWidth: 400,
+                minWidth: 520,
             }}>
+                <ChannelLevels />
+                <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
+
+                {/* ── Record Timer Overlay ── */}
+                {isSessionRecording && (
+                    <div style={{
+                        position: 'absolute',
+                        top: -40,
+                        left: 48,
+                        background: 'rgba(239, 68, 68, 0.95)',
+                        color: 'white',
+                        padding: '6px 14px',
+                        borderRadius: 14,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        fontFamily: 'monospace',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.3)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        whiteSpace: 'nowrap',
+                    }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'white', animation: 'pulse 1s infinite' }} />
+                        REC {formatMs(recordingDuration)}
+                    </div>
+                )}
+
+                {/* ── Record Button ── */}
+                <Button
+                    onClick={handleRecordClick}
+                    title={isSessionRecording ? "Stop Session Recording" : (isSessionArmed ? "Disarm Session Recording" : "Arm Session Recording")}
+                    style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        background: isSessionRecording 
+                            ? '#ef4444' 
+                            : (isSessionArmed ? 'rgba(239, 68, 68, 0.12)' : 'transparent'),
+                        border: isSessionArmed || isSessionRecording 
+                            ? '2px solid #ef4444' 
+                            : '2px solid rgba(255,255,255,0.08)',
+                        color: isSessionRecording ? 'white' : (isSessionArmed ? '#ef4444' : 'rgba(255,255,255,0.3)'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: isSessionRecording ? '0 0 20px rgba(239, 68, 68, 0.4)' : 'none',
+                        marginLeft: 4
+                    }}
+                >
+                    <RecordIcon size={24} />
+                </Button>
                 {/* ── Play / Stop — dominant element ── */}
                 <Button
                     onClick={handleToggle}
@@ -978,7 +1089,7 @@ export const GlobalActionBar = () => {
                             : '0 0 28px rgba(124, 58, 237, 0.45)'
                     }}
                 >
-                    {isPlaying ? <StopIcon size={30} weight="fill" /> : <PlayIcon size={30} weight="fill" />}
+                    {isPlaying ? <StopIcon size={30} /> : <PlayIcon size={30} />}
                 </Button>
 
                 <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
@@ -1052,7 +1163,7 @@ export const GlobalActionBar = () => {
                             transition: 'all 0.2s ease',
                         }}
                     >
-                        <StackIcon size={18} />
+                        <LayersIcon size={20} />
                     </Button>
 
                     {/* ── Performance toggle ── */}
@@ -1070,7 +1181,7 @@ export const GlobalActionBar = () => {
                             transition: 'all 0.2s ease',
                         }}
                     >
-                        <PulseIcon size={18} />
+                        <ActivityIcon size={20} />
                     </Button>
 
                     {/* ── Dev Inspector toggle ── */}
@@ -1089,7 +1200,7 @@ export const GlobalActionBar = () => {
                                 transition: 'all 0.2s ease',
                             }}
                         >
-                            <BugIcon size={18} />
+                            <DebugIcon size={20} />
                         </Button>
                     )}
 
@@ -1102,7 +1213,7 @@ export const GlobalActionBar = () => {
                             title="Settings"
                             style={{ width: 36, height: 36, padding: 0, borderRadius: 10, opacity: 0.5 }}
                         >
-                            <GearIcon size={18} />
+                            <SettingsIcon size={20} />
                         </Button>
                         {showSettings && <SettingsPopover onClose={() => setShowSettings(false)} />}
                     </div>
@@ -1125,58 +1236,60 @@ const LiveTrackPad = ({ onOpenFX }: { onOpenFX: (id: 'live') => void }) => {
         <Card style={{
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'center',
-            height: 96,
-            padding: '16px 20px',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            height: '100%',
+            padding: '24px 8px',
             position: 'relative',
-            background: isLive ? 'rgba(0,0,0,0.4)' : undefined,
-            border: isLive ? `1px solid rgba(234, 179, 8, 0.4)` : '1px solid rgba(234, 179, 8, 0.1)',
-            boxShadow: liveTrack.isMuted ? 'none' : '0 0 12px rgba(234, 179, 8, 0.15)',
+            background: isLive ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.02)',
+            border: isLive ? `1px solid rgba(234, 179, 8, 0.4)` : '1px dashed rgba(234, 179, 8, 0.2)',
+            boxShadow: liveTrack.isMuted ? 'none' : 'inset 0 0 20px rgba(234, 179, 8, 0.05)',
         }}>
-            <Row style={{ justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
-                <Row style={{ alignItems: 'center', gap: 16 }}>
-                    <div style={{
-                        width: 48, height: 48, borderRadius: 24,
+            <Stack style={{ alignItems: 'center', gap: 12 }}>
+                <button 
+                    onClick={() => setLiveTrackState({ isMuted: !liveTrack.isMuted })}
+                    style={{
+                        width: 44, height: 44, borderRadius: 22,
                         background: liveTrack.isMuted ? 'rgba(255,255,255,0.05)' : 'rgba(234, 179, 8, 0.15)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: `1px solid ${liveTrack.isMuted ? 'rgba(255,255,255,0.1)' : 'rgba(234, 179, 8, 0.5)'}`,
                         transition: 'all 0.2s ease',
-                    }}>
-                        <MicrophoneIcon size={24} style={{ color: liveTrack.isMuted ? 'rgba(255,255,255,0.3)' : '#eab308' }} weight={liveTrack.isMuted ? 'regular' : 'fill'} />
-                    </div>
-                    <Stack style={{ gap: 2 }}>
-                        <Label style={{
-                            fontSize: 16,
-                            fontWeight: 800,
-                            letterSpacing: '0.05em',
-                            color: liveTrack.isMuted ? 'rgba(255,255,255,0.4)' : '#eab308',
-                        }}>LIVE INPUT</Label>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>
-                            {liveTrack.isMuted ? 'MUTED' : (isPlaying ? 'MONITORING' : 'IDLE')}
-                        </span>
-                    </Stack>
-                </Row>
+                        cursor: 'pointer',
+                        padding: 0,
+                        outline: 'none'
+                    }}
+                    title={liveTrack.isMuted ? "Unmute Live Input" : "Mute Live Input"}
+                >
+                    <MicrophoneIcon size={20} style={{ color: liveTrack.isMuted ? 'rgba(255,255,255,0.3)' : '#eab308' }} />
+                </button>
+                <Stack style={{ gap: 4, alignItems: 'center' }}>
+                    <Label style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        letterSpacing: '0.05em',
+                        color: liveTrack.isMuted ? 'rgba(255,255,255,0.4)' : '#eab308',
+                        textAlign: 'center',
+                        lineHeight: 1.2
+                    }}>LIVE<br/>INPUT</Label>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                        {liveTrack.isMuted ? 'MUTED' : (isPlaying ? 'MONITOR' : 'IDLE')}
+                    </span>
+                </Stack>
+            </Stack>
 
-                <Row style={{ gap: 12 }}>
-                    {!isLive && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onOpenFX('live')}
-                            style={{ height: 48, padding: '0 16px', borderRadius: 12 }}
-                        >
-                            <SlidersIcon size={20} />
-                        </Button>
-                    )}
+            {!isLive && (
+                <Stack style={{ width: '100%', marginTop: 24 }}>
                     <Button
-                        onClick={() => setLiveTrackState({ isMuted: !liveTrack.isMuted })}
-                        variant={liveTrack.isMuted ? 'active-warning' : 'ghost'}
-                        style={{ height: 48, padding: '0 24px', borderRadius: 12, fontSize: 13, fontWeight: 800 }}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onOpenFX('live')}
+                        style={{ height: 40, borderRadius: 12, width: '100%' }}
+                        title="Live Input Settings"
                     >
-                        MUTE
+                        <MixerIcon size={18} />
                     </Button>
-                </Row>
-            </Row>
+                </Stack>
+            )}
         </Card>
     );
 };
@@ -1187,18 +1300,26 @@ export const TrackControls = () => {
 
     return (
         <div style={{ position: 'relative', width: '100%' }}>
-            <Grid cols="repeat(4, 1fr)" style={{ width: '100%', gap: 16, marginBottom: 16 }}>
-                {[0, 1, 2, 3].map(id => (
-                    <TrackPad
-                        key={id}
-                        trackId={id}
-                        onOpenFX={(id) => setActiveFXTrack(id)}
-                    />
-                ))}
-            </Grid>
+            <div style={{ display: 'flex', gap: 16, width: '100%', alignItems: 'stretch' }}>
+                <div style={{ flex: '0 0 80px' }}>
+                    <LiveTrackPad onOpenFX={(id) => setActiveFXTrack(id as unknown as number)} />
+                </div>
+                
+                {/* Visual Separator */}
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', margin: '16px 0' }} />
 
-            {/* Live Track spans full width below the 4 columns */}
-            <LiveTrackPad onOpenFX={(id) => setActiveFXTrack(id as unknown as number)} />
+                <div style={{ flex: 4 }}>
+                    <Grid cols="repeat(4, 1fr)" style={{ gap: 16, height: '100%' }}>
+                        {[0, 1, 2, 3].map(id => (
+                            <TrackPad
+                                key={id}
+                                trackId={id}
+                                onOpenFX={(id) => setActiveFXTrack(id)}
+                            />
+                        ))}
+                    </Grid>
+                </div>
+            </div>
 
             {activeFXTrack !== null && (
                 <Modal onClose={() => setActiveFXTrack(null)}>

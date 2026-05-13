@@ -6,18 +6,21 @@ import { FXBuilder } from '@live-looper/types';
 import { TrackFX } from './TrackFX';
 import { Tuner } from './Tuner';
 import {
-    ArrowLeftIcon,
-    MetronomeIcon,
-    SpeakerSlashIcon,
-    SpeakerHighIcon,
     GuitarIcon,
-    StopIcon,
     MinusIcon,
     PlusIcon,
-    MicrophoneIcon,
-    SlidersIcon,
-    GearIcon,
 } from '@phosphor-icons/react';
+import { 
+    MetronomeIcon, 
+    StopIcon, 
+    MicrophoneIcon, 
+    MixerIcon, 
+    MuteIcon, 
+    VolumeHighIcon,
+    TempoIcon,
+    ArrowLeftIcon,
+    SettingsIcon
+} from '@live-looper/icons';
 import { Button } from '@live-looper/ui';
 import { SettingsPopover } from './SettingsPopover';
 
@@ -268,7 +271,7 @@ export const GuitarPracticeView: React.FC = () => {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             boxShadow: '0 4px 20px rgba(16,185,129,0.3)',
                         }}>
-                            <GuitarIcon size={22} color="white" weight="fill" />
+                            <GuitarIcon size={22} color="white" />
                         </div>
                         <div>
                             <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>
@@ -329,7 +332,7 @@ export const GuitarPracticeView: React.FC = () => {
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div style={{ background: 'rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <SlidersIcon size={14} weight="bold" />
+                                <MixerIcon size={14} />
                                 <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em' }}>LIVE PEDALBOARD</span>
                             </div>
                         </div>
@@ -384,7 +387,6 @@ export const GuitarPracticeView: React.FC = () => {
                                 }}>
                                     <MicrophoneIcon
                                         size={14}
-                                        weight={isRunning && hasPermission === 'granted' ? 'fill' : 'regular'}
                                         color={isRunning && hasPermission === 'granted' ? '#10b981' : 'rgba(255,255,255,0.3)'}
                                     />
                                 </div>
@@ -467,8 +469,8 @@ export const GuitarPracticeView: React.FC = () => {
                                     }}
                                 >
                                     {isMuted
-                                        ? <SpeakerSlashIcon size={32} weight="fill" />
-                                        : <SpeakerHighIcon size={32} weight="fill" />
+                                        ? <MuteIcon size={32} />
+                                        : <VolumeHighIcon size={32} />
                                     }
                                 </button>
                             </div>
@@ -519,7 +521,7 @@ export const GuitarPracticeView: React.FC = () => {
                     }}
                 >
                     {isRunning
-                        ? <><StopIcon size={22} weight="fill" /> STOP</>
+                        ? <><StopIcon size={22} /> STOP</>
                         : <><GuitarIcon size={22} weight="fill" /> START PLAYING</>
                     }
                 </button>
@@ -627,7 +629,7 @@ export const GuitarPracticeView: React.FC = () => {
                             transition: 'all 0.2s ease',
                         }}
                     >
-                        <GearIcon size={24} weight={showSettings ? "fill" : "regular"} />
+                        <SettingsIcon size={24} />
                     </button>
                     {showSettings && (
                         <SettingsPopover 

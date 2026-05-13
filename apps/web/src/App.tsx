@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectDashboard } from './components/ProjectDashboard';
 import { LooperWorkspace } from './components/LooperWorkspace';
 import { GuitarPracticeView } from './components/GuitarPracticeView';
+import { IconShowcase } from './components/IconShowcase';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { GlobalDialog } from './components/GlobalDialog';
 import { useLooperStore } from './store/useLooperStore';
@@ -22,6 +23,7 @@ function App() {
         <Route path="/" element={<ProjectDashboard />} />
         <Route path="/projects/:id" element={<LooperWorkspace />} />
         <Route path="/practice" element={<GuitarPracticeView />} />
+        <Route path="/icons" element={<IconShowcase />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

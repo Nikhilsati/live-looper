@@ -25,8 +25,7 @@ class AudioEngine {
     performerSource: MediaStreamAudioSourceNode | null = null;
     private dualOutputEnabled: boolean = false;
 
-    private currentStream: MediaStream | null = null;
-    private currentInputNode: MediaStreamAudioSourceNode | null = null;
+    private activeStreams: Map<string, MediaStream> = new Map();
 
     /** Shadow of each track's current mute state inside the worklet. Used by applySolo/setMute
      *  to determine whether a MUTE_TRACK toggle is actually needed. */
@@ -89,7 +88,8 @@ class AudioEngine {
             await this.context.audioWorklet.addModule(bustedGateUrl);
 
             this.workletNode = new AudioWorkletNode(this.context, 'live-looper-processor', {
-                numberOfInputs: 1,
+                // Support up to 4 separate audio inputs (one per track)
+                numberOfInputs: 4,
                 numberOfOutputs: 5,
                 outputChannelCount: [2, 2, 2, 2, 2]
             });
@@ -203,43 +203,74 @@ class AudioEngine {
     }
 
 
-    async initInput(deviceId?: string) {
+    // Array to hold per-channel MediaStreamAudioSourceNodes
+    private inputSources: (MediaStreamAudioSourceNode | null)[] = [null, null, null, null];
+
+    /**
+     * Initialize multiple input devices and connect each to its corresponding worklet input channel.
+     * @param deviceIds Array of device IDs, indexed by channel (0-3). If an entry is undefined/null, the default device is used for that channel.
+     */
+    async initInputs(deviceIds: (string | null | undefined)[] = []) {
         if (!this.context) return;
-
-        // Tear down existing stream before creating a new one
-        if (this.currentInputNode) {
-            this.currentInputNode.disconnect();
-            this.currentInputNode = null;
+        
+        // Clean up any existing sources
+        for (let i = 0; i < 4; i++) {
+            const src = this.inputSources[i];
+            if (src) {
+                src.disconnect();
+                this.inputSources[i] = null;
+            }
         }
-        if (this.currentStream) {
-            this.currentStream.getTracks().forEach(t => t.stop());
-            this.currentStream = null;
-        }
 
-        try {
-            const constraints: MediaStreamConstraints = {
-                audio: {
-                    echoCancellation: false,
-                    autoGainControl: false,
-                    noiseSuppression: false,
-                    ...(deviceId ? { deviceId: { exact: deviceId } } : {})
+        // Collect all currently used device IDs to determine what to stop
+        const usedDeviceIds = new Set(deviceIds.map(id => id || 'default'));
+
+        // Stop and remove streams that are no longer in use
+        this.activeStreams.forEach((stream, deviceId) => {
+            if (!usedDeviceIds.has(deviceId)) {
+                stream.getTracks().forEach(t => t.stop());
+                this.activeStreams.delete(deviceId);
+            }
+        });
+
+        for (let i = 0; i < 4; i++) {
+            const deviceId = deviceIds[i] || 'default';
+            try {
+                let stream: MediaStream;
+                
+                if (this.activeStreams.has(deviceId)) {
+                    stream = this.activeStreams.get(deviceId)!;
+                } else {
+                    const constraints: MediaStreamConstraints = {
+                        audio: {
+                            echoCancellation: false,
+                            autoGainControl: false,
+                            noiseSuppression: false,
+                            ...(deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {})
+                        }
+                    };
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.activeStreams.set(deviceId, stream);
                 }
-            };
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            this.currentStream = stream;
-            const source = this.context.createMediaStreamSource(stream);
-            this.currentInputNode = source;
-            if (this.workletNode) source.connect(this.workletNode);
-            if (this.liveTrackFX) source.connect(this.liveTrackFX.input);
-            console.log('Microphone connected', deviceId ?? '(default)');
-        } catch (e) {
-            console.error('Error accessing microphone', e);
+
+                const source = this.context.createMediaStreamSource(stream);
+                this.inputSources[i] = source;
+                // Connect this source to the worklet's input channel i
+                if (this.workletNode) {
+                    source.connect(this.workletNode, 0, i);
+                }
+                // Also route raw input to performer bus for zero‑latency monitoring
+                source.connect(this.performerBus!);
+            } catch (e) {
+                console.error(`Failed to acquire input for channel ${i}`, e);
+            }
         }
     }
 
-    /** Switch the active microphone without restarting the AudioContext. */
+    // Deprecated single-device initializer – retained for backward compatibility.
     async setInputDevice(deviceId: string) {
-        await this.initInput(deviceId);
+        // Re-initialize only the first channel with the supplied device ID.
+        await this.initInputs([deviceId]);
     }
 
     /**
@@ -307,7 +338,9 @@ class AudioEngine {
     start() {
         if (this.context?.state === 'suspended') this.context.resume();
         if (this.dualOutputEnabled && this.performerContext?.state === 'suspended') this.performerContext.resume();
-        this.initInput();
+        // Retrieve channel mapping from the store (fallback to empty array for defaults)
+        const mapping = (globalThis as any).looperStore?.getState().channelMapping ?? [];
+        this.initInputs(mapping);
         this.workletNode?.port.postMessage({ type: 'START' });
     }
 
@@ -418,6 +451,13 @@ class AudioEngine {
     setSmartSnapEnabled(enabled: boolean) {
         this.smartSnapEnabled = enabled;
         this.workletNode?.port.postMessage({ type: 'SET_SMART_SNAP', payload: { enabled } });
+    }
+
+    setTrackChannelMode(trackId: number, mode: 'mono' | 'stereo') {
+        this.workletNode?.port.postMessage({
+            type: 'CONFIG_CHANNELS',
+            payload: { trackConfigs: [{ trackId, mode }] }
+        });
     }
 
     setBpm(bpm: number) {
@@ -702,8 +742,8 @@ class AudioEngine {
     // --- Session Recording & Replay Methods ---
 
     startLiveRecording() {
-        if (!this.currentStream) {
-            console.warn("No active stream to record for session.");
+        if (!this.performerDestination) {
+            console.warn("No performer destination to record for session.");
             return;
         }
 
@@ -712,10 +752,10 @@ class AudioEngine {
         const options = { mimeType: 'audio/webm;codecs=opus' };
         
         try {
-            this.sessionRecorder = new MediaRecorder(this.currentStream, options);
+            this.sessionRecorder = new MediaRecorder(this.performerDestination.stream, options);
         } catch (e) {
             // Fallback if codec not supported
-            this.sessionRecorder = new MediaRecorder(this.currentStream);
+            this.sessionRecorder = new MediaRecorder(this.performerDestination.stream);
         }
 
         this.sessionRecorder.ondataavailable = (e) => {

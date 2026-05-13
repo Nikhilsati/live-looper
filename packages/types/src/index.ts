@@ -140,6 +140,9 @@ export interface EngineState {
     isCalibratingLatency: boolean;
     jitter: number;
     lastHitOffset: number; // ms offset from quantization boundary
+    channelMapping: (string | null)[];
+    trackChannelConfig: { [trackId: number]: { mode: 'mono' | 'stereo' } };
+    inputLevels: number[];
 }
 
 // Storage Interfaces
@@ -158,6 +161,8 @@ export interface ProjectRecord {
         showLayers?: boolean;
         smartSnapEnabled?: boolean;
         liveTrack?: LiveTrackState;
+        channelMapping?: (string | null)[];
+        trackChannelConfig?: { [trackId: number]: { mode: 'mono' | 'stereo' } };
     };
 }
 
@@ -270,10 +275,11 @@ export type WorkletMessage =
     | { type: 'SET_BUFFER'; payload: { trackId: number; sectionIndex: number; buffer: Float32Array } }
     | { type: 'SET_MODE'; payload: { mode: Mode } }
     | { type: 'ENTER_LIVE_MODE'; payload: { snapshot: FrozenProjectSnapshot } }
-    | { type: 'SET_SMART_SNAP'; payload: { enabled: boolean } };
+    | { type: 'SET_SMART_SNAP'; payload: { enabled: boolean } }
+    | { type: 'CONFIG_CHANNELS'; payload: { trackConfigs: { trackId: number; mode: 'mono' | 'stereo' }[] } };
 
 export type WorkletEvent =
-    | ({ type: 'TICK' } & Pick<EngineState, 'currentBar' | 'currentBeat' | 'sectionProgress' | 'jitter'> & { sectionIndex: number })
+    | ({ type: 'TICK' } & Pick<EngineState, 'currentBar' | 'currentBeat' | 'sectionProgress' | 'jitter' | 'inputLevels'> & { sectionIndex: number })
     | { type: 'RECORD_STOP'; trackId: number; sectionIndex: number; buffer: Float32Array; rawBuffer?: Float32Array; waveformData: number[]; layerCount: number }
     | { type: 'TRACK_CLEARED'; trackId: number }
     | { type: 'SECTION_CHANGE'; sectionIndex: number }

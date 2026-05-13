@@ -24,6 +24,19 @@ export const useKeyboardShortcuts = () => {
                 const trackId = parseInt(e.code.replace('Digit', ''), 10) - 1;
                 toggleTrackRecording(trackId);
             }
+
+            // R -> Toggle Session Recording
+            if (e.code === 'KeyR') {
+                e.preventDefault();
+                const { isPlaying } = useLooperStore.getState();
+                const { isSessionArmed, setIsSessionArmed, toggleRecording } = useSessionStore.getState();
+                
+                if (isPlaying) {
+                    toggleRecording();
+                } else {
+                    setIsSessionArmed(!isSessionArmed);
+                }
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);

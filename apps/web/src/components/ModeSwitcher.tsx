@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLooperStore } from '../store/useLooperStore';
 import { Row, Button } from '@live-looper/ui';
-import { LayoutIcon, PlayIcon, BroadcastIcon, FloppyDiskIcon, RecordIcon } from '@phosphor-icons/react';
+import { LayoutIcon, PlayIcon, BroadcastIcon, SaveIcon } from '@live-looper/icons';
 import type { Mode } from '@live-looper/types';
 import { useSessionStore } from '../store/useSessionStore';
 import { SessionManager } from './SessionManager';
@@ -48,32 +48,6 @@ export const ModeSwitcher: React.FC = () => {
     return (
         <Row style={{ gap: 12, alignItems: 'center' }}>
             {/* Recording / Arm Toggle */}
-            <Button
-                onClick={() => setIsSessionArmed(!isSessionArmed)}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '9px 14px',
-                    borderRadius: 12,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    background: isSessionArmed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.05)',
-                    color: isSessionArmed ? '#ef4444' : 'rgba(255,255,255,0.4)',
-                    border: isSessionArmed ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.1)',
-                    transition: 'all 0.2s ease',
-                }}
-            >
-                <div style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: isSessionArmed ? '#ef4444' : 'rgba(255,255,255,0.2)',
-                    boxShadow: isSessionArmed ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none',
-                    animation: isSessionRecording ? 'pulse 1s infinite' : 'none'
-                }} />
-                <span>REC</span>
-            </Button>
 
             <Row style={{
                 gap: 4,
@@ -112,7 +86,7 @@ export const ModeSwitcher: React.FC = () => {
                                 animation: (isActive && m.id === 'live') ? 'live-pulse 2s ease-in-out infinite' : 'none',
                             }}
                         >
-                            <Icon size={15} />
+                            <Icon size={18} />
                             <span>{m.label}</span>
                         </Button>
                     );
@@ -138,7 +112,7 @@ export const ModeSwitcher: React.FC = () => {
                             transition: 'all 0.2s ease',
                         }}
                     >
-                        <FloppyDiskIcon size={15} weight={showSessions || isSessionReplaying ? 'fill' : 'regular'} />
+                        <SaveIcon size={18} />
                         <span>Sessions</span>
                     </Button>
                     {showSessions && (

@@ -3,12 +3,10 @@ import { createPortal } from 'react-dom';
 import { useLooperStore } from '../store/useLooperStore';
 import { Card, Row, Heading, Switch, Button, Knob } from '@live-looper/ui';
 import {
-    XIcon, SlidersIcon, SpeakerSlashIcon, WaveformIcon,
-    SpeakerHighIcon, LightningIcon, ClockIcon, WavesIcon,
-    WaveTriangleIcon, CirclesFourIcon, ActivityIcon,
-    CaretDownIcon, FloppyDiskIcon, DownloadSimpleIcon, UploadSimpleIcon, TrashIcon, SwatchesIcon,
-    Circle, FilePlusIcon
+    XIcon, SlidersIcon,
+    TrashIcon, FloppyDiskIcon, DownloadSimpleIcon, UploadSimpleIcon, FilePlusIcon
 } from '@phosphor-icons/react';
+import { ListIcon, PowerIcon, NoiseGateIcon, EffectEqIcon, CompressorIcon, DriveIcon, ChorusIcon, PhaserIcon, TremoloIcon, DelayIcon, ReverbIcon } from '@live-looper/icons';
 import type { FXState } from '@live-looper/types';
 
 interface TrackFXProps {
@@ -98,7 +96,7 @@ const PresetMenu = ({
                 style={{ padding: '4px', height: 24, width: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)' }}
                 title="Presets"
             >
-                <SwatchesIcon size={14} weight={isOpen ? "fill" : "regular"} color={isOpen ? "var(--primary, #a881ff)" : "inherit"} />
+                <ListIcon size={14} style={{ color: isOpen ? "var(--primary, #a881ff)" : "inherit" }} />
             </button>
 
             {isOpen && createPortal(
@@ -273,7 +271,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.noiseGate}
                     enabled={fx.noiseGate.enabled}
                     onToggle={v => updateFX('noiseGate', { enabled: v })}
-                    icon={<SpeakerSlashIcon size={10} />}
+                    icon={<NoiseGateIcon size={12} />}
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
@@ -298,7 +296,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.eq}
                     enabled={true}
                     alwaysOn
-                    icon={<WaveformIcon size={10} />}
+                    icon={<EffectEqIcon size={12} />}
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
@@ -323,7 +321,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.compressor}
                     enabled={true}
                     alwaysOn
-                    icon={<SpeakerHighIcon size={10} />}
+                    icon={<CompressorIcon size={12} />}
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
@@ -348,7 +346,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.drive}
                     enabled={fx.drive.enabled}
                     onToggle={v => updateFX('drive', { enabled: v })}
-                    icon={<LightningIcon size={10} />}
+                    icon={<DriveIcon size={12} />}
                     cols="1fr"
                     moduleWidth={96}
                     knobGap={12}
@@ -370,7 +368,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.chorus}
                     enabled={fx.chorus?.enabled ?? false}
                     onToggle={v => updateFX('chorus', { enabled: v })}
-                    icon={<WaveTriangleIcon size={10} />}
+                    icon={<ChorusIcon size={12} />}
                     cols="1fr 1fr"
                     moduleWidth={152}
                     knobGap={14}
@@ -399,9 +397,11 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     <Knob color={COLORS.chorus} size={50} label="Depth"
                         value={fx.chorus?.depth ?? 0.4} min={0} max={1} step={0.01}
                         onChange={v => updateFX('chorus', { depth: v })} />
-                    <Knob color={COLORS.chorus} size={50} label="Mix"
-                        value={fx.chorus?.mix ?? 0.5} min={0} max={1} step={0.01}
-                        onChange={v => updateFX('chorus', { mix: v })} />
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center' }}>
+                        <Knob color={COLORS.chorus} size={50} label="Mix"
+                            value={fx.chorus?.mix ?? 0.5} min={0} max={1} step={0.01}
+                            onChange={v => updateFX('chorus', { mix: v })} />
+                    </div>
                 </FxModule>
 
                 {/* ── Phaser — 2-col ── */}
@@ -410,7 +410,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.phaser}
                     enabled={fx.phaser?.enabled ?? false}
                     onToggle={v => updateFX('phaser', { enabled: v })}
-                    icon={<CirclesFourIcon size={10} />}
+                    icon={<PhaserIcon size={12} />}
                     cols="1fr 1fr"
                     moduleWidth={152}
                     knobGap={14}
@@ -439,9 +439,11 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     <Knob color={COLORS.phaser} size={50} label="Depth"
                         value={fx.phaser?.depth ?? 0.5} min={0} max={1} step={0.01}
                         onChange={v => updateFX('phaser', { depth: v })} />
-                    <Knob color={COLORS.phaser} size={50} label="Fdbk"
-                        value={fx.phaser?.feedback ?? 0.5} min={0} max={0.9} step={0.01}
-                        onChange={v => updateFX('phaser', { feedback: v })} />
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center' }}>
+                        <Knob color={COLORS.phaser} size={50} label="Fdbk"
+                            value={fx.phaser?.feedback ?? 0.5} min={0} max={0.9} step={0.01}
+                            onChange={v => updateFX('phaser', { feedback: v })} />
+                    </div>
                 </FxModule>
 
                 {/* ── Tremolo — 2-col ── */}
@@ -450,7 +452,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.tremolo}
                     enabled={fx.tremolo?.enabled ?? false}
                     onToggle={v => updateFX('tremolo', { enabled: v })}
-                    icon={<ActivityIcon size={10} />}
+                    icon={<TremoloIcon size={12} />}
                     cols="1fr 1fr"
                     moduleWidth={160}
                     knobGap={14}
@@ -495,7 +497,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.delay}
                     enabled={fx.delay.enabled}
                     onToggle={v => updateFX('delay', { enabled: v })}
-                    icon={<ClockIcon size={10} />}
+                    icon={<DelayIcon size={12} />}
                     cols="1fr 1fr 1fr"
                     moduleWidth={192}
                     knobGap={18}
@@ -538,9 +540,11 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     <Knob color={COLORS.delay} size={52} label="Filt"
                         value={fx.delay.filter} min={0} max={1} step={0.01}
                         onChange={v => updateFX('delay', { filter: v })} />
-                    <Knob color={COLORS.delay} size={52} label="Mix"
-                        value={fx.delay.mix} min={0} max={1} step={0.01}
-                        onChange={v => updateFX('delay', { mix: v })} />
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center' }}>
+                        <Knob color={COLORS.delay} size={52} label="Mix"
+                            value={fx.delay.mix} min={0} max={1} step={0.01}
+                            onChange={v => updateFX('delay', { mix: v })} />
+                    </div>
                 </FxModule>
 
                 {/* ── Reverb — 2-col (Mix|Size / PreD|Damp) ── */}
@@ -549,7 +553,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     color={COLORS.reverb}
                     enabled={fx.reverb.enabled}
                     onToggle={v => updateFX('reverb', { enabled: v })}
-                    icon={<WavesIcon size={10} />}
+                    icon={<ReverbIcon size={12} />}
                     cols="1fr 1fr"
                     moduleWidth={152}
                     knobGap={14}
@@ -607,18 +611,31 @@ const FxModule = ({ name, color, enabled, children, onToggle, alwaysOn, icon, fo
             className={`fx-module ${isOn ? 'enabled' : 'disabled'}`}
             style={{ '--module-color': color, flex: `0 0 ${moduleWidth}px` } as React.CSSProperties}
         >
-            {/* Header row */}
-            <div className="fx-module-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ color, opacity: isOn ? 0.85 : 0.4 }}>{icon}</span>
-                    <span className="fx-module-name">{name}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Top Controls (Toggle & Presets) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 24 }}>
+                <div>
                     {moduleType && currentFxState && onLoadPreset && (
                         <PresetMenu type="module" moduleType={moduleType} currentFxState={currentFxState} onLoad={onLoadPreset} />
                     )}
+                </div>
+                <div>
                     {!alwaysOn && onToggle && (
-                        <Switch checked={enabled} onChange={onToggle} />
+                        <button
+                            className="ghost small"
+                            onClick={() => onToggle(!enabled)}
+                            style={{
+                                padding: '4px', height: 24, width: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: enabled ? 'transparent' : 'rgba(255,255,255,0.05)',
+                                color: enabled ? color : 'rgba(255,255,255,0.4)',
+                                filter: enabled ? `drop-shadow(0 0 4px ${color})` : 'none',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer',
+                                border: 'none'
+                            }}
+                            title={enabled ? "Bypass Module" : "Enable Module"}
+                        >
+                            <PowerIcon size={14} />
+                        </button>
                     )}
                 </div>
             </div>
@@ -636,6 +653,12 @@ const FxModule = ({ name, color, enabled, children, onToggle, alwaysOn, icon, fo
 
             {/* Optional footer (mode/sync buttons) */}
             {footer}
+
+            {/* Bottom Branding (Icon & Name) */}
+            <div style={{ marginTop: 'auto', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <span style={{ color, opacity: isOn ? 0.85 : 0.4 }}>{icon}</span>
+                <span className="fx-module-name">{name}</span>
+            </div>
         </div>
     );
 };

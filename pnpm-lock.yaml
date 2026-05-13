@@ -20,6 +20,9 @@ importers:
       '@live-looper/audio-engine':
         specifier: workspace:*
         version: link:../../packages/audio-engine
+      '@live-looper/icons':
+        specifier: workspace:*
+        version: link:../../packages/icons
       '@live-looper/mode-controller':
         specifier: workspace:*
         version: link:../../packages/mode-controller
@@ -103,6 +106,22 @@ importers:
       '@live-looper/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+
+  packages/icons:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+    devDependencies:
+      '@live-looper/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   packages/mode-controller:
     devDependencies:
