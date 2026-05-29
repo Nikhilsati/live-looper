@@ -1,5 +1,4 @@
-UI Design Instruction Set (Performance-First, Artist-Centric)
-0. Core Philosophy
+UI Design Instruction Set (Performance-First, Artist-Centric) 0. Core Philosophy
 
 Design this app as if:
 
@@ -94,6 +93,7 @@ Immediate feedback
 Tolerance for complexity: Extremely Low
 
 2️⃣ Global Design Rules
+
 1. The UI Must Reduce Mental Load
 
 Avoid:

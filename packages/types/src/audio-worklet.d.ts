@@ -1,20 +1,22 @@
 // src/types/audio-worklet.d.ts
 
 export interface AudioWorkletProcessor {
-    readonly port: MessagePort;
-    process(
-        inputs: Float32Array[][],
-        outputs: Float32Array[][],
-        parameters: Record<string, Float32Array>
-    ): boolean;
+  readonly port: MessagePort;
+  process(
+    inputs: Float32Array[][],
+    outputs: Float32Array[][],
+    parameters: Record<string, Float32Array>,
+  ): boolean;
 }
 
 declare var AudioWorkletProcessor: {
-    prototype: AudioWorkletProcessor;
-    new(options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
+  prototype: AudioWorkletProcessor;
+  new (options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
 };
 
 declare function registerProcessor(
-    name: string,
-    processorCtor: (new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor)
+  name: string,
+  processorCtor: new (
+    options?: AudioWorkletNodeOptions,
+  ) => AudioWorkletProcessor,
 ): void;

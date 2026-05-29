@@ -514,3 +514,78 @@ oat-dialog::part(panel) {
 .pan-slider::-webkit-slider-thumb:hover {
     transform: scale(1.2);
 }
+
+/* ─── Signal Flow Animation (Timeline patch cable marching ants) ─── */
+@keyframes signal-flow {
+    from {
+        stroke-dashoffset: 0;
+    }
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+.signal-flow-line {
+    stroke-dasharray: 6 4;
+    animation: signal-flow 1.2s linear infinite;
+}
+
+/* ─── Timeline Section Card ─── */
+.timeline-section-card {
+    min-width: 200px;
+    background: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: var(--ui-radius-lg);
+    padding: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.timeline-section-card.active {
+    border-color: var(--ui-color-primary) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 0 0 16px rgba(124, 58, 237, 0.2) !important;
+}
+
+.timeline-section-card.queued {
+    border-color: var(--ui-color-warning) !important;
+    background: rgba(234, 88, 12, 0.05) !important;
+    box-shadow: 0 0 16px rgba(234, 88, 12, 0.2) !important;
+}
+
+.timeline-section-card.clickable {
+    cursor: pointer;
+}
+
+.timeline-section-card.clickable:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.timeline-section-card.clickable.active:hover {
+    border-color: var(--ui-color-primary-light) !important;
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3) !important;
+}
+
+.timeline-section-card.clickable.queued:hover {
+    border-color: #fbbf24;
+    box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3) !important;
+}
+
+/* ─── Timeline Section Card Progress Overlay ─── */
+.timeline-section-progress-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: rgba(167, 139, 250, 0.08);
+    pointer-events: none;
+    z-index: 0;
+    transition: width 0.1s linear;
+}

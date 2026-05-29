@@ -1,4 +1,5 @@
 # Product Requirements Document (PRD)
+
 ## Live Looper – Effects Engine (Performance-Optimized, Native Web Audio)
 
 ---
@@ -17,6 +18,7 @@ The system must:
 - Be extensible for future effects
 
 Revisions applied:
+
 - Pre-FX stage removed
 - Reverb implemented as per-track insert (no shared send bus)
 
@@ -73,7 +75,6 @@ Limiter
 ↓
 Output
 
-
 Characteristics:
 
 - Fully linear per-track insert chain
@@ -91,18 +92,21 @@ Characteristics:
 ## 4.1 EQ
 
 **Implementation**
+
 - 3 × `BiquadFilterNode`
   - Low Shelf
   - Peaking (Mid)
   - High Shelf
 
 **Parameters**
+
 - Low gain (-12dB to +12dB)
 - Mid gain (-12dB to +12dB)
 - Mid frequency (300Hz–4kHz)
 - High gain (-12dB to +12dB)
 
 **Constraints**
+
 - Always instantiated
 - No runtime node creation
 - Parameter changes must use ramp automation
@@ -112,9 +116,11 @@ Characteristics:
 ## 4.2 Compressor (Per Track)
 
 **Node**
+
 - `DynamicsCompressorNode`
 
 **Parameters**
+
 - Threshold
 - Ratio
 - Attack
@@ -122,6 +128,7 @@ Characteristics:
 - Makeup gain
 
 Used for:
+
 - Dynamic control
 - Tightening loop peaks
 
@@ -130,13 +137,16 @@ Used for:
 ## 4.3 Drive
 
 **Node**
+
 - `WaveShaperNode`
 
 **Parameters**
+
 - Amount
 - Optional tone control (pre high-cut filter)
 
 **Rules**
+
 - Distortion curve recalculated only when amount changes
 - No per-sample JS processing
 
@@ -145,22 +155,26 @@ Used for:
 ## 4.4 Delay
 
 **Nodes**
+
 - `DelayNode`
 - Feedback loop via `GainNode`
 - Optional filter in feedback path
 
 **Parameters**
+
 - Time (BPM-synced to looper clock)
 - Feedback
 - Mix (dry/wet)
 - High cut
 
 **Sync Modes**
+
 - 1/4
 - 1/8
 - 1/8 dotted
 
 **Mixing**
+
 - Implement via Dry GainNode + Wet GainNode
 - Avoid reconnecting graph
 
@@ -169,17 +183,20 @@ Used for:
 ## 4.5 Reverb (Insert Mode)
 
 **Node**
+
 - `ConvolverNode`
 
 Each track has its own instance.
 
 **Constraints**
+
 - IR length ≤ 2 seconds
 - Default small-room impulse response
 - Mix control (dry/wet)
 - No shared bus in this version
 
 **Tradeoff**
+
 - Slightly higher CPU than shared send
 - Lower architectural complexity
 
@@ -188,9 +205,11 @@ Each track has its own instance.
 ## 4.6 Pan
 
 **Node**
+
 - `StereoPannerNode`
 
 **Range**
+
 - -1 (Left) to +1 (Right)
 
 ---
@@ -204,11 +223,13 @@ All modulation effects must be toggleable and CPU-safe.
 ## 5.1 Phaser
 
 **Implementation**
+
 - 2–4 `BiquadFilterNode` (allpass)
 - LFO via `OscillatorNode`
 - Optional feedback loop
 
 **Parameters**
+
 - Rate
 - Depth
 - Feedback
@@ -218,11 +239,13 @@ All modulation effects must be toggleable and CPU-safe.
 ## 5.2 Flanger
 
 **Implementation**
+
 - Short `DelayNode` (0–10ms)
 - LFO modulating delayTime
 - Feedback loop
 
 **Parameters**
+
 - Rate
 - Depth
 - Feedback
@@ -232,9 +255,11 @@ All modulation effects must be toggleable and CPU-safe.
 ## 5.3 Tremolo
 
 **Implementation**
+
 - LFO → `GainNode.gain`
 
 **Parameters**
+
 - Rate
 - Depth
 
@@ -247,14 +272,17 @@ All modulation effects must be toggleable and CPU-safe.
 ## 6.1 Glue Compressor
 
 **Node**
+
 - `DynamicsCompressorNode`
 
 **Preset Characteristics**
+
 - Ratio: 2–4
 - Medium attack
 - Subtle gain reduction
 
 Purpose:
+
 - Cohesion across tracks
 
 ---
@@ -274,12 +302,12 @@ Must prevent digital clipping under peak stacking.
 
 # 7. Performance Requirements
 
-| Metric | Target |
-|--------|--------|
-| Audio Latency | < 10ms |
-| CPU Load (4 tracks full FX) | < 40% on modern laptop |
-| Memory overhead | Stable, no progressive growth |
-| XRuns / Glitches | 0 under normal use |
+| Metric                      | Target                        |
+| --------------------------- | ----------------------------- |
+| Audio Latency               | < 10ms                        |
+| CPU Load (4 tracks full FX) | < 40% on modern laptop        |
+| Memory overhead             | Stable, no progressive growth |
+| XRuns / Glitches            | 0 under normal use            |
 
 ---
 
@@ -367,3 +395,4 @@ All effects enabled simultaneously without dropouts
 Smooth section transitions
 
 Clean, extensible architecture
+```

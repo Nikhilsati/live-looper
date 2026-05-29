@@ -1,79 +1,82 @@
-import { type SessionEvent, type FrozenProjectSnapshot } from '@live-looper/types';
-import { audioEngine } from '@live-looper/audio-engine';
+import {
+  type SessionEvent,
+  type FrozenProjectSnapshot,
+} from "@live-looper/types";
+import { audioEngine } from "@live-looper/audio-engine";
 
 /**
- * SRP: This class is solely responsible for the accumulation of session data 
+ * SRP: This class is solely responsible for the accumulation of session data
  * during a performance. It handles timing, event logging, and audio capture.
  */
 export class SessionRecorder {
-    private static instance: SessionRecorder;
-    private events: SessionEvent[] = [];
-    private startTime: number = 0;
-    private snapshot: FrozenProjectSnapshot | null = null;
-    private isRecording: boolean = false;
+  private static instance: SessionRecorder;
+  private events: SessionEvent[] = [];
+  private startTime: number = 0;
+  private snapshot: FrozenProjectSnapshot | null = null;
+  private isRecording: boolean = false;
 
-    private constructor() { }
+  private constructor() {}
 
-    static getInstance(): SessionRecorder {
-        if (!SessionRecorder.instance) {
-            SessionRecorder.instance = new SessionRecorder();
-        }
-        return SessionRecorder.instance;
+  static getInstance(): SessionRecorder {
+    if (!SessionRecorder.instance) {
+      SessionRecorder.instance = new SessionRecorder();
     }
+    return SessionRecorder.instance;
+  }
 
-    async start(snapshot: FrozenProjectSnapshot) {
-        this.events = [];
-        this.startTime = Date.now();
-        this.snapshot = snapshot;
-        this.isRecording = true;
+  async start(snapshot: FrozenProjectSnapshot) {
+    this.events = [];
+    this.startTime = Date.now();
+    this.snapshot = snapshot;
+    this.isRecording = true;
 
-        await audioEngine.startLiveRecording();
-        this.logEvent('PLAY');
-    }
+    await audioEngine.startLiveRecording();
+    this.logEvent("PLAY");
+  }
 
-    async stop(): Promise<{
-        events: SessionEvent[];
-        snapshot: FrozenProjectSnapshot;
-        durationMs: number;
-        audioBlob?: Blob;
-    } | null> {
-        if (!this.isRecording || !this.snapshot) return null;
+  async stop(): Promise<{
+    events: SessionEvent[];
+    snapshot: FrozenProjectSnapshot;
+    durationMs: number;
+    audioBlob?: Blob;
+  } | null> {
+    if (!this.isRecording || !this.snapshot) return null;
 
-        this.logEvent('STOP');
-        const durationMs = Date.now() - this.startTime;
-        const audioBlob = await audioEngine.stopLiveRecording();
+    this.logEvent("STOP");
+    const durationMs = Date.now() - this.startTime;
+    const audioBlob = await audioEngine.stopLiveRecording();
 
-        const result = {
-            events: [...this.events],
-            snapshot: this.snapshot,
-            durationMs,
-            audioBlob: audioBlob || undefined
-        };
+    const result = {
+      events: [...this.events],
+      snapshot: this.snapshot,
+      durationMs,
+      audioBlob: audioBlob || undefined,
+    };
 
-        this.isRecording = false;
-        this.events = [];
-        this.snapshot = null;
+    this.isRecording = false;
+    this.events = [];
+    this.snapshot = null;
 
-        return result;
-    }
+    return result;
+  }
 
-    logEvent(type: any, payload?: any) {
-        if (!this.isRecording) return;
+  logEvent(type: any, payload?: any) {
+    if (!this.isRecording) return;
 
-        this.events.push({
-            timestampMs: Date.now() - this.startTime,
-            type,
-            payload
-        });
-    }
+    this.events.push({
+      timestampMs: Date.now() - this.startTime,
+      type,
+      payload,
+    });
+  }
 
-    getIsRecording(): boolean {
-        return this.isRecording;
-    }
+  getIsRecording(): boolean {
+    return this.isRecording;
+  }
 
-    getStartTime(): number {
-        return this.startTime;
-    }
+  getStartTime(): number {
+    return this.startTime;
+  }
 }
 
 export const sessionRecorder = SessionRecorder.getInstance();

@@ -1,4 +1,4 @@
-import { BaseEffect } from './BaseEffect';
+import { BaseEffect } from "./BaseEffect";
 
 /**
  * PanEffect — stereo panner.  Sits at the end of the chain.
@@ -6,16 +6,16 @@ import { BaseEffect } from './BaseEffect';
  * Signal flow: input → panner → output
  */
 export class PanEffect extends BaseEffect {
-    private panner!: StereoPannerNode;
+  private panner!: StereoPannerNode;
 
-    buildGraph(): void {
-        this.panner = this.context.createStereoPanner();
-        this.input.connect(this.panner);
-        this.panner.connect(this.output);
-    }
+  buildGraph(): void {
+    this.panner = this.context.createStereoPanner();
+    this.input.connect(this.panner);
+    this.panner.connect(this.output);
+  }
 
-    update(panValue: number, _bpm: number): void {
-        const t = this.context.currentTime + 0.05;
-        this.panner.pan.setTargetAtTime(panValue, t, 0.02);
-    }
+  update(panValue: number, _bpm: number): void {
+    const t = this.context.currentTime + 0.05;
+    this.panner.pan.setTargetAtTime(panValue, t, 0.02);
+  }
 }
