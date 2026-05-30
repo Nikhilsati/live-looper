@@ -605,3 +605,67 @@ oat-dialog::part(panel) {
 .ui-level-meter-bar {
     transition: background 0.05s ease, box-shadow 0.05s ease;
 }
+
+/* ─── Button Variants Specificity Fix ────────────────────────────────────── */
+:is(button, .btn).primary {
+    background-color: var(--primary) !important;
+    color: var(--primary-foreground, #fff) !important;
+    border-color: rgb(from #fff r g b / 0.15) rgb(from #000 r g b / 0.2) rgb(from #000 r g b / 0.2) rgb(from #fff r g b / 0.15) !important;
+}
+:is(button, .btn).primary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--primary), white 15%) !important;
+}
+
+:is(button, .btn).success {
+    background-color: var(--success) !important;
+    color: var(--success-foreground, #fff) !important;
+    border-color: rgb(from #fff r g b / 0.15) rgb(from #000 r g b / 0.2) rgb(from #000 r g b / 0.2) rgb(from #fff r g b / 0.15) !important;
+}
+:is(button, .btn).success:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--success), white 15%) !important;
+}
+
+:is(button, .btn).danger {
+    background-color: var(--danger) !important;
+    color: var(--danger-foreground, #fff) !important;
+    border-color: rgb(from #fff r g b / 0.15) rgb(from #000 r g b / 0.2) rgb(from #000 r g b / 0.2) rgb(from #fff r g b / 0.15) !important;
+}
+:is(button, .btn).danger:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--danger), white 15%) !important;
+}
+
+:is(button, .btn).warning {
+    background-color: var(--warning) !important;
+    color: var(--warning-foreground, #fff) !important;
+    border-color: rgb(from #fff r g b / 0.15) rgb(from #000 r g b / 0.2) rgb(from #000 r g b / 0.2) rgb(from #fff r g b / 0.15) !important;
+}
+:is(button, .btn).warning:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--warning), white 15%) !important;
+}
+
+:is(button, .btn).accent {
+    background-color: var(--accent) !important;
+    color: #fff !important;
+    border-color: rgb(from #fff r g b / 0.15) rgb(from #000 r g b / 0.2) rgb(from #000 r g b / 0.2) rgb(from #fff r g b / 0.15) !important;
+}
+:is(button, .btn).accent:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--accent), white 15%) !important;
+}
+
+:is(button, .btn).outline {
+    background-color: transparent !important;
+    color: var(--foreground) !important;
+    border: 1px solid var(--border) !important;
+}
+:is(button, .btn).outline:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+:is(button, .btn).ghost {
+    background-color: transparent !important;
+    color: var(--foreground) !important;
+    border: 1px solid transparent !important;
+}
+:is(button, .btn).ghost:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
