@@ -5,6 +5,7 @@ import { Modal, Card, Heading, Text, Button } from "@live-looper/ui";
 const meta: Meta<typeof Modal> = {
   title: "UI/Modal",
   component: Modal,
+  tags: ["ai-generated"],
 };
 
 export default meta;

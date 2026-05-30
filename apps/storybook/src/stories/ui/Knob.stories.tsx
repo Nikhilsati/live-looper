@@ -5,6 +5,7 @@ import { Knob } from "@live-looper/ui";
 const meta: Meta<typeof Knob> = {
   title: "UI/Knob",
   component: Knob,
+  tags: ["ai-generated"],
   argTypes: {
     color: { control: "color" },
     size: { control: { type: "range", min: 30, max: 120, step: 5 } },

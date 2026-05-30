@@ -6,6 +6,7 @@ import { Button } from "@live-looper/ui";
 const meta: Meta<typeof Tuner> = {
   title: "Web/Tuner",
   component: Tuner,
+  tags: ["ai-generated"],
 };
 
 export default meta;

@@ -6,6 +6,7 @@ import { useLooperStore } from "../../../../web/src/store/useLooperStore";
 const meta: Meta<typeof LatencyMonitor> = {
   title: "Web/LatencyMonitor",
   component: LatencyMonitor,
+  tags: ["ai-generated"],
   decorators: [
     (Story) => {
       // Return a container with relative layout and padding so the fixed LatencyMonitor is visible

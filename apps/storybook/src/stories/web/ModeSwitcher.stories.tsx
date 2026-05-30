@@ -7,6 +7,7 @@ import { useSessionStore } from "../../../../web/src/store/useSessionStore";
 const meta: Meta<typeof ModeSwitcher> = {
   title: "Web/ModeSwitcher",
   component: ModeSwitcher,
+  tags: ["ai-generated"],
 };
 
 export default meta;

@@ -5,6 +5,7 @@ import { Waveform } from "@live-looper/ui";
 const meta: Meta<typeof Waveform> = {
   title: "UI/Waveform",
   component: Waveform,
+  tags: ["ai-generated"],
   argTypes: {
     height: { control: "number" },
     bars: { control: "number" },

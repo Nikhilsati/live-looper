@@ -1,10 +1,12 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { Button } from "@live-looper/ui";
+import { expect } from "storybook/test";
 
 const meta: Meta<typeof Button> = {
   title: "UI/Button",
   component: Button,
+  tags: ["ai-generated"],
   argTypes: {
     variant: {
       control: "select",
@@ -99,5 +101,17 @@ export const Disabled: Story = {
   args: {
     disabled: true,
     children: "Disabled Button",
+  },
+};
+
+export const CssCheck: Story = {
+  args: {
+    variant: "primary",
+    children: "Style Check",
+  },
+  play: async ({ canvas }) => {
+    const button = canvas.getByRole("button", { name: /style check/i });
+    // Verify that the border radius from UI.css is loaded (12px)
+    await expect(getComputedStyle(button).borderRadius).toBe("12px");
   },
 };

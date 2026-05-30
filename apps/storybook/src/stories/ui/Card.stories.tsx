@@ -5,6 +5,7 @@ import { Card, Heading, Text, Button } from "@live-looper/ui";
 const meta: Meta<typeof Card> = {
   title: "UI/Card",
   component: Card,
+  tags: ["ai-generated"],
 };
 
 export default meta;
