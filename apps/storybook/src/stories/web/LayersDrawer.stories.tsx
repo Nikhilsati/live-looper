@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { LayersDrawer } from "../../../../web/src/components/TrackControls";
+import { LayersDrawer } from "../../../../web/src/components/track/LayersDrawer";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
 import { db } from "@live-looper/storage";
 

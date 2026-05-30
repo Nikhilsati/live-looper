@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { ProgressRing } from "../../../../web/src/components/TrackControls";
+import { ProgressRing } from "../../../../web/src/components/track/ProgressRing";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
 
 const meta: Meta<typeof ProgressRing> = {

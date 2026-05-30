@@ -489,31 +489,24 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
   createNewProject: async (name) => {
     if (!modeController.isActionAllowed("add-section")) return ""; // Basic check
-    const id = await audioEngine.createNewProject(name);
+    const { projectService } = await import("@live-looper/storage");
+    const { ProjectLoader } = await import("../controllers/ProjectLoader");
+    const { DEFAULT_BPM } = await import("@live-looper/audio-engine");
+    const id = await projectService.createProject(name, DEFAULT_BPM);
+    await ProjectLoader.loadProject(id);
     await get().fetchProjects();
     return id;
   },
 
   loadProject: async (id) => {
-    // Reset current tracks before loading to avoid flicker/stale data
-    set({
-      tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
-      isPlaying: false,
-    });
-    await audioEngine.loadProject(id);
-    const project = await db.projects.get(id);
-    set({ currentProject: project || null });
+    // Rely on ProjectLoader to do the heavy lifting and DB interactions
+    const { ProjectLoader } = await import("../controllers/ProjectLoader");
+    await ProjectLoader.loadProject(id);
   },
 
   loadDemoData: async () => {
-    set({
-      tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
-      isPlaying: false,
-    });
-    await audioEngine.loadDemoData();
-    // audioEngine.loadDemoData creates a new project and calls loadProject
-    // internally, which emits PROJECT_LOADED. We still need to sync
-    // currentProject and the project list in the store.
+    const { ProjectLoader } = await import("../controllers/ProjectLoader");
+    await ProjectLoader.loadDemoData();
     const projects = await db.projects.orderBy("updatedAt").reverse().toArray();
     const lastProject = projects[0] ?? null;
     set({ projectList: projects, currentProject: lastProject });

@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { TrackPad, LiveTrackPad } from "../../../../web/src/components/TrackControls";
+import { TrackPad } from "../../../../web/src/components/track/TrackPad";
+import { LiveTrackPad } from "../../../../web/src/components/track/LiveTrackPad";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
 import { FXBuilder } from "@live-looper/audio-engine";
 

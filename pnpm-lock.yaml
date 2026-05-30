@@ -175,9 +175,6 @@ importers:
 
   packages/audio-engine:
     dependencies:
-      '@live-looper/storage':
-        specifier: workspace:*
-        version: link:../storage
       mitt:
         specifier: ^3.0.1
         version: 3.0.1
