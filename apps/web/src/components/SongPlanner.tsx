@@ -186,7 +186,12 @@ export const SongPlanner = () => {
       <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
         <Heading style={{ fontSize: 24, margin: 0 }}>Timeline</Heading>
         {isPlan && (
-          <Button onClick={handleAdd} size="sm" variant="ghost">
+          <Button
+            onClick={handleAdd}
+            size="sm"
+            variant="ghost"
+            title="Add a new song section to the timeline"
+          >
             <Row style={{ alignItems: "center", gap: 6 }}>
               <PlusIcon size={14} /> Add Section
             </Row>
@@ -218,6 +223,13 @@ export const SongPlanner = () => {
                 <Card
                   onClick={() => handleSectionClick(idx)}
                   className={`timeline-section-card ${isActive ? "active" : ""} ${isQueued ? "queued" : ""} ${!isPlan ? "clickable" : ""}`}
+                  title={
+                    isPlan
+                      ? undefined
+                      : isPlaying
+                        ? "Queue section to play next"
+                        : "Switch to this section"
+                  }
                 >
                   {isActive && isPlaying && (
                     <div
@@ -254,6 +266,7 @@ export const SongPlanner = () => {
                           }}
                           disabled={idx === 0}
                           style={{ padding: "4px 8px" }}
+                          title="Move section left"
                         >
                           <CaretLeftIcon size={16} />
                         </Button>
@@ -266,6 +279,7 @@ export const SongPlanner = () => {
                           }}
                           disabled={idx === sections.length - 1}
                           style={{ padding: "4px 8px" }}
+                          title="Move section right"
                         >
                           <CaretRightIcon size={16} />
                         </Button>
@@ -278,6 +292,7 @@ export const SongPlanner = () => {
                           }}
                           disabled={sections.length <= 1}
                           style={{ padding: "4px 8px" }}
+                          title="Delete section"
                         >
                           <TrashIcon
                             size={16}
@@ -300,7 +315,7 @@ export const SongPlanner = () => {
                         onClick={() =>
                           handleToggleCarryForward(trackIndex, idx, isLinked)
                         }
-                        title={`${isLinked ? "Unlink" : "Link"} T${trackIndex + 1}`}
+                        title={`${isLinked ? "Unlink" : "Link"} Track ${trackIndex + 1} carry-forward from previous section`}
                         style={{
                           position: "absolute",
                           left: -5,

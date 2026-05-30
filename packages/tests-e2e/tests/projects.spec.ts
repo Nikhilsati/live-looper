@@ -30,7 +30,9 @@ test.describe("Project Management", () => {
     await projectCard.locator("button").nth(1).click();
 
     // Confirm deletion in the custom modal dialog
-    await page.getByRole("button", { name: "Delete Forever", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Delete Forever", exact: true })
+      .click();
 
     await expect(projectCard).not.toBeVisible();
   });

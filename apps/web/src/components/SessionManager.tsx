@@ -84,6 +84,7 @@ export const SessionManager = ({ onClose }: { onClose: () => void }) => {
           size="sm"
           onClick={onClose}
           style={{ padding: 4, borderRadius: 8 }}
+          title="Close Session Manager"
         >
           <XIcon size={18} />
         </Button>
@@ -148,6 +149,7 @@ export const SessionManager = ({ onClose }: { onClose: () => void }) => {
                       variant="danger"
                       onClick={stopReplay}
                       style={{ width: 32, height: 32, padding: 0 }}
+                      title="Stop replay"
                     >
                       <StopIcon size={16} weight="fill" />
                     </Button>
@@ -170,6 +172,7 @@ export const SessionManager = ({ onClose }: { onClose: () => void }) => {
                     variant="ghost"
                     onClick={() => handleDelete(session.id)}
                     style={{ width: 32, height: 32, padding: 0, opacity: 0.5 }}
+                    title="Delete session permanently"
                   >
                     <TrashIcon size={16} />
                   </Button>

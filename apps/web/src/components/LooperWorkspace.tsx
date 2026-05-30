@@ -83,20 +83,20 @@ export const LooperWorkspace: React.FC = () => {
                     mode === "planning"
                       ? "rgba(59,130,246,0.12)"
                       : mode === "practice"
-                      ? "rgba(234,179,8,0.12)"
-                      : "rgba(220,38,38,0.12)",
+                        ? "rgba(234,179,8,0.12)"
+                        : "rgba(220,38,38,0.12)",
                   color:
                     mode === "planning"
                       ? "#93c5fd"
                       : mode === "practice"
-                      ? "#fcd34d"
-                      : "#fca5a5",
+                        ? "#fcd34d"
+                        : "#fca5a5",
                   border: `1px solid ${
                     mode === "planning"
                       ? "rgba(59,130,246,0.25)"
                       : mode === "practice"
-                      ? "rgba(234,179,8,0.25)"
-                      : "rgba(220,38,38,0.25)"
+                        ? "rgba(234,179,8,0.25)"
+                        : "rgba(220,38,38,0.25)"
                   }`,
                   textTransform: "uppercase",
                 }}

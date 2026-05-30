@@ -174,6 +174,7 @@ const PresetMenu = ({
                   background: "transparent",
                 }}
                 onClick={handleSave}
+                title="Save current configuration as a preset"
               >
                 <FloppyDiskIcon size={16} weight="regular" />
                 <span
@@ -196,6 +197,7 @@ const PresetMenu = ({
                   background: "transparent",
                 }}
                 onClick={() => fileInputRef.current?.click()}
+                title="Import preset from a JSON file"
               >
                 <UploadSimpleIcon size={16} weight="regular" />
                 <span
@@ -218,6 +220,7 @@ const PresetMenu = ({
                   background: "transparent",
                 }}
                 onClick={handleSave}
+                title="Create a new blank preset"
               >
                 <FilePlusIcon size={16} weight="regular" />
                 <span
@@ -321,6 +324,7 @@ const PresetMenu = ({
                               e.stopPropagation();
                               exportFXPreset(p.id);
                             }}
+                            title="Export preset to file"
                           >
                             <DownloadSimpleIcon size={12} color="#a881ff" />
                           </Button>
@@ -335,6 +339,7 @@ const PresetMenu = ({
                               e.stopPropagation();
                               deleteFXPreset(p.id);
                             }}
+                            title="Delete preset"
                           >
                             <TrashIcon size={12} color="#ff6b6b" />
                           </Button>
@@ -457,6 +462,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             <Button
               onClick={onClose}
               variant="ghost"
+              title="Close Pedalboard"
               style={{
                 padding: "6px",
                 borderRadius: "50%",
@@ -503,6 +509,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={0}
             step={1}
             onChange={(v) => updateFX("noiseGate", { threshold: v })}
+            title="Noise Gate Threshold: audio levels below this will be silenced (double-click to reset)"
           />
           <Knob
             color={COLORS.noiseGate}
@@ -514,6 +521,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={0.5}
             step={0.001}
             onChange={(v) => updateFX("noiseGate", { attack: v })}
+            title="Noise Gate Attack Time: how fast the gate opens (double-click to reset)"
           />
           <Knob
             color={COLORS.noiseGate}
@@ -525,6 +533,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={2.0}
             step={0.01}
             onChange={(v) => updateFX("noiseGate", { release: v })}
+            title="Noise Gate Release Time: how fast the gate closes (double-click to reset)"
           />
         </FxModule>
 
@@ -552,6 +561,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={12}
             step={0.1}
             onChange={(v) => updateFX("eq", { low: v })}
+            title="Low Frequency EQ Gain (double-click to reset)"
           />
           <Knob
             color={COLORS.eq}
@@ -563,6 +573,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={12}
             step={0.1}
             onChange={(v) => updateFX("eq", { mid: v })}
+            title="Mid Frequency EQ Gain (double-click to reset)"
           />
           <Knob
             color={COLORS.eq}
@@ -574,6 +585,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={12}
             step={0.1}
             onChange={(v) => updateFX("eq", { high: v })}
+            title="High Frequency EQ Gain (double-click to reset)"
           />
         </FxModule>
 
@@ -601,6 +613,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={0}
             step={1}
             onChange={(v) => updateFX("compressor", { threshold: v })}
+            title="Compressor Threshold: signal levels above this will be compressed (double-click to reset)"
           />
           <Knob
             color={COLORS.compressor}
@@ -612,6 +625,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={20}
             step={0.1}
             onChange={(v) => updateFX("compressor", { ratio: v })}
+            title="Compression Ratio: slope of compression curve (double-click to reset)"
           />
           <Knob
             color={COLORS.compressor}
@@ -623,6 +637,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={24}
             step={1}
             onChange={(v) => updateFX("compressor", { gain: v })}
+            title="Compressor Makeup Gain: amplifies the output signal (double-click to reset)"
           />
         </FxModule>
 
@@ -649,6 +664,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("drive", { amount: v })}
+            title="Overdrive Saturation Amount (double-click to reset)"
           />
           <Knob
             color={COLORS.drive}
@@ -659,6 +675,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("drive", { tone: v })}
+            title="Overdrive Tone: controls brightness/warmth (double-click to reset)"
           />
         </FxModule>
 
@@ -687,6 +704,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                       { "--module-color": COLORS.chorus } as React.CSSProperties
                     }
                     onClick={() => updateFX("chorus", { voices: v })}
+                    title={v === 1 ? "Standard Chorus Mode" : "Doubler Mode"}
                   >
                     {v === 1 ? "CHR" : "DBL"}
                   </button>
@@ -705,6 +723,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={5}
             step={0.05}
             onChange={(v) => updateFX("chorus", { rate: v })}
+            title="Chorus Modulation LFO Rate (double-click to reset)"
           />
           <Knob
             color={COLORS.chorus}
@@ -715,6 +734,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("chorus", { depth: v })}
+            title="Chorus Modulation Depth (double-click to reset)"
           />
           <div
             style={{
@@ -732,6 +752,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
               max={1}
               step={0.01}
               onChange={(v) => updateFX("chorus", { mix: v })}
+              title="Chorus Dry/Wet Mix (double-click to reset)"
             />
           </div>
         </FxModule>
@@ -761,6 +782,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                       { "--module-color": COLORS.phaser } as React.CSSProperties
                     }
                     onClick={() => updateFX("phaser", { stages: s })}
+                    title={`${s} Stages Phaser Mode`}
                   >
                     {s}st
                   </button>
@@ -779,6 +801,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={5}
             step={0.05}
             onChange={(v) => updateFX("phaser", { rate: v })}
+            title="Phaser Modulation LFO Rate (double-click to reset)"
           />
           <Knob
             color={COLORS.phaser}
@@ -789,6 +812,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("phaser", { depth: v })}
+            title="Phaser Modulation Depth (double-click to reset)"
           />
           <div
             style={{
@@ -806,6 +830,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
               max={0.9}
               step={0.01}
               onChange={(v) => updateFX("phaser", { feedback: v })}
+              title="Phaser Feedback Amount (double-click to reset)"
             />
           </div>
         </FxModule>
@@ -833,6 +858,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                     { "--module-color": COLORS.tremolo } as React.CSSProperties
                   }
                   onClick={() => updateFX("tremolo", { sync: false })}
+                  title="Set rate in Hertz (Hz)"
                 >
                   FREE
                 </button>
@@ -844,6 +870,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                   onClick={() =>
                     updateFX("tremolo", { sync: true, rate: 0.25 })
                   }
+                  title="Sync rate to project tempo (BPM)"
                 >
                   SYNC
                 </button>
@@ -862,6 +889,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
               max={1}
               step={0.25}
               onChange={(v) => updateFX("tremolo", { rate: v })}
+              title="Tremolo Sync Rate: fractions of a bar (double-click to reset)"
             />
           ) : (
             <Knob
@@ -874,6 +902,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
               max={20}
               step={0.1}
               onChange={(v) => updateFX("tremolo", { rate: v })}
+              title="Tremolo Modulation LFO Rate (double-click to reset)"
             />
           )}
           <Knob
@@ -885,6 +914,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("tremolo", { depth: v })}
+            title="Tremolo Modulation Depth (double-click to reset)"
           />
         </FxModule>
 
@@ -913,6 +943,9 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                       { "--module-color": COLORS.delay } as React.CSSProperties
                     }
                     onClick={() => updateFX("delay", { mode: m })}
+                    title={
+                      m === "mono" ? "Mono Delay" : "Ping Pong Delay (stereo)"
+                    }
                   >
                     {m === "mono" ? "MNO" : "PNG"}
                   </button>
@@ -930,6 +963,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
                       { "--module-color": COLORS.delay } as React.CSSProperties
                     }
                     onClick={() => updateFX("delay", { time: t })}
+                    title={`Sync delay to ${t === 0.25 ? "quarter" : t === 0.5 ? "half" : t === 0.75 ? "three-quarter" : "whole"} beat`}
                   >
                     {t === 0.25
                       ? "¼"
@@ -954,6 +988,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={2}
             step={0.001}
             onChange={(v) => updateFX("delay", { time: v })}
+            title="Delay Time (double-click to reset)"
           />
           <Knob
             color={COLORS.delay}
@@ -964,6 +999,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={0.9}
             step={0.01}
             onChange={(v) => updateFX("delay", { feedback: v })}
+            title="Delay Feedback / Repeat Amount (double-click to reset)"
           />
           <Knob
             color={COLORS.delay}
@@ -974,6 +1010,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("delay", { filter: v })}
+            title="Delay Bandpass Filter cutoff (double-click to reset)"
           />
           <div
             style={{
@@ -991,6 +1028,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
               max={1}
               step={0.01}
               onChange={(v) => updateFX("delay", { mix: v })}
+              title="Delay Dry/Wet Mix (double-click to reset)"
             />
           </div>
         </FxModule>
@@ -1018,6 +1056,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("reverb", { mix: v })}
+            title="Reverb Dry/Wet Mix (double-click to reset)"
           />
           <Knob
             color={COLORS.reverb}
@@ -1029,6 +1068,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={5}
             step={0.1}
             onChange={(v) => updateFX("reverb", { size: v })}
+            title="Reverb Room Size / Decay Time (double-click to reset)"
           />
           <Knob
             color={COLORS.reverb}
@@ -1040,6 +1080,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={100}
             step={1}
             onChange={(v) => updateFX("reverb", { predelay: v })}
+            title="Reverb Pre-Delay Time (double-click to reset)"
           />
           <Knob
             color={COLORS.reverb}
@@ -1050,6 +1091,7 @@ export const TrackFX = ({ trackId, onClose, fullSize }: TrackFXProps) => {
             max={1}
             step={0.01}
             onChange={(v) => updateFX("reverb", { damping: v })}
+            title="Reverb High Frequency Damping (double-click to reset)"
           />
         </FxModule>
       </div>

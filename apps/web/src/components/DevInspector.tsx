@@ -428,6 +428,7 @@ const DualWaveformViewer: React.FC<DualWaveformViewerProps> = ({
           <button
             disabled={amp <= 0.5}
             onClick={() => setAmp((a) => Math.max(0.5, a - 0.5))}
+            title="Decrease waveform amplitude height"
             style={{
               background: "transparent",
               border: "none",
@@ -453,6 +454,7 @@ const DualWaveformViewer: React.FC<DualWaveformViewerProps> = ({
           <button
             disabled={amp >= 10}
             onClick={() => setAmp((a) => Math.min(10, a + 0.5))}
+            title="Increase waveform amplitude height"
             style={{
               background: "transparent",
               border: "none",
@@ -482,6 +484,7 @@ const DualWaveformViewer: React.FC<DualWaveformViewerProps> = ({
           <button
             disabled={zoom <= 1}
             onClick={() => setZoom((z) => Math.max(1, z - 1))}
+            title="Decrease waveform zoom"
             style={{
               background: "transparent",
               border: "none",
@@ -507,6 +510,7 @@ const DualWaveformViewer: React.FC<DualWaveformViewerProps> = ({
           <button
             disabled={zoom >= 10}
             onClick={() => setZoom((z) => Math.min(10, z + 1))}
+            title="Increase waveform zoom"
             style={{
               background: "transparent",
               border: "none",
@@ -858,6 +862,7 @@ export const DevInspector: React.FC = () => {
               <button
                 onClick={fetchSnapshot}
                 disabled={loading}
+                title="Refresh Dev Inspector snapshot from IndexedDB"
                 style={{
                   background: "rgba(99,102,241,0.15)",
                   border: "1px solid rgba(99,102,241,0.4)",
@@ -1369,6 +1374,11 @@ export const DevInspector: React.FC = () => {
                                               : layer.id,
                                           )
                                         }
+                                        title={
+                                          expandedLayerId === layer.id
+                                            ? "Hide waveform comparison"
+                                            : "Show waveform comparison"
+                                        }
                                         style={{
                                           background:
                                             expandedLayerId === layer.id
@@ -1408,6 +1418,7 @@ export const DevInspector: React.FC = () => {
                                               .deleteLayer(layer.id);
                                           }
                                         }}
+                                        title="Permanently delete this layer from database"
                                         style={{
                                           background: "rgba(239, 68, 68, 0.1)",
                                           border:

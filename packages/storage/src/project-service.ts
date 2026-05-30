@@ -107,7 +107,7 @@ export class ProjectService {
 
     await db.transaction(
       "rw",
-      [db.layers, db.audioBlobs, db.projects],
+      [db.layers, db.audioBlobs, db.projects, db.sections, db.tracks],
       async () => {
         const audioBlob: AudioBlobRecord = {
           id: audioBlobId,
@@ -150,6 +150,45 @@ export class ProjectService {
         };
         await db.layers.add(layer);
 
+        // Propagate to linked downstream sections
+        const section = await db.sections.get(sectionId);
+        const track = await db.tracks.get(trackId);
+        if (section && track) {
+          const trackIndex = track.order;
+          const allSections = await db.sections
+            .where({ projectId })
+            .sortBy("order");
+          const startIndex = allSections.findIndex((s) => s.id === sectionId);
+          if (startIndex !== -1) {
+            for (let i = startIndex + 1; i < allSections.length; i++) {
+              const nextSection = allSections[i];
+              const isLinked = nextSection.trackLinks
+                ? nextSection.trackLinks[trackIndex]
+                : true;
+              if (isLinked) {
+                const nextActiveCount = await db.layers
+                  .where({ projectId, trackId, sectionId: nextSection.id })
+                  .filter((l) => !l.deletedAt)
+                  .count();
+                const propagatedLayer: LayerRecord = {
+                  id: uuidv4(),
+                  projectId,
+                  trackId,
+                  sectionId: nextSection.id,
+                  audioBlobId,
+                  rawAudioBlobId,
+                  gain,
+                  order: nextActiveCount,
+                  deletedAt: null,
+                };
+                await db.layers.add(propagatedLayer);
+              } else {
+                break;
+              }
+            }
+          }
+        }
+
         await db.projects.update(projectId, { updatedAt: Date.now() });
       },
     );
@@ -167,37 +206,116 @@ export class ProjectService {
   }): Promise<boolean> {
     const { projectId, trackId, sectionId } = params;
 
-    const activeLayers = await db.layers
-      .where({ projectId, trackId, sectionId })
-      .filter((l) => !l.deletedAt)
-      .sortBy("order");
+    return await db.transaction(
+      "rw",
+      [db.layers, db.projects, db.sections, db.tracks],
+      async () => {
+        const activeLayers = await db.layers
+          .where({ projectId, trackId, sectionId })
+          .filter((l) => !l.deletedAt)
+          .sortBy("order");
 
-    if (activeLayers.length === 0) return false;
+        if (activeLayers.length === 0) return false;
 
-    // The last active layer (highest order) is the one that was most recently recorded.
-    const topLayer = activeLayers[activeLayers.length - 1];
-    await db.layers.update(topLayer.id, { deletedAt: Date.now() });
-    await db.projects.update(projectId, { updatedAt: Date.now() });
-    return true;
+        // The last active layer (highest order) is the one that was most recently recorded.
+        const topLayer = activeLayers[activeLayers.length - 1];
+        await db.layers.update(topLayer.id, { deletedAt: Date.now() });
+
+        // Propagate to linked downstream sections
+        const section = await db.sections.get(sectionId);
+        const track = await db.tracks.get(trackId);
+        if (section && track) {
+          const trackIndex = track.order;
+          const allSections = await db.sections
+            .where({ projectId })
+            .sortBy("order");
+          const startIndex = allSections.findIndex((s) => s.id === sectionId);
+          if (startIndex !== -1) {
+            for (let i = startIndex + 1; i < allSections.length; i++) {
+              const nextSection = allSections[i];
+              const isLinked = nextSection.trackLinks
+                ? nextSection.trackLinks[trackIndex]
+                : true;
+              if (isLinked) {
+                const nextActiveLayers = await db.layers
+                  .where({ projectId, trackId, sectionId: nextSection.id })
+                  .filter((l) => !l.deletedAt)
+                  .sortBy("order");
+                if (nextActiveLayers.length > 0) {
+                  const nextTopLayer =
+                    nextActiveLayers[nextActiveLayers.length - 1];
+                  await db.layers.update(nextTopLayer.id, {
+                    deletedAt: Date.now(),
+                  });
+                }
+              } else {
+                break;
+              }
+            }
+          }
+        }
+
+        await db.projects.update(projectId, { updatedAt: Date.now() });
+        return true;
+      },
+    );
   }
 
-  /**
-   * Hard-deletes a specific layer and its corresponding audio blob.
-   */
   async deleteLayer(layerId: string): Promise<void> {
     const layer = await db.layers.get(layerId);
     if (!layer) return;
 
-    const { projectId, audioBlobId } = layer;
+    const { projectId, audioBlobId, trackId, sectionId } = layer;
 
     await db.transaction(
       "rw",
-      [db.layers, db.audioBlobs, db.projects],
+      [db.layers, db.audioBlobs, db.projects, db.sections, db.tracks],
       async () => {
         await db.layers.delete(layerId);
-        if (audioBlobId) {
-          await db.audioBlobs.delete(audioBlobId);
+
+        // Propagate deletion to downstream linked sections
+        const section = await db.sections.get(sectionId);
+        const track = await db.tracks.get(trackId);
+        if (section && track) {
+          const trackIndex = track.order;
+          const allSections = await db.sections
+            .where({ projectId })
+            .sortBy("order");
+          const startIndex = allSections.findIndex((s) => s.id === sectionId);
+          if (startIndex !== -1) {
+            for (let i = startIndex + 1; i < allSections.length; i++) {
+              const nextSection = allSections[i];
+              const isLinked = nextSection.trackLinks
+                ? nextSection.trackLinks[trackIndex]
+                : true;
+              if (isLinked) {
+                const matchingLayers = await db.layers
+                  .where({
+                    projectId,
+                    trackId,
+                    sectionId: nextSection.id,
+                    audioBlobId,
+                  })
+                  .toArray();
+                for (const ml of matchingLayers) {
+                  await db.layers.delete(ml.id);
+                }
+              } else {
+                break;
+              }
+            }
+          }
         }
+
+        if (audioBlobId) {
+          const referencedCount = await db.layers
+            .where({ audioBlobId })
+            .count();
+          if (referencedCount === 0) {
+            await db.audioBlobs.delete(audioBlobId);
+          }
+        }
+
         await db.projects.update(projectId, { updatedAt: Date.now() });
       },
     );

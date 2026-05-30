@@ -93,6 +93,7 @@ export const LatencyMonitor = () => {
               size="sm"
               onClick={calibrateLatency}
               disabled={isCalibratingLatency}
+              title="Measure and compensate for microphone-to-speaker round-trip latency"
               style={{ gap: "8px", fontSize: "11px", height: "32px" }}
             >
               {isCalibratingLatency ? (
@@ -126,6 +127,7 @@ export const LatencyMonitor = () => {
 
             {/* Sparkline */}
             <div
+              title="Real-time jitter history graph"
               style={{
                 height: "32px",
                 width: "100%",

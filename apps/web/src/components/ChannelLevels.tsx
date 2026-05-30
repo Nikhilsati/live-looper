@@ -7,6 +7,7 @@ export const ChannelLevels: React.FC = () => {
 
   return (
     <div
+      title="Input volume level meters for all 4 tracks"
       style={{
         display: "flex",
         alignItems: "center",

@@ -121,6 +121,7 @@ export const SettingsPopover: React.FC<SettingsPopoverProps> = ({
               useLooperStore.getState().loadDemoData();
               onClose();
             }}
+            title="Load pre-configured demo tracks and loop layers"
           >
             <CloudArrowDownIcon size={16} />
             Load Demo
@@ -193,6 +194,7 @@ export const SettingsPopover: React.FC<SettingsPopoverProps> = ({
                   type="checkbox"
                   checked={smartSnapEnabled}
                   onChange={(e) => setSmartSnapEnabled(e.target.checked)}
+                  title="Toggle auto-aligning of recorded loops to the nearest bar boundary"
                   style={{ cursor: "pointer", accentColor: "#a78bfa" }}
                 />
               </label>
@@ -303,6 +305,7 @@ export const SettingsPopover: React.FC<SettingsPopoverProps> = ({
               style={selectStyle}
               value={inputDeviceId ?? ""}
               onChange={(e) => setInputDevice(e.target.value)}
+              title="Select microphone / audio interface input device"
             >
               {availableInputs.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
@@ -357,6 +360,7 @@ export const SettingsPopover: React.FC<SettingsPopoverProps> = ({
               style={selectStyle}
               value={outputDeviceId ?? ""}
               onChange={(e) => setOutputDevice(e.target.value)}
+              title="Select main playback output speaker / headphone device"
             >
               {availableOutputs.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
@@ -397,6 +401,7 @@ export const SettingsPopover: React.FC<SettingsPopoverProps> = ({
               type="checkbox"
               checked={dualOutputMode}
               onChange={(e) => setDualOutputMode(e.target.checked)}
+              title="Toggle separate routing for performer monitoring (cue mix) vs main audience mix"
               style={{ cursor: "pointer", accentColor: "#a78bfa" }}
             />
           </div>
@@ -446,6 +451,7 @@ export const SettingsPopover: React.FC<SettingsPopoverProps> = ({
                   style={selectStyle}
                   value={performerOutputDeviceId ?? ""}
                   onChange={(e) => setPerformerOutputDevice(e.target.value)}
+                  title="Select output device for performer monitoring (headphones)"
                 >
                   {availableOutputs.map((d) => (
                     <option key={d.deviceId} value={d.deviceId}>

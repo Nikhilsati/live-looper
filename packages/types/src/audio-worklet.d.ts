@@ -1,13 +1,6 @@
 // src/types/audio-worklet.d.ts
 
-export interface AudioWorkletProcessor {
-  readonly port: MessagePort;
-  process(
-    inputs: Float32Array[][],
-    outputs: Float32Array[][],
-    parameters: Record<string, Float32Array>,
-  ): boolean;
-}
+import { AudioWorkletProcessor } from ".";
 
 declare var AudioWorkletProcessor: {
   prototype: AudioWorkletProcessor;

@@ -338,6 +338,7 @@ interface KnobProps {
   size?: number;
   step?: number;
   unit?: string;
+  title?: string;
 }
 
 function polarToXY(cx: number, cy: number, r: number, angleDeg: number) {
@@ -368,6 +369,7 @@ export const Knob = ({
   size = 44,
   step = 0.01,
   unit = "",
+  title,
 }: KnobProps) => {
   const dragging = React.useRef(false);
   const lastY = React.useRef(0);
@@ -488,6 +490,7 @@ export const Knob = ({
   return (
     <div
       className="ui-knob-wrap"
+      title={title}
       style={{ "--knob-glow": `${color}99` } as React.CSSProperties}
     >
       <svg

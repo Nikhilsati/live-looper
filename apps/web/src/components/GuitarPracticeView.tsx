@@ -296,6 +296,7 @@ export const GuitarPracticeView: React.FC = () => {
           <Button
             variant="ghost"
             onClick={handleBack}
+            title="Exit practice view and return to dashboard"
             style={{
               width: 44,
               height: 44,
@@ -445,6 +446,9 @@ export const GuitarPracticeView: React.FC = () => {
             </div>
             <button
               onClick={() => setShowFX((v) => !v)}
+              title={
+                showFX ? "Collapse Pedalboard panel" : "Expand Pedalboard panel"
+              }
               style={{
                 background: "transparent",
                 border: "none",
@@ -531,6 +535,7 @@ export const GuitarPracticeView: React.FC = () => {
                 </div>
 
                 <div
+                  title="Live Microphone Input levels"
                   style={{
                     width: 32,
                     height: 32,
@@ -609,6 +614,7 @@ export const GuitarPracticeView: React.FC = () => {
                     step={0.01}
                     value={volume}
                     onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    title="Adjust master output volume"
                     style={
                       {
                         WebkitAppearance: "slider-vertical",
@@ -673,6 +679,7 @@ export const GuitarPracticeView: React.FC = () => {
                     onDoubleClick={() =>
                       setLiveTrackState({ fx: { ...liveTrack.fx, pan: 0 } })
                     }
+                    title="Adjust master output pan (double-click to center)"
                   />
                   <span
                     style={{
@@ -747,6 +754,11 @@ export const GuitarPracticeView: React.FC = () => {
         <button
           id="practice-start-stop-btn"
           onClick={isRunning ? handleStop : handleStart}
+          title={
+            isRunning
+              ? "Stop practice audio session"
+              : "Start practice audio session (loads virtual pedalboard and tuner)"
+          }
           style={{
             padding: "0 40px",
             height: 64,
@@ -802,6 +814,7 @@ export const GuitarPracticeView: React.FC = () => {
         >
           <button
             onClick={() => handleBpmChange(-1)}
+            title="Decrease tempo by 1 BPM"
             style={{
               width: 36,
               height: 64,
@@ -881,6 +894,7 @@ export const GuitarPracticeView: React.FC = () => {
 
           <button
             onClick={() => handleBpmChange(1)}
+            title="Increase tempo by 1 BPM"
             style={{
               width: 36,
               height: 64,

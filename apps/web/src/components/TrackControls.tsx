@@ -534,14 +534,12 @@ const TrackPad = ({
   };
   const handleClear = () => {
     audioEngine.clearTrack(trackId);
-    useLooperStore
-      .getState()
-      .setTrackState(trackId, {
-        isRecording: false,
-        hasAudio: false,
-        waveformData: [],
-        layerCount: 0,
-      });
+    useLooperStore.getState().setTrackState(trackId, {
+      isRecording: false,
+      hasAudio: false,
+      waveformData: [],
+      layerCount: 0,
+    });
   };
 
   // Long-press erase logic (Live mode)
@@ -693,6 +691,7 @@ const TrackPad = ({
                 size="sm"
                 onClick={() => onOpenFX(trackId)}
                 style={{ padding: "4px", opacity: 0.6 }}
+                title="Configure track effects and mix"
               >
                 <MixerIcon size={14} />
               </Button>
@@ -743,6 +742,9 @@ const TrackPad = ({
                 onMouseLeave={cancelEraseHold}
                 onTouchStart={startEraseHold}
                 onTouchEnd={cancelEraseHold}
+                title={
+                  eraseDisabled ? "No audio to erase" : "Hold to clear loop"
+                }
                 style={{
                   width: 32,
                   height: 32,
@@ -779,6 +781,17 @@ const TrackPad = ({
       <Button
         onClick={handleArm}
         className={padGlowClass}
+        title={
+          track.isArmed
+            ? "Disarm recording"
+            : isOverdubbing
+              ? "Track recording (overdub)"
+              : isRecording
+                ? "Track recording"
+                : track.hasAudio
+                  ? "Arm track for recording / overdub"
+                  : "Arm track for recording"
+        }
         style={{
           background: padColor,
           border: `${padBorderWidth}px solid ${padBorderColor}`,
@@ -911,6 +924,9 @@ const TrackPad = ({
           onClick={handleUndo}
           disabled={track.layerCount === 0}
           size="md"
+          title={
+            track.layerCount === 0 ? "No layers to undo" : "Undo last layer"
+          }
           style={{
             flex: 1,
             height: 60,
@@ -926,6 +942,11 @@ const TrackPad = ({
             onClick={handleClear}
             disabled={!track.hasAudio && !track.isRecording}
             size="md"
+            title={
+              !track.hasAudio && !track.isRecording
+                ? "No audio to erase"
+                : "Clear loop"
+            }
             style={{
               flex: 0.6,
               height: 60,
@@ -1506,6 +1527,11 @@ export const GlobalActionBar = () => {
           data-testid="transport-button"
           onClick={handleToggle}
           variant={isPlaying ? "danger" : "primary"}
+          title={
+            isPlaying
+              ? "Stop performance playback"
+              : "Start performance playback"
+          }
           style={{
             width: 72,
             height: 72,
@@ -1537,6 +1563,7 @@ export const GlobalActionBar = () => {
             data-testid="bpm-button"
             variant="ghost"
             onClick={() => setShowBpmPopup(true)}
+            title="Change tempo (BPM)"
             style={{
               height: 48,
               padding: "0 16px",
@@ -1577,46 +1604,6 @@ export const GlobalActionBar = () => {
               </span>
             </div>
           </Button>
-
-          <div
-            style={{
-              width: 1,
-              height: 32,
-              background: "rgba(255,255,255,0.08)",
-            }}
-          />
-
-          {/* Section Quick Queue */}
-          <Row style={{ gap: 6 }}>
-            {sections.slice(0, 4).map((sec) => (
-              <Button
-                key={sec.index}
-                onClick={() => {
-                  if (!isPlaying) return;
-                  useLooperStore.getState().setQueuedSection(sec.index);
-                  audioEngine.queueSection(sec.index);
-                }}
-                variant={
-                  sec.index === currentSectionIndex
-                    ? "active-primary"
-                    : sec.index === queuedSectionIndex
-                      ? "active-warning"
-                      : "ghost"
-                }
-                disabled={!isPlaying}
-                style={{
-                  height: 36,
-                  padding: "0 12px",
-                  borderRadius: 12,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  minWidth: 70,
-                }}
-              >
-                {sec.name}
-              </Button>
-            ))}
-          </Row>
 
           {/* ── Layers toggle ── */}
           <div

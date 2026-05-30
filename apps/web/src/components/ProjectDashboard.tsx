@@ -89,7 +89,10 @@ export const ProjectDashboard: React.FC = () => {
             </Text>
           </Stack>
           <Row style={{ gap: 16 }}>
-            <label style={{ cursor: "pointer" }}>
+            <label
+              style={{ cursor: "pointer" }}
+              title="Import a project file (.llp) from your computer"
+            >
               <div
                 style={{
                   display: "inline-flex",
@@ -136,6 +139,7 @@ export const ProjectDashboard: React.FC = () => {
               }}
               onClick={() => setIsCreating(true)}
               className="header-btn-primary"
+              title="Create a new multi-track loop project"
             >
               <PlusIcon size={20} style={{ marginRight: 10 }} weight="bold" />
               Create Project
@@ -237,6 +241,7 @@ export const ProjectDashboard: React.FC = () => {
           id="guitar-practice-card"
           className="guitar-practice-card"
           onClick={() => navigate("/practice")}
+          title="Quick Play: Plug in and play live pass-through with full FX rack (no project needed)"
           style={{
             position: "relative",
             padding: "28px 32px",
@@ -428,6 +433,7 @@ export const ProjectDashboard: React.FC = () => {
               }}
               className="project-card"
               onClick={() => navigate(`/projects/${p.id}`)}
+              title="Open project loop session"
             >
               {/* Decorative background flare */}
               <div
@@ -487,6 +493,7 @@ export const ProjectDashboard: React.FC = () => {
                         transition: "all 0.2s",
                       }}
                       className="card-action-btn"
+                      title="Export project backup file (.llp)"
                     >
                       <DownloadSimpleIcon size={20} weight="bold" />
                     </Button>
@@ -516,6 +523,7 @@ export const ProjectDashboard: React.FC = () => {
                         transition: "all 0.2s",
                       }}
                       className="card-action-btn-danger"
+                      title="Delete project permanently"
                     >
                       <TrashIcon size={20} weight="bold" />
                     </Button>

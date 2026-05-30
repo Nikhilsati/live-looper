@@ -122,6 +122,7 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
             >
               <button
                 onClick={() => setTrackChannelMode(trackId, "mono")}
+                title="Set input channel mode to Mono (combines left & right inputs)"
                 style={{
                   padding: "4px 10px",
                   borderRadius: 6,
@@ -143,6 +144,7 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
               </button>
               <button
                 onClick={() => setTrackChannelMode(trackId, "stereo")}
+                title="Set input channel mode to Stereo (keeps left & right inputs separate)"
                 style={{
                   padding: "4px 10px",
                   borderRadius: 6,
@@ -217,6 +219,7 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
               setChannelMapping(trackId, null);
               setIsOpen(false);
             }}
+            title="Select the system default microphone/audio input"
             style={{
               width: "100%",
               display: "flex",
@@ -266,6 +269,7 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
                 setChannelMapping(trackId, device.deviceId);
                 setIsOpen(false);
               }}
+              title={`Select ${device.label || "this input device"}`}
               style={{
                 width: "100%",
                 display: "flex",
@@ -373,6 +377,7 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
       <button
         ref={triggerRef}
         onClick={toggleOpen}
+        title="Input channel settings (change device and Mono/Stereo mode)"
         style={{
           display: "flex",
           alignItems: "center",

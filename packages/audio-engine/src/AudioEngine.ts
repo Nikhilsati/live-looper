@@ -236,7 +236,7 @@ class AudioEngine {
   }
 
   /** Mirrors the worklet's computeWaveformData — RMS per block, 120 points. */
-  private computeWaveform(buffer: Float32Array, numPoints = 120): number[] {
+  public computeWaveform(buffer: Float32Array, numPoints = 120): number[] {
     const step = Math.floor(buffer.length / numPoints);
     if (step <= 0) return Array(numPoints).fill(0);
     const out: number[] = [];
@@ -815,9 +815,13 @@ class AudioEngine {
 
           if (trackIdx !== -1 && sectionIdx !== -1) {
             this.loadBuffer(trackIdx, sectionIdx, data);
-            layerCounts[trackIdx] = (layerCounts[trackIdx] || 0) + 1;
-            // Accumulate waveform RMS per track (last layer wins for now)
-            waveformDataMap[trackIdx] = this.computeWaveform(data);
+
+            // Only count layers and compute waveform for the initial active section (Section 0) on load!
+            if (sectionIdx === 0) {
+              layerCounts[trackIdx] = (layerCounts[trackIdx] || 0) + 1;
+              // Accumulate waveform RMS per track (last layer wins for now)
+              waveformDataMap[trackIdx] = this.computeWaveform(data);
+            }
           }
         } catch (e) {
           console.error("Error loading audio blob into engine", e);

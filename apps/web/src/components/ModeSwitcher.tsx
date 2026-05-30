@@ -75,6 +75,13 @@ export const ModeSwitcher: React.FC = () => {
             <Button
               key={m.id}
               onClick={() => setMode(m.id)}
+              title={
+                m.id === "planning"
+                  ? "Switch to Planning Mode — configure timeline sections, tempo, and routing"
+                  : m.id === "practice"
+                    ? "Switch to Practice Mode — rehearse transitions and loop timing"
+                    : "Switch to Live Mode — simplified interface for stage performance"
+              }
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -118,6 +125,7 @@ export const ModeSwitcher: React.FC = () => {
         <div style={{ position: "relative" }}>
           <Button
             onClick={() => setShowSessions(!showSessions)}
+            title="Open Session Manager to load/save/replay recorded loop sessions"
             style={{
               display: "flex",
               alignItems: "center",

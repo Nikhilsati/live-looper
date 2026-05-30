@@ -1,4 +1,5 @@
 /// <reference path="./oat.d.ts" />
+/// <reference path="./audio-worklet.d.ts" />
 
 export interface SectionConfig {
   id: string;
@@ -292,6 +293,11 @@ export type WorkletEvent =
       | "inputLevels"
     > & { sectionIndex: number })
   | {
+      type: "RECORD_START";
+      trackId: number;
+      sectionIndex: number;
+    }
+  | {
       type: "RECORD_STOP";
       trackId: number;
       sectionIndex: number;
@@ -301,7 +307,11 @@ export type WorkletEvent =
       layerCount: number;
     }
   | { type: "TRACK_CLEARED"; trackId: number }
-  | { type: "SECTION_CHANGE"; sectionIndex: number }
+  | {
+      type: "SECTION_CHANGE";
+      sectionIndex: number;
+      trackStates?: { id: number; state: string }[];
+    }
   | { type: "RTL_MEASURED"; samples: number }
   | { type: "RTL_TIMEOUT" }
   | { type: "UNDO_LAYER"; trackId: number; sectionIndex?: number };
@@ -422,4 +432,13 @@ export class FXBuilder {
     // Return a deep clone to prevent reference mutations
     return JSON.parse(JSON.stringify(this.state));
   }
+}
+
+export interface AudioWorkletProcessor {
+  readonly port: MessagePort;
+  process(
+    inputs: Float32Array[][],
+    outputs: Float32Array[][],
+    parameters: Record<string, Float32Array>,
+  ): boolean;
 }

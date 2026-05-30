@@ -68,7 +68,14 @@ interface LooperStore extends EngineState {
     sectionProgress: number;
   }) => void;
   setTrackState: (trackId: number, state: Partial<TrackState>) => void;
-  setCurrentSection: (index: number) => void;
+  setCurrentSection: (
+    index: number,
+    trackStates?: { id: number; state: string }[],
+  ) => Promise<void>;
+  syncTrackStatesForSection: (
+    sectionIndex: number,
+    trackStates?: { id: number; state: string }[],
+  ) => Promise<void>;
   setQueuedSection: (index: number | null) => void;
   setSections: (sections: SectionConfig[]) => void;
   setBpm: (bpm: number) => void;
@@ -656,10 +663,79 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     set({ sections });
   },
 
-  setCurrentSection: (index) => {
+  setCurrentSection: async (index, trackStates) => {
     if (!modeController.isActionAllowed("trigger-section")) return;
     sessionRecorder.logEvent("SECTION_CHANGE", { index });
     set({ currentSectionIndex: index, queuedSectionIndex: null });
+    await get().syncTrackStatesForSection(index, trackStates);
+  },
+
+  syncTrackStatesForSection: async (sectionIndex: number, trackStates?: { id: number; state: string }[]) => {
+    const { currentProject, tracks } = get();
+    if (!currentProject?.id) return;
+
+    try {
+      const sectionRecord = await db.sections
+        .where({ projectId: currentProject.id })
+        .filter((s: any) => s.order === sectionIndex)
+        .first();
+      if (!sectionRecord) return;
+
+      const newTracks = await Promise.all(
+        tracks.map(async (t, i) => {
+          const trackRecord = await db.tracks
+            .where({ projectId: currentProject.id, order: i })
+            .first();
+          if (!trackRecord) return t;
+
+          const layers = await db.layers
+            .where({
+              projectId: currentProject.id,
+              trackId: trackRecord.id,
+              sectionId: sectionRecord.id,
+            })
+            .filter((l: any) => !l.deletedAt)
+            .sortBy("order");
+
+          const count = layers.length;
+          let waveformData: number[] = [];
+
+          if (count > 0) {
+            // Get waveform from the last layer
+            const lastLayer = layers[count - 1];
+            const blobRecord = await db.audioBlobs.get(lastLayer.audioBlobId);
+            if (blobRecord && audioEngine.context) {
+              try {
+                const arrayBuffer = await blobRecord.blob.arrayBuffer();
+                const audioBuffer =
+                  await audioEngine.context.decodeAudioData(arrayBuffer);
+                const data = audioBuffer.getChannelData(0);
+                waveformData = audioEngine.computeWaveform(data);
+              } catch (e) {
+                console.error("Error decoding audio for waveform", e);
+              }
+            }
+          }
+
+          const engineState = trackStates?.find((ts) => ts.id === i);
+          const isArmed = engineState ? (engineState.state === "ARMED") : false;
+          const isRecording = engineState ? (engineState.state === "RECORDING" || engineState.state === "POST_ROLL") : false;
+
+          return {
+            ...t,
+            isArmed,
+            isRecording,
+            hasAudio: count > 0,
+            layerCount: count,
+            waveformData,
+          };
+        }),
+      );
+
+      set({ tracks: newTracks });
+    } catch (e) {
+      console.error("Error syncing track states for section", e);
+    }
   },
 
   setQueuedSection: (index) => {
@@ -793,6 +869,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           inputLevels: event.inputLevels || [0, 0, 0, 0],
         });
         break;
+      case "RECORD_START":
+        setTrackState(event.trackId, {
+          isRecording: true,
+          isArmed: false,
+        });
+        break;
       case "RECORD_STOP":
         setTrackState(event.trackId, {
           isRecording: false,
@@ -815,7 +897,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         });
         break;
       case "SECTION_CHANGE":
-        setCurrentSection(event.sectionIndex);
+        setCurrentSection(event.sectionIndex, event.trackStates).catch((e) =>
+          console.error("Error in SECTION_CHANGE handler", e),
+        );
         break;
       case "RTL_MEASURED":
         set({
