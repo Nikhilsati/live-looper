@@ -175,6 +175,12 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           this.isPlaying = false;
           this.currentSample = 0;
           this.sectionSampleOffset = 0;
+          for (const track of this.tracks) {
+            if (track.state === "RECORDING" || track.state === "POST_ROLL") {
+              const sd = track.sections.get(this.currentSectionIndex);
+              track.state = (sd && sd.layers.length > 0) ? "PLAYING" : "IDLE";
+            }
+          }
           break;
 
         case "CONFIG": {

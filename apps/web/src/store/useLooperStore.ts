@@ -637,13 +637,20 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   },
 
   stopPlayback: () => {
-    const { setIsPlaying } = get();
+    const { setIsPlaying, tracks, setTrackState } = get();
     if (!modeController.isActionAllowed("stop-transport")) return;
 
     sessionRecorder.logEvent("STOP");
 
     audioEngine.stop();
     setIsPlaying(false);
+
+    // Reset recording and arm states for any tracks that were actively recording or armed
+    tracks.forEach((track, id) => {
+      if (track.isRecording || track.isArmed) {
+        setTrackState(id, { isRecording: false, isArmed: false });
+      }
+    });
   },
 
   setBpm: (bpm) => {
@@ -1042,35 +1049,40 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     const track = tracks[trackId];
     if (!track) return;
 
-    if (isPlaying && !track.isRecording) {
-      const currentSection = sections[currentSectionIndex];
-      if (currentSection) {
-        const sectionLengthMs =
-          (60 / bpm) * 4 * currentSection.lengthInBars * 1000;
-        let offset = 0;
-        if (sectionProgress > 0.5) {
-          offset = (sectionProgress - 1.0) * sectionLengthMs;
-        } else {
-          offset = sectionProgress * sectionLengthMs;
-        }
-        setLastHitOffset(offset);
+    if (track.isArmed || track.isRecording) {
+      // Disarm or stop recording
+      setTrackState(trackId, { isArmed: false, isRecording: false });
+      audioEngine.armTrack(trackId);
+    } else {
+      // Arm the track
+      setTrackState(trackId, { isArmed: true, isRecording: false });
+      audioEngine.armTrack(trackId);
 
-        setTrackState(trackId, { isArmed: true });
-        // Fallback: auto-clear after 1.5× section length
-        setTimeout(() => {
-          const currentTrack = get().tracks[trackId];
-          if (currentTrack?.isArmed) {
-            setTrackState(trackId, { isArmed: false });
+      if (isPlaying) {
+        const currentSection = sections[currentSectionIndex];
+        if (currentSection) {
+          const sectionLengthMs =
+            (60 / bpm) * 4 * currentSection.lengthInBars * 1000;
+          let offset = 0;
+          if (sectionProgress > 0.5) {
+            offset = (sectionProgress - 1.0) * sectionLengthMs;
+          } else {
+            offset = sectionProgress * sectionLengthMs;
           }
-        }, sectionLengthMs * 1.5);
-      }
-    } else if (track.isRecording) {
-      setTrackState(trackId, { isArmed: false });
-    }
+          setLastHitOffset(offset);
 
-    audioEngine.armTrack(trackId);
-    setTrackState(trackId, { isRecording: !track.isRecording });
+          // Fallback: auto-clear after 1.5× section length
+          setTimeout(() => {
+            const currentTrack = get().tracks[trackId];
+            if (currentTrack?.isArmed) {
+              setTrackState(trackId, { isArmed: false });
+            }
+          }, sectionLengthMs * 1.5);
+        }
+      }
+    }
   },
+
 
   togglePlayback: async () => {
     const { isPlaying, startPlayback, stopPlayback } = get();

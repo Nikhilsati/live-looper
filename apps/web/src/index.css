@@ -214,3 +214,80 @@ button:disabled {
 tbody tr:hover {
   background-color: unset !important;
 }
+
+/* Track Behaviour Animations */
+@keyframes pulse-border {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0px rgba(168, 85, 247, 0.6);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.6);
+  }
+}
+
+@keyframes record-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0px rgba(220, 38, 38, 0.7);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.5);
+  }
+}
+
+@keyframes overdub-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0px rgba(217, 119, 6, 0.7);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.5);
+  }
+}
+
+@keyframes armed-blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes playing-border {
+  0% {
+    border-color: #7c3aed;
+  }
+
+  33% {
+    border-color: #a855f7;
+  }
+
+  66% {
+    border-color: #7c3aed;
+  }
+
+  100% {
+    border-color: #6d28d9;
+  }
+}
+
+@keyframes sweep {
+  0% {
+    left: -8%;
+  }
+
+  100% {
+    left: 108%;
+  }
+}

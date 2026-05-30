@@ -433,6 +433,188 @@ const LayersDrawer = ({
   );
 };
 
+// ─── Track Behavior State Badge ────────────────────────────────────────────────
+const StateBadge = ({ state }: { state: "idle" | "armed" | "recording" | "playing" | "muted" | "overdubbing" }) => {
+  let label = "Idle";
+  let bg = "#1e1e30";
+  let color = "#6b6b8a";
+  let dotColor = "#3a3a5c";
+  let animation = "none";
+
+  if (state === "armed") {
+    label = "Armed";
+    bg = "#2d1a4a";
+    color = "#c084fc";
+    dotColor = "#c084fc";
+    animation = "armed-blink 1.1s ease-in-out infinite";
+  } else if (state === "recording") {
+    label = "Recording";
+    bg = "#3b0f0f";
+    color = "#f87171";
+    dotColor = "#dc2626";
+    animation = "armed-blink 0.8s ease-in-out infinite";
+  } else if (state === "overdubbing") {
+    label = "Overdubbing";
+    bg = "#2a1a00";
+    color = "#fbbf24";
+    dotColor = "#d97706";
+    animation = "armed-blink 0.8s ease-in-out infinite";
+  } else if (state === "playing") {
+    label = "Playing";
+    bg = "#1e1433";
+    color = "#a78bfa";
+    dotColor = "#7c3aed";
+  } else if (state === "muted") {
+    label = "Muted";
+    bg = "#1e1e30";
+    color = "#4a4a6a";
+    dotColor = "#3a3a5c";
+  }
+
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 10,
+        fontWeight: 600,
+        padding: "2px 6px",
+        borderRadius: 5,
+        background: bg,
+        color: color,
+        animation: animation,
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: dotColor,
+          animation: animation,
+        }}
+      />
+      {label}
+    </div>
+  );
+};
+
+// ─── Track Behavior Layer Row Summary ──────────────────────────────────────────
+const LayerRow = ({
+  state,
+  layerCount,
+  accent,
+}: {
+  state: "idle" | "armed" | "recording" | "playing" | "muted" | "overdubbing";
+  layerCount: number;
+  accent: string;
+}) => {
+  let label = `${layerCount} Layer${layerCount !== 1 ? "s" : ""}`;
+  let labelColor = "rgba(255,255,255,0.4)";
+  let waveColor = "#7c3aed";
+  let isRecordingState = false;
+  let isOverdubState = false;
+  let opacity = 1;
+  let borderStyle: React.CSSProperties = {};
+
+  if (state === "recording") {
+    label = "+Layer";
+    labelColor = "#f87171";
+    waveColor = "#dc2626";
+    isRecordingState = true;
+    borderStyle = { border: "0.5px solid #dc2626" };
+  } else if (state === "overdubbing") {
+    label = "+Layer";
+    labelColor = "#d97706";
+    waveColor = "#d97706";
+    isOverdubState = true;
+    borderStyle = { border: "0.5px solid #d97706" };
+  } else if (state === "armed") {
+    opacity = 0.4;
+  } else if (state === "muted") {
+    opacity = 0.4;
+    labelColor = "#4a4a6a";
+  } else if (state === "playing") {
+    borderStyle = { border: "0.5px solid #7c3aed" };
+  }
+
+  // Static mockup heights for mini-wave bars
+  const miniHeights = [6, 10, 8, 14, 7, 12, 9, 5, 11, 8];
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 6,
+        paddingTop: 6,
+        borderTop: "0.5px solid rgba(255,255,255,0.06)",
+        fontSize: 11,
+        color: labelColor,
+        opacity: opacity,
+      }}
+    >
+      <span style={{ fontWeight: 500, minWidth: 44 }}>{label}</span>
+      <div
+        style={{
+          flex: 1,
+          height: 24,
+          background: "#1e1433",
+          borderRadius: 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          position: "relative",
+          ...borderStyle,
+        }}
+      >
+        {/* Sweep progress indicator for active states */}
+        {(isRecordingState || isOverdubState || state === "playing") && (
+          <div
+            style={{
+              position: "absolute",
+              left: "-8%",
+              height: "100%",
+              width: "16%",
+              background: `linear-gradient(90deg, transparent, ${isRecordingState
+                  ? "rgba(220,38,38,0.3)"
+                  : isOverdubState
+                    ? "rgba(217,119,6,0.3)"
+                    : "rgba(124,58,237,0.3)"
+                }, transparent)`,
+              animation: `sweep ${isRecordingState ? "1.4s" : isOverdubState ? "1.8s" : "2s"
+                } linear infinite`,
+              borderRadius: 4,
+            }}
+          />
+        )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+          }}
+        >
+          {miniHeights.map((h, idx) => (
+            <div
+              key={idx}
+              style={{
+                width: 2,
+                height: h,
+                background: waveColor,
+                borderRadius: 1,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
 const TrackPad = ({
   trackId,
@@ -476,7 +658,6 @@ const TrackPad = ({
   }, [track.isArmed]);
 
   // Section-scoped layer count — queried from DB so it's always accurate
-  // regardless of the stale across-all-sections total in the Zustand store.
   const [sectionLayerCount, setSectionLayerCount] = useState(0);
   useEffect(() => {
     const { currentProject } = useLooperStore.getState();
@@ -510,14 +691,12 @@ const TrackPad = ({
     return () => {
       cancelled = true;
     };
-    // Re-run when section changes, or when a recording completes (layerCount tick in store)
   }, [trackId, currentSectionIndex, track.layerCount, track.hasAudio]);
 
   const handleArm = () => {
     toggleTrackRecording(trackId);
   };
   const handleMute = () => {
-    // Route through store — subscriber calls audioEngine.setMute with shadow tracking
     useLooperStore
       .getState()
       .setTrackState(trackId, { isMuted: !track.isMuted });
@@ -572,61 +751,67 @@ const TrackPad = ({
   useEffect(() => () => cancelEraseHold(), []);
 
   // --- Visual state derivation ---
-  const beatDuration = 60 / bpm;
-  const animationStyle = { animationDuration: `${beatDuration}s` };
+  let currentState: "idle" | "armed" | "recording" | "playing" | "muted" | "overdubbing" = "idle";
+  if (track.isArmed) {
+    currentState = "armed";
+  } else if (track.isRecording) {
+    currentState = track.hasAudio ? "overdubbing" : "recording";
+  } else if (track.isMuted) {
+    currentState = "muted";
+  } else if (track.hasAudio) {
+    currentState = "playing";
+  } else {
+    currentState = "idle";
+  }
 
-  const isOverdubbing = !track.isArmed && track.isRecording && track.hasAudio;
-  const isRecording = !track.isArmed && track.isRecording && !track.hasAudio;
+  let cardBorder = isLive ? `1px solid ${palette.border}30` : "1px solid rgba(255,255,255,0.08)";
+  let cardAnimation = "none";
+  let cardBg = isLive ? "rgba(0,0,0,0.4)" : "var(--card)";
 
-  // Pad colour — uses per-track palette for idle/hasAudio states
-  const padColor = track.isArmed
-    ? "rgba(124,58,237,0.12)"
-    : isOverdubbing
-      ? "#4c1d95"
-      : isRecording
-        ? "#7f1d1d"
-        : track.hasAudio
-          ? palette.haudio
-          : palette.idle;
+  if (currentState === "idle") {
+    cardBorder = "1.5px solid #2d2d4a";
+  } else if (currentState === "armed") {
+    cardBorder = "1.5px solid #7c3aed";
+    cardAnimation = "armed-blink 1.1s ease-in-out infinite";
+  } else if (currentState === "recording") {
+    cardBorder = "1.5px solid #dc2626";
+    cardAnimation = "record-pulse 1.2s ease-in-out infinite";
+  } else if (currentState === "playing") {
+    cardBorder = "1.5px solid #7c3aed";
+    cardAnimation = "playing-border 2.5s ease-in-out infinite";
+  } else if (currentState === "muted") {
+    cardBorder = "1.5px solid #3a3a5c";
+  } else if (currentState === "overdubbing") {
+    cardBorder = "1.5px solid #d97706";
+    cardAnimation = "overdub-pulse 1s ease-in-out infinite";
+  }
 
-  const padBorderColor = track.isArmed
-    ? "#a78bfa"
-    : isOverdubbing
-      ? "#7c3aed"
-      : isRecording
-        ? "#ef4444"
-        : track.hasAudio
-          ? palette.borderHasAudio
-          : palette.border;
+  let padBg = "#1e1e30";
+  let padBorder = "1.5px solid #2d2d4a";
+  let padAnimation = "none";
+  let padOpacity = 1;
 
-  const padBorderWidth =
-    track.isArmed || track.isRecording || track.hasAudio ? 2 : 1;
-
-  let padGlowClass = "";
-  if (track.isArmed) padGlowClass = "glow-purple";
-  else if (isOverdubbing) padGlowClass = "glow-purple";
-  else if (isRecording) padGlowClass = "glow-red";
-  else if (track.hasAudio) padGlowClass = palette.glow;
-
-  const statusLabel = track.isArmed
-    ? "◌ ARMED"
-    : isOverdubbing
-      ? "◎ OD"
-      : isRecording
-        ? "● REC"
-        : track.hasAudio
-          ? "▶ LOOP"
-          : "○ EMPTY";
-
-  const statusColor = track.isArmed
-    ? "#c4b5fd"
-    : isOverdubbing
-      ? "#c4b5fd"
-      : isRecording
-        ? "#fca5a5"
-        : track.hasAudio
-          ? palette.accent
-          : "#374151";
+  if (currentState === "idle") {
+    padBg = "#1a1a2e";
+    padBorder = "1.5px solid #2d2d4a";
+  } else if (currentState === "armed") {
+    padBg = "#2d1a4a";
+    padBorder = "1.5px solid #7c3aed";
+    padAnimation = "armed-blink 1.1s ease-in-out infinite";
+  } else if (currentState === "recording") {
+    padBg = "#2a1010";
+    padBorder = "1.5px solid #dc2626";
+  } else if (currentState === "playing") {
+    padBg = "rgba(124, 58, 237, 0.15)";
+    padBorder = "2px solid #7c3aed";
+  } else if (currentState === "muted") {
+    padBg = "#1c1c2a";
+    padBorder = "1.5px solid #2a2a42";
+    padOpacity = 0.6;
+  } else if (currentState === "overdubbing") {
+    padBg = "#1f1508";
+    padBorder = "1.5px solid #d97706";
+  }
 
   const eraseDisabled = !track.hasAudio && !track.isRecording;
 
@@ -640,22 +825,27 @@ const TrackPad = ({
         padding: isLive ? "24px 20px" : "20px 16px",
         flex: 1,
         position: "relative",
-        background: isLive ? "rgba(0,0,0,0.4)" : undefined,
-        border: isLive ? `1px solid ${palette.border}30` : undefined,
+        background: cardBg,
+        border: cardBorder,
+        animation: cardAnimation,
+        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
       {/* Header row */}
       <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <Label
-          style={{
-            fontSize: isLive ? 18 : 14,
-            fontWeight: 800,
-            letterSpacing: isLive ? "0.05em" : "normal",
-            color: palette.accent,
-          }}
-        >
-          TRACK {trackId + 1}
-        </Label>
+        <Stack style={{ gap: 4 }}>
+          <Label
+            style={{
+              fontSize: isLive ? 18 : 14,
+              fontWeight: 800,
+              letterSpacing: isLive ? "0.05em" : "normal",
+              color: palette.accent,
+            }}
+          >
+            TRACK {trackId + 1}
+          </Label>
+          <StateBadge state={currentState} />
+        </Stack>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {showHit && isPlaying && (
             <div
@@ -777,24 +967,25 @@ const TrackPad = ({
         </div>
       </Row>
 
-      {/* Main pad — waveform is overlaid inside as a backdrop */}
+      {/* Main pad — styled according to mockup */}
       <Button
         onClick={handleArm}
-        className={padGlowClass}
         title={
           track.isArmed
             ? "Disarm recording"
-            : isOverdubbing
+            : currentState === "overdubbing"
               ? "Track recording (overdub)"
-              : isRecording
+              : currentState === "recording"
                 ? "Track recording"
                 : track.hasAudio
                   ? "Arm track for recording / overdub"
                   : "Arm track for recording"
         }
         style={{
-          background: padColor,
-          border: `${padBorderWidth}px solid ${padBorderColor}`,
+          background: padBg,
+          border: padBorder,
+          animation: padAnimation,
+          opacity: padOpacity,
           height: isLive ? 220 : 140,
           width: "100%",
           borderRadius: 24,
@@ -805,8 +996,7 @@ const TrackPad = ({
           gap: 8,
           position: "relative",
           overflow: "hidden",
-          transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-          animationDuration: `${beatDuration}s`,
+          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
         {/* Progress Background (Live Mode) */}
@@ -825,77 +1015,161 @@ const TrackPad = ({
           />
         )}
 
-        {/* Waveform backdrop — always inside pad in Live mode */}
-        {track.hasAudio && (
+        {/* Content based on behavior state */}
+        {currentState === "idle" && (
+          <div style={{ color: "#3a3a5c", fontSize: 32, zIndex: 1, userSelect: "none" }}>
+            &#9654;
+          </div>
+        )}
+
+        {currentState === "armed" && (
           <div
             style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              pointerEvents: "none",
-              opacity: isLive ? 0.45 : 0.25,
-              zIndex: 0,
-              padding: isLive ? "0 8px" : "0 12px",
+              color: "#7c3aed",
+              fontSize: 15,
+              textAlign: "center",
+              padding: "0 10px",
+              lineHeight: 1.4,
+              fontWeight: 600,
+              zIndex: 1,
+              animation: "armed-blink 1.1s ease-in-out infinite",
             }}
           >
-            <Waveform
-              data={track.waveformData}
-              progress={sectionProgress}
-              height={isLive ? 180 : 100}
-              bars={sections[currentSectionIndex]?.lengthInBars}
-              variant={isLive ? "minimal" : undefined}
+            Waiting for bar end
+          </div>
+        )}
+
+        {currentState === "recording" && (
+          <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ "--primary-light": "#dc2626", width: "100%", padding: "0 12px" } as any}>
+              <Waveform
+                data={[0.2, 0.4, 0.3, 0.6, 0.25, 0.5, 0.2, 0.45, 0.35, 0.3, 0.55, 0.18, 0.4, 0.33, 0.5, 0.22, 0.42, 0.28, 0.35, 0.2]}
+                progress={sectionProgress}
+                height={isLive ? 180 : 100}
+                bars={sections[currentSectionIndex]?.lengthInBars}
+                variant={isLive ? "minimal" : undefined}
+              />
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: "#dc2626",
+                animation: "armed-blink 0.8s ease-in-out infinite",
+              }}
             />
           </div>
         )}
 
-        {/* Icon — on top of waveform */}
-        <div style={{ position: "relative", zIndex: 1 }}>
-          {track.isArmed ? (
-            <RecordIcon
-              size={isLive ? 56 : 48}
-              style={
-                {
-                  animation:
-                    "pulse var(--anim-speed) ease-in-out infinite alternate",
-                  color: "#a78bfa",
-                  ...animationStyle,
-                } as any
-              }
+        {currentState === "playing" && (
+          <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
+            <div style={{ "--primary-light": palette.accent, width: "100%", padding: "0 12px" } as any}>
+              <Waveform
+                data={track.waveformData}
+                progress={sectionProgress}
+                height={isLive ? 180 : 100}
+                bars={sections[currentSectionIndex]?.lengthInBars}
+                variant={isLive ? "minimal" : undefined}
+              />
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                left: "-8%",
+                height: "100%",
+                width: "16%",
+                background: "linear-gradient(90deg, transparent, rgba(124,58,237,0.25), transparent)",
+                animation: "sweep 2s linear infinite",
+                borderRadius: 4,
+                pointerEvents: "none",
+              }}
             />
-          ) : isOverdubbing ? (
-            <LoopIcon
-              size={isLive ? 56 : 48}
-              style={
-                {
-                  animation: "spin var(--anim-speed) linear infinite",
-                  ...animationStyle,
-                } as any
-              }
+          </div>
+        )}
+
+        {currentState === "muted" && (
+          <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
+            <div style={{ "--primary-light": "#4a4a6a", width: "100%", padding: "0 12px", opacity: 0.3 } as any}>
+              <Waveform
+                data={track.waveformData}
+                progress={sectionProgress}
+                height={isLive ? 180 : 100}
+                bars={sections[currentSectionIndex]?.lengthInBars}
+                variant={isLive ? "minimal" : undefined}
+              />
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                bottom: 8,
+                right: 12,
+                fontSize: 11,
+                color: "#4a4a6a",
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+              }}
+            >
+              MUTED
+            </div>
+          </div>
+        )}
+
+        {currentState === "overdubbing" && (
+          <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
+            {/* Background waveform layer */}
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", opacity: 0.4, padding: "0 12px" }}>
+              <Waveform
+                data={track.waveformData}
+                progress={sectionProgress}
+                height={isLive ? 180 : 100}
+                bars={sections[currentSectionIndex]?.lengthInBars}
+                variant={isLive ? "minimal" : undefined}
+              />
+            </div>
+            {/* Overlay active overdub layer in amber */}
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", opacity: 0.8, padding: "0 12px", "--primary-light": "#d97706" } as any}>
+              <Waveform
+                data={track.waveformData}
+                progress={sectionProgress}
+                height={isLive ? 180 : 100}
+                bars={sections[currentSectionIndex]?.lengthInBars}
+                variant={isLive ? "minimal" : undefined}
+              />
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#d97706",
+                letterSpacing: "0.06em",
+              }}
+            >
+              +DUB
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                left: "-8%",
+                height: "100%",
+                width: "16%",
+                background: "linear-gradient(90deg, transparent, rgba(217,119,6,0.25), transparent)",
+                animation: "sweep 1.8s linear infinite",
+                borderRadius: 4,
+                pointerEvents: "none",
+              }}
             />
-          ) : isRecording ? (
-            <RecordIcon
-              size={isLive ? 56 : 48}
-              style={
-                {
-                  animation:
-                    "pulse var(--anim-speed) ease-in-out infinite alternate",
-                  ...animationStyle,
-                } as any
-              }
-            />
-          ) : track.hasAudio ? (
-            <PlayIcon size={isLive ? 56 : 48} />
-          ) : (
-            <MicrophoneIcon
-              size={isLive ? 52 : 48}
-              color="rgba(255,255,255,0.2)"
-            />
-          )}
-        </div>
+          </div>
+        )}
       </Button>
 
-      {/* Bottom controls — M/S pill + Undo (Erase moved to header in Live mode) */}
+      {/* Bottom controls — M/S pill + Undo */}
       <Row style={{ gap: 10 }}>
         {/* M / S — joined segmented control */}
         <ButtonGroup style={{ flex: 1, height: 60 }}>
@@ -905,7 +1179,18 @@ const TrackPad = ({
             size="md"
             variant={track.isMuted ? "active-warning" : "outline"}
             title={track.isMuted ? "Unmute track" : "Mute track"}
-            style={{ flex: 1, height: "100%" }}
+            style={{
+              flex: 1,
+              height: "100%",
+              ...(track.isMuted
+                ? {
+                  background: "#3a2a5e",
+                  color: "#c084fc",
+                  borderColor: "#7c3aed",
+                  boxShadow: "0 0 10px rgba(124, 58, 237, 0.4)",
+                }
+                : {}),
+            }}
           >
             M
           </Button>
@@ -969,6 +1254,15 @@ const TrackPad = ({
         />
       )}
 
+      {/* Layer Row Summary */}
+      {!showLayers && (track.layerCount > 0 || currentState === "recording" || currentState === "overdubbing") && (
+        <LayerRow
+          state={currentState}
+          layerCount={sectionLayerCount}
+          accent={palette.accent}
+        />
+      )}
+
       {/* Layers Drawer — expands inline at the bottom of the card */}
       {showLayers && (
         <LayersDrawer
@@ -979,6 +1273,7 @@ const TrackPad = ({
       )}
     </Card>
   );
+
 };
 
 // ─── Section Progress Ring ─────────────────────────────────────────────────────
