@@ -52,10 +52,10 @@ function autoCorrelate(buf: Float32Array, sampleRate: number) {
       break;
     }
 
-  let newBuf = buf.slice(r1, r2);
-  let size = newBuf.length;
+  const newBuf = buf.slice(r1, r2);
+  const size = newBuf.length;
 
-  let c = new Array(size).fill(0);
+  const c = new Array(size).fill(0);
   for (let i = 0; i < size; i++) {
     for (let j = 0; j < size - i; j++) {
       c[i] = c[i] + newBuf[j] * newBuf[j + i];
@@ -73,11 +73,11 @@ function autoCorrelate(buf: Float32Array, sampleRate: number) {
     }
   }
   let T0 = maxpos;
-  let x1 = c[T0 - 1],
+  const x1 = c[T0 - 1],
     x2 = c[T0],
     x3 = c[T0 + 1];
-  let a = (x1 + x3 - 2 * x2) / 2;
-  let b = (x3 - x1) / 2;
+  const a = (x1 + x3 - 2 * x2) / 2;
+  const b = (x3 - x1) / 2;
   if (a) T0 = T0 - b / (2 * a);
 
   return sampleRate / T0;

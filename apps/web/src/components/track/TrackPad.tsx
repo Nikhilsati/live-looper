@@ -183,7 +183,7 @@ export const TrackPad = ({
 
   let cardBorder = isLive ? `1px solid ${palette.border}30` : "1px solid rgba(255,255,255,0.08)";
   let cardAnimation = "none";
-  let cardBg = isLive ? "rgba(0,0,0,0.4)" : "var(--card)";
+  const cardBg = isLive ? "rgba(0,0,0,0.4)" : "var(--card)";
 
   if (currentState === "idle") {
     cardBorder = "1.5px solid #2d2d4a";
