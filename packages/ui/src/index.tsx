@@ -1,6 +1,7 @@
 /// <reference types="@live-looper/types" />
 import React from "react";
 import "./UI.css";
+import { cva, type VariantProps } from "class-variance-authority";
 
 interface BaseProps extends React.HTMLAttributes<
   HTMLDivElement | HTMLSpanElement | HTMLHeadingElement | HTMLParagraphElement
@@ -10,14 +11,25 @@ interface BaseProps extends React.HTMLAttributes<
   style?: React.CSSProperties;
 }
 
+export const cardVariants = cva("card", {
+  variants: {},
+  defaultVariants: {},
+});
+
+export interface CardProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof cardVariants> {
+  children?: React.ReactNode;
+}
+
 export const Card = ({
   children,
-  className = "",
+  className,
   style,
   ...props
-}: BaseProps) => (
+}: CardProps) => (
   <div
-    className={`card ${className}`}
+    className={cardVariants({ className })}
     style={{ borderRadius: "var(--radius-large)", ...style }}
     {...props}
   >
@@ -25,32 +37,44 @@ export const Card = ({
   </div>
 );
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?:
-    | "primary"
-    | "success"
-    | "danger"
-    | "warning"
-    | "accent"
-    | "ghost"
-    | "active-primary"
-    | "active-warning"
-    | "outline";
-  size?: "sm" | "md" | "lg" | "none";
-}
+export const buttonVariants = cva("", {
+  variants: {
+    variant: {
+      primary: "primary",
+      success: "success",
+      danger: "danger",
+      warning: "warning",
+      accent: "accent",
+      ghost: "ghost",
+      "active-primary": "active-primary",
+      "active-warning": "active-warning",
+      outline: "outline",
+    },
+    size: {
+      sm: "small",
+      md: "",
+      lg: "",
+      none: "",
+    },
+  },
+  defaultVariants: {
+    size: "none",
+  },
+});
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
 
 export const Button = ({
   children,
   variant,
-  size = "none",
-  className = "",
+  size,
+  className,
   ...props
-}: React.PropsWithChildren<ButtonProps>) => {
+}: ButtonProps) => {
   return (
-    <button
-      className={`${variant || ""} ${size === "sm" ? "small" : ""} ${className}`}
-      {...props}
-    >
+    <button className={buttonVariants({ variant, size, className })} {...props}>
       {children}
     </button>
   );
@@ -93,14 +117,29 @@ export const Switch = ({
   </label>
 );
 
+export const badgeVariants = cva("badge", {
+  variants: {
+    variant: {
+      live: "success",
+    },
+  },
+  defaultVariants: {},
+});
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {
+  children?: React.ReactNode;
+}
+
 export const Badge = ({
   children,
   variant,
-  className = "",
+  className,
   ...props
-}: BaseProps & { variant?: "live" }) => (
+}: BadgeProps) => (
   <span
-    className={`badge ${variant === "live" ? "success" : ""} ${className}`}
+    className={badgeVariants({ variant, className })}
     style={{ fontSize: "10px" }}
     {...props}
   >
@@ -230,23 +269,37 @@ export const Modal = ({
   </div>
 );
 
-export const Waveform = ({
-  data,
-  progress,
-  className = "",
-  height = 36,
-  bars = 0,
-  beatsPerBar = 4,
-  variant = "default",
-}: {
+export const waveformVariants = cva("ui-waveform", {
+  variants: {
+    variant: {
+      default: "",
+      minimal: "",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+  },
+});
+
+export interface WaveformProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof waveformVariants> {
   data: number[];
   progress: number;
-  className?: string;
   height?: number;
   bars?: number;
   beatsPerBar?: number;
-  variant?: "default" | "minimal";
-}) => {
+}
+
+export const Waveform = ({
+  data,
+  progress,
+  className,
+  height = 36,
+  bars = 0,
+  beatsPerBar = 4,
+  variant,
+}: WaveformProps) => {
   if (!data.length) return null;
   const max = Math.max(...data, 0.01);
   const activeIdx = Math.floor(progress * data.length);
@@ -560,16 +613,28 @@ export const Knob = ({
 
 // ─── Level Meter ──────────────────────────────────────────────────────────────
 
-export interface LevelMeterProps {
-  value?: number; // 0 to 1
-  values?: number[]; // Array of 0 to 1 values for multi-channel
-  analyser?: AnalyserNode | null; // Optional AnalyserNode for live mic input
-  vertical?: boolean;
-  bars?: number; // Number of LED bars (for segmented layout), default 16
+export const levelMeterVariants = cva("ui-level-meter", {
+  variants: {
+    orientation: {
+      horizontal: "horizontal",
+      vertical: "vertical",
+    },
+  },
+  defaultVariants: {
+    orientation: "horizontal",
+  },
+});
+
+export interface LevelMeterProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "color">,
+    VariantProps<typeof levelMeterVariants> {
+  value?: number;
+  values?: number[];
+  analyser?: AnalyserNode | null;
+  vertical?: boolean; // legacy support mapped to orientation
+  bars?: number;
   variant?: "segmented" | "continuous";
-  color?: string | string[]; // Accent color override (single color, or array of colors per channel)
-  className?: string;
-  style?: React.CSSProperties;
+  color?: string | string[];
 }
 
 export const LevelMeter = ({
@@ -580,8 +645,9 @@ export const LevelMeter = ({
   bars = 16,
   variant = "segmented",
   color,
-  className = "",
+  className,
   style,
+  ...props
 }: LevelMeterProps) => {
   const [localLevel, setLocalLevel] = React.useState(0);
   const rafRef = React.useRef<number>(0);
@@ -609,10 +675,11 @@ export const LevelMeter = ({
   }, [analyser, value]);
 
   const channels = values !== undefined ? values : [analyser ? localLevel : value];
+  const orientation = vertical ? "vertical" : "horizontal";
 
   return (
     <div
-      className={`ui-level-meter ${vertical ? "vertical" : "horizontal"} ${className}`}
+      className={levelMeterVariants({ orientation, className })}
       style={{
         display: "flex",
         flexDirection: vertical ? "row" : "column", // Channels side-by-side or stacked
@@ -622,6 +689,7 @@ export const LevelMeter = ({
         boxSizing: "border-box",
         ...style,
       }}
+      {...props}
     >
       {channels.map((chVal, chIdx) => {
         const level = Math.min(1, Math.max(0, chVal));

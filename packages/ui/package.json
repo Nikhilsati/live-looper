@@ -10,7 +10,8 @@
     },
     "dependencies": {
         "@knadh/oat": "^0.3.0",
-        "@phosphor-icons/react": "^2.1.10"
+        "@phosphor-icons/react": "^2.1.10",
+        "class-variance-authority": "^0.7.1"
     },
     "devDependencies": {
         "@live-looper/types": "workspace:*",
