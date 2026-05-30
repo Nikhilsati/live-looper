@@ -76,7 +76,7 @@ export const RecordingSession: Story = {
     useEffect(() => {
       useLooperStore.setState({
         isPlaying: true,
-        mode: "planning",
+        mode: "practice",
         bpm: 100,
         currentSectionIndex: 0,
         queuedSectionIndex: null,

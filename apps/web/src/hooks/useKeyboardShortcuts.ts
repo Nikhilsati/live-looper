@@ -33,7 +33,8 @@ export const useKeyboardShortcuts = () => {
       // R -> Toggle Session Recording
       if (e.code === "KeyR") {
         e.preventDefault();
-        const { isPlaying } = useLooperStore.getState();
+        const { isPlaying, mode } = useLooperStore.getState();
+        if (mode === "planning") return;
         const { isSessionArmed, setIsSessionArmed, toggleRecording } =
           useSessionStore.getState();
 

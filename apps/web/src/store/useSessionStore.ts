@@ -30,14 +30,21 @@ interface SessionState {
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
-  isSessionArmed: true,
+  isSessionArmed: false,
   isSessionRecording: false,
   isSessionReplaying: false,
   sessions: [],
   recordingDuration: 0,
   recordingStartTime: null,
 
-  setIsSessionArmed: (v) => set({ isSessionArmed: v }),
+  setIsSessionArmed: (v) => {
+    const looperStore = useLooperStore.getState();
+    if (looperStore.mode === "planning") {
+      set({ isSessionArmed: false });
+    } else {
+      set({ isSessionArmed: v });
+    }
+  },
 
   fetchSessions: async (projectId) => {
     const sessions = await sessionService.getSessionsForProject(projectId);
@@ -46,6 +53,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   startRecording: async () => {
     const looperStore = useLooperStore.getState();
+    if (looperStore.mode === "planning") return;
     const snapshot: FrozenProjectSnapshot = {
       sections: JSON.parse(JSON.stringify(looperStore.sections)),
       tracks: JSON.parse(JSON.stringify(looperStore.tracks)),
@@ -105,6 +113,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   toggleRecording: async () => {
+    const looperStore = useLooperStore.getState();
+    if (looperStore.mode === "planning") return;
     const { isSessionRecording, startRecording, stopRecording } = get();
     if (isSessionRecording) {
       await stopRecording();
@@ -268,7 +278,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }
         looperStore.stopPlayback();
       } else {
-        if (isSessionArmed && !isSessionRecording) {
+        if (looperStore.mode !== "planning" && isSessionArmed && !isSessionRecording) {
           await startRecording();
         }
         await looperStore.startPlayback();

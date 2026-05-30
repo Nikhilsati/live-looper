@@ -1731,7 +1731,7 @@ export const GlobalActionBar = () => {
         />
 
         {/* ── Record Timer Overlay ── */}
-        {isSessionRecording && (
+        {mode !== "planning" && isSessionRecording && (
           <div
             style={{
               position: "absolute",
@@ -1766,46 +1766,48 @@ export const GlobalActionBar = () => {
         )}
 
         {/* ── Record Button ── */}
-        <Button
-          onClick={handleRecordClick}
-          title={
-            isSessionRecording
-              ? "Stop Session Recording"
-              : isSessionArmed
-                ? "Disarm Session Recording"
-                : "Arm Session Recording"
-          }
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            flexShrink: 0,
-            background: isSessionRecording
-              ? "#ef4444"
-              : isSessionArmed
-                ? "rgba(239, 68, 68, 0.12)"
-                : "transparent",
-            border:
-              isSessionArmed || isSessionRecording
-                ? "2px solid #ef4444"
-                : "2px solid rgba(255,255,255,0.08)",
-            color: isSessionRecording
-              ? "white"
-              : isSessionArmed
+        {mode !== "planning" && (
+          <Button
+            onClick={handleRecordClick}
+            title={
+              isSessionRecording
+                ? "Stop Session Recording"
+                : isSessionArmed
+                  ? "Disarm Session Recording"
+                  : "Arm Session Recording"
+            }
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              flexShrink: 0,
+              background: isSessionRecording
                 ? "#ef4444"
-                : "rgba(255,255,255,0.3)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: isSessionRecording
-              ? "0 0 20px rgba(239, 68, 68, 0.4)"
-              : "none",
-            marginLeft: 4,
-          }}
-        >
-          <RecordIcon size={24} />
-        </Button>
+                : isSessionArmed
+                  ? "rgba(239, 68, 68, 0.12)"
+                  : "transparent",
+              border:
+                isSessionArmed || isSessionRecording
+                  ? "2px solid #ef4444"
+                  : "2px solid rgba(255,255,255,0.08)",
+              color: isSessionRecording
+                ? "white"
+                : isSessionArmed
+                  ? "#ef4444"
+                  : "rgba(255,255,255,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              boxShadow: isSessionRecording
+                ? "0 0 20px rgba(239, 68, 68, 0.4)"
+                : "none",
+              marginLeft: 4,
+            }}
+          >
+            <RecordIcon size={24} />
+          </Button>
+        )}
         {/* ── Play / Stop — dominant element ── */}
         <Button
           data-testid="transport-button"

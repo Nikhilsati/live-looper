@@ -25,6 +25,7 @@ import {
 } from "@live-looper/storage";
 import { sessionRecorder } from "./SessionRecorder";
 import { uiAlert } from "./useDialogStore";
+import { useSessionStore } from "./useSessionStore";
 interface LooperStore extends EngineState {
   projectList: ProjectRecord[];
   currentProject: ProjectRecord | null;
@@ -609,6 +610,13 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
       audioEngine.setMode(targetMode);
       if (targetMode === "live" && snapshot) {
         audioEngine.enterLiveMode(snapshot);
+      }
+      if (targetMode === "planning") {
+        const sessionStore = useSessionStore.getState();
+        if (sessionStore.isSessionRecording) {
+          await sessionStore.stopRecording();
+        }
+        sessionStore.setIsSessionArmed(false);
       }
     } else if (error) {
       uiAlert(error);
