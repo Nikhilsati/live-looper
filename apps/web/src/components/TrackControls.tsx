@@ -580,10 +580,10 @@ const LayerRow = ({
               height: "100%",
               width: "16%",
               background: `linear-gradient(90deg, transparent, ${isRecordingState
-                  ? "rgba(220,38,38,0.3)"
-                  : isOverdubState
-                    ? "rgba(217,119,6,0.3)"
-                    : "rgba(124,58,237,0.3)"
+                ? "rgba(220,38,38,0.3)"
+                : isOverdubState
+                  ? "rgba(217,119,6,0.3)"
+                  : "rgba(124,58,237,0.3)"
                 }, transparent)`,
               animation: `sweep ${isRecordingState ? "1.4s" : isOverdubState ? "1.8s" : "2s"
                 } linear infinite`,
@@ -1076,18 +1076,7 @@ export const TrackPad = ({
                 variant={isLive ? "minimal" : undefined}
               />
             </div>
-            <div
-              style={{
-                position: "absolute",
-                left: "-8%",
-                height: "100%",
-                width: "16%",
-                background: "linear-gradient(90deg, transparent, rgba(124,58,237,0.25), transparent)",
-                animation: "sweep 2s linear infinite",
-                borderRadius: 4,
-                pointerEvents: "none",
-              }}
-            />
+
           </div>
         )}
 
