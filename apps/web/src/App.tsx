@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Home } from "./components/Home";
 import { ProjectDashboard } from "./components/ProjectDashboard";
 import { LooperWorkspace } from "./components/LooperWorkspace";
 import { GuitarPracticeView } from "./components/GuitarPracticeView";
@@ -20,7 +21,8 @@ function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<ProjectDashboard />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/looper" element={<ProjectDashboard />} />
         <Route path="/projects/:id" element={<LooperWorkspace />} />
         <Route path="/practice" element={<GuitarPracticeView />} />
         <Route path="/icons" element={<IconShowcase />} />
