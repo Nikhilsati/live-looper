@@ -8,7 +8,7 @@ import type {
   LayerRecord,
   AudioBlobRecord,
 } from "@live-looper/types";
-import { FXBuilder, TRACK_COUNT } from "@live-looper/types";
+import { TRACK_COUNT } from "@live-looper/types";
 
 export class ProjectService {
 
@@ -457,7 +457,7 @@ export class ProjectService {
   }
 
   private getDefaultFX() {
-    return new FXBuilder().build();
+    return {};
   }
 }
 

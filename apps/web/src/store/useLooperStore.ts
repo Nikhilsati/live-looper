@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "@live-looper/audio-engine";
 import type {
   EngineState,
   TrackState,

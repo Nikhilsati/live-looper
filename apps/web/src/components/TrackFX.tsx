@@ -1117,7 +1117,7 @@ interface FxModuleProps {
   /** Gap between knobs in px */
   knobGap?: number;
   // For Presets
-  moduleType?: keyof FXState;
+  moduleType?: string;
   currentFxState?: any;
   onLoadPreset?: (state: any) => void;
 }

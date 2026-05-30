@@ -85,16 +85,7 @@ export interface TremoloSettings {
 }
 
 export interface FXState {
-  eq: EQSettings;
-  compressor: CompressorSettings;
-  drive: DriveSettings;
-  chorus: ChorusSettings;
-  phaser: PhaserSettings;
-  tremolo: TremoloSettings;
-  delay: DelaySettings;
-  reverb: ReverbSettings;
-  noiseGate: NoiseGateSettings;
-  pan: number;
+  [effectId: string]: any;
 }
 
 export interface Track {
@@ -338,108 +329,7 @@ export type EngineEvent =
       };
     };
 
-export class FXBuilder {
-  private state: FXState;
-  constructor(initialState?: Partial<FXState>) {
-    this.state = {
-      eq: { low: 0, mid: 0, midFreq: 1000, high: 0 },
-      compressor: {
-        threshold: -24,
-        ratio: 4,
-        attack: 0.003,
-        release: 0.25,
-        gain: 0,
-      },
-      drive: { amount: 0, tone: 1, enabled: false },
-      chorus: { rate: 0.5, depth: 0.4, mix: 0.5, voices: 1, enabled: false },
-      phaser: {
-        rate: 0.5,
-        depth: 0.5,
-        feedback: 0.5,
-        stages: 4,
-        enabled: false,
-      },
-      tremolo: { rate: 5, depth: 0.5, sync: false, enabled: false },
-      delay: {
-        time: 0.5,
-        feedback: 0.3,
-        mix: 0,
-        mode: "mono",
-        filter: 1,
-        enabled: false,
-      },
-      reverb: { mix: 0, size: 1.5, predelay: 0, damping: 1, enabled: false },
-      noiseGate: { threshold: -50, attack: 0.01, release: 0.1, enabled: false },
-      pan: 0,
-    };
-
-    if (initialState) {
-      this.merge(initialState);
-    }
-  }
-
-  withEQ(eq: Partial<EQSettings>) {
-    Object.assign(this.state.eq, eq);
-    return this;
-  }
-  withCompressor(comp: Partial<CompressorSettings>) {
-    Object.assign(this.state.compressor, comp);
-    return this;
-  }
-  withDrive(drive: Partial<DriveSettings>) {
-    Object.assign(this.state.drive, drive);
-    return this;
-  }
-  withChorus(chorus: Partial<ChorusSettings>) {
-    Object.assign(this.state.chorus, chorus);
-    return this;
-  }
-  withPhaser(phaser: Partial<PhaserSettings>) {
-    Object.assign(this.state.phaser, phaser);
-    return this;
-  }
-  withTremolo(tremolo: Partial<TremoloSettings>) {
-    Object.assign(this.state.tremolo, tremolo);
-    return this;
-  }
-  withDelay(delay: Partial<DelaySettings>) {
-    Object.assign(this.state.delay, delay);
-    return this;
-  }
-  withReverb(reverb: Partial<ReverbSettings>) {
-    Object.assign(this.state.reverb, reverb);
-    return this;
-  }
-  withNoiseGate(gate: Partial<NoiseGateSettings>) {
-    Object.assign(this.state.noiseGate, gate);
-    return this;
-  }
-  withPan(pan: number) {
-    this.state.pan = pan;
-    return this;
-  }
-
-  merge(partial: Partial<FXState>) {
-    if (partial.eq) Object.assign(this.state.eq, partial.eq);
-    if (partial.compressor)
-      Object.assign(this.state.compressor, partial.compressor);
-    if (partial.drive) Object.assign(this.state.drive, partial.drive);
-    if (partial.chorus) Object.assign(this.state.chorus, partial.chorus);
-    if (partial.phaser) Object.assign(this.state.phaser, partial.phaser);
-    if (partial.tremolo) Object.assign(this.state.tremolo, partial.tremolo);
-    if (partial.delay) Object.assign(this.state.delay, partial.delay);
-    if (partial.reverb) Object.assign(this.state.reverb, partial.reverb);
-    if (partial.noiseGate)
-      Object.assign(this.state.noiseGate, partial.noiseGate);
-    if (partial.pan !== undefined) this.state.pan = partial.pan;
-    return this;
-  }
-
-  build(): FXState {
-    // Return a deep clone to prevent reference mutations
-    return JSON.parse(JSON.stringify(this.state));
-  }
-}
+// FXBuilder moved to @live-looper/audio-engine
 
 export interface AudioWorkletProcessor {
   readonly port: MessagePort;

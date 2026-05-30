@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { TrackPad, LiveTrackPad } from "../../../../web/src/components/TrackControls";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "@live-looper/audio-engine";
 
 const meta: Meta<typeof TrackPad> = {
   title: "Web/TrackPad",

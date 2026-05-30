@@ -40,7 +40,7 @@ import { MasterClock } from "./MasterClock";
 import { engineEvents } from "./EventBus";
 import { MasterBus } from "./MasterBus";
 import { db, projectService } from "@live-looper/storage";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "./FXBuilder";
 
 class AudioEngine {
   context: AudioContext | null = null;

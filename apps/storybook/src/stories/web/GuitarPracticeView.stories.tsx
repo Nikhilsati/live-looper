@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { GuitarPracticeView } from "../../../../web/src/components/GuitarPracticeView";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "@live-looper/audio-engine";
 import { MemoryRouter } from "react-router-dom";
 
 const meta: Meta<typeof GuitarPracticeView> = {

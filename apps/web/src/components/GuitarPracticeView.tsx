@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { audioEngine } from "@live-looper/audio-engine";
 import { useLooperStore } from "../store/useLooperStore";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "@live-looper/audio-engine";
 import { TrackFX } from "./TrackFX";
 import { Tuner } from "./Tuner";
 import { GuitarIcon, MinusIcon, PlusIcon } from "@phosphor-icons/react";

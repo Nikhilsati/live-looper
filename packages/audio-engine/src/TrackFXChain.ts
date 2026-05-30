@@ -1,17 +1,8 @@
 import type { FXState } from "@live-looper/types";
 import {
   BaseEffect,
-  NoiseGateEffect,
-  EQEffect,
-  CompressorEffect,
-  DriveEffect,
-  ChorusEffect,
-  PhaserEffect,
-  TremoloEffect,
-  DelayEffect,
-  ReverbEffect,
-  PanEffect,
 } from "./effects";
+import { EffectRegistry } from "./effects/EffectRegistry";
 
 /**
  * TrackFXChain — thin orchestrator for the serial audio effect chain.
@@ -31,50 +22,23 @@ export class TrackFXChain {
   /** Chain-level output. Connect this to the next destination. */
   public output: GainNode;
 
-  // ── Effect instances ────────────────────────────────────────────────────
-  public readonly noiseGate: NoiseGateEffect;
-  public readonly eq: EQEffect;
-  public readonly compressor: CompressorEffect;
-  public readonly drive: DriveEffect;
-  public readonly chorus: ChorusEffect;
-  public readonly phaser: PhaserEffect;
-  public readonly tremolo: TremoloEffect;
-  public readonly delay: DelayEffect;
-  public readonly reverb: ReverbEffect;
-  public readonly pan: PanEffect;
+  /** Map of effect ID to instantiated BaseEffect */
+  public readonly activeEffects = new Map<string, BaseEffect>();
 
   /** Ordered effect array — the serial processing chain. */
-  private effects: BaseEffect[];
+  private effects: BaseEffect[] = [];
 
   constructor(context: AudioContext) {
     this.input = context.createGain();
     this.output = context.createGain();
 
-    // Instantiate effects
-    this.noiseGate = new NoiseGateEffect(context);
-    this.eq = new EQEffect(context);
-    this.compressor = new CompressorEffect(context);
-    this.drive = new DriveEffect(context);
-    this.chorus = new ChorusEffect(context);
-    this.phaser = new PhaserEffect(context);
-    this.tremolo = new TremoloEffect(context);
-    this.delay = new DelayEffect(context);
-    this.reverb = new ReverbEffect(context);
-    this.pan = new PanEffect(context);
-
-    // Default signal chain order
-    this.effects = [
-      this.noiseGate,
-      this.eq,
-      this.compressor,
-      this.drive,
-      this.chorus,
-      this.phaser,
-      this.tremolo,
-      this.delay,
-      this.reverb,
-      this.pan,
-    ];
+    // Instantiate effects dynamically
+    const definitions = EffectRegistry.getAll();
+    for (const def of definitions) {
+      const instance = def.createNode(context);
+      this.activeEffects.set(def.id, instance);
+      this.effects.push(instance);
+    }
 
     this.wireChain();
   }
@@ -116,10 +80,10 @@ export class TrackFXChain {
    * fully rewired without allocating any new nodes.
    *
    * @example
-   * // Move reverb before delay
+   * // Move reverb before delay (assuming IDs map to instances)
    * chain.reorder([
-   *   chain.noiseGate, chain.eq, chain.compressor, chain.drive,
-   *   chain.chorus, chain.phaser, chain.reverb, chain.delay, chain.pan,
+   *   chain.activeEffects.get("reverb"),
+   *   chain.activeEffects.get("delay"),
    * ]);
    */
   reorder(newOrder: BaseEffect[]): void {
@@ -134,15 +98,10 @@ export class TrackFXChain {
    * do so internally without touching the chain.
    */
   update(state: FXState, bpm: number): void {
-    this.noiseGate.update(state.noiseGate, bpm);
-    this.eq.update(state.eq, bpm);
-    this.compressor.update(state.compressor, bpm);
-    this.drive.update(state.drive, bpm);
-    this.chorus.update(state.chorus, bpm);
-    this.phaser.update(state.phaser, bpm);
-    this.tremolo.update(state.tremolo, bpm);
-    this.delay.update(state.delay, bpm);
-    this.reverb.update(state.reverb, bpm);
-    this.pan.update(state.pan, bpm);
+    for (const [id, effect] of Array.from(this.activeEffects.entries())) {
+      if (state[id] !== undefined) {
+        effect.update(state[id], bpm);
+      }
+    }
   }
 }

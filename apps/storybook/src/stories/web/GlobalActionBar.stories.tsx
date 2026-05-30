@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { GlobalActionBar } from "../../../../web/src/components/TrackControls";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
 import { useSessionStore } from "../../../../web/src/store/useSessionStore";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "@live-looper/audio-engine";
 
 const meta: Meta<typeof GlobalActionBar> = {
   title: "Web/GlobalActionBar",

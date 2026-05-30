@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { LooperWorkspace } from "../../../../web/src/components/LooperWorkspace";
 import { useLooperStore } from "../../../../web/src/store/useLooperStore";
 import { useSessionStore } from "../../../../web/src/store/useSessionStore";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder } from "@live-looper/audio-engine";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 
 const meta: Meta<typeof LooperWorkspace> = {
