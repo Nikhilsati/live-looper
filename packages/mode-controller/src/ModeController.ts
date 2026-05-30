@@ -4,6 +4,49 @@ import type {
   EngineState,
 } from "@live-looper/types";
 
+export const MODE_PERMISSIONS: Record<Mode, string[]> = {
+  live: [
+    "trigger-section",
+    "record",
+    "overdub",
+    "clear-track",
+    "mute",
+    "unmute",
+    "stop-transport",
+    "start-transport",
+    "record-session",
+  ],
+  practice: [
+    "trigger-section",
+    "record",
+    "overdub",
+    "clear-track",
+    "mute",
+    "unmute",
+    "stop-transport",
+    "start-transport",
+    "edit-bpm",
+    "record-session",
+  ],
+  planning: [
+    "add-section",
+    "remove-section",
+    "rename-section",
+    "reorder-sections",
+    "change-routing",
+    "modify-fx-config",
+    "trigger-section",
+    "record",
+    "overdub",
+    "clear-track",
+    "mute",
+    "unmute",
+    "stop-transport",
+    "start-transport",
+    "edit-bpm",
+  ],
+};
+
 export class ModeController {
   private static instance: ModeController;
   private currentMode: Mode = "planning";
@@ -84,35 +127,13 @@ export class ModeController {
   /**
    * Authority model: Check if an action is allowed in the current mode.
    */
-  isActionAllowed(action: string): boolean {
-    switch (this.currentMode) {
-      case "live":
-        return [
-          "trigger-section",
-          "record",
-          "overdub",
-          "clear-track",
-          "mute",
-          "unmute",
-          "stop-transport",
-          "start-transport",
-        ].includes(action);
-
-      case "practice":
-        const restrictedInPractice = [
-          "add-section",
-          "remove-section",
-          "reorder-sections",
-          "change-routing",
-          "modify-fx-config",
-        ];
-        return !restrictedInPractice.includes(action);
-
-      case "planning":
-      default:
-        return true;
-    }
+  isActionAllowed(action: string, overrideMode?: Mode): boolean {
+    const mode = overrideMode ?? this.currentMode;
+    return MODE_PERMISSIONS[mode]?.includes(action) ?? false;
   }
 }
 
 export const modeController = ModeController.getInstance();
+
+export const can = (action: string, mode?: Mode) =>
+  modeController.isActionAllowed(action, mode);

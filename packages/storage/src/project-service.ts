@@ -8,9 +8,46 @@ import type {
   LayerRecord,
   AudioBlobRecord,
 } from "@live-looper/types";
-import { FXBuilder } from "@live-looper/types";
+import { FXBuilder, TRACK_COUNT } from "@live-looper/types";
 
 export class ProjectService {
+
+  /**
+   * Walks all sections downstream of `sectionId` (by order) that are linked
+   * to the given track, and calls `callback` for each linked section.
+   * Stops at the first unlinked section (chain broken).
+   *
+   * Must be called inside a Dexie transaction that includes `db.sections` and
+   * `db.tracks`.
+   */
+  private async _propagateToLinkedSections(
+    projectId: string,
+    trackId: string,
+    sectionId: string,
+    callback: (nextSection: SectionRecord) => Promise<void>,
+  ): Promise<void> {
+    const section = await db.sections.get(sectionId);
+    const track = await db.tracks.get(trackId);
+    if (!section || !track) return;
+
+    const trackIndex = track.order;
+    const allSections = await db.sections.where({ projectId }).sortBy("order");
+    const startIndex = allSections.findIndex((s) => s.id === sectionId);
+    if (startIndex === -1) return;
+
+    for (let i = startIndex + 1; i < allSections.length; i++) {
+      const nextSection = allSections[i];
+      const isLinked = nextSection.trackLinks
+        ? nextSection.trackLinks[trackIndex]
+        : true;
+      if (isLinked) {
+        await callback(nextSection);
+      } else {
+        break; // chain broken
+      }
+    }
+  }
+
   async createProject(name: string, bpm: number): Promise<string> {
     const projectId = uuidv4();
     const now = Date.now();
@@ -38,8 +75,8 @@ export class ProjectService {
       async () => {
         await db.projects.add(project);
 
-        // Default 4 tracks
-        for (let i = 0; i < 4; i++) {
+        // Default TRACK_COUNT tracks
+        for (let i = 0; i < TRACK_COUNT; i++) {
           const track: TrackRecord = {
             id: uuidv4(),
             projectId,
@@ -151,43 +188,29 @@ export class ProjectService {
         await db.layers.add(layer);
 
         // Propagate to linked downstream sections
-        const section = await db.sections.get(sectionId);
-        const track = await db.tracks.get(trackId);
-        if (section && track) {
-          const trackIndex = track.order;
-          const allSections = await db.sections
-            .where({ projectId })
-            .sortBy("order");
-          const startIndex = allSections.findIndex((s) => s.id === sectionId);
-          if (startIndex !== -1) {
-            for (let i = startIndex + 1; i < allSections.length; i++) {
-              const nextSection = allSections[i];
-              const isLinked = nextSection.trackLinks
-                ? nextSection.trackLinks[trackIndex]
-                : true;
-              if (isLinked) {
-                const nextActiveCount = await db.layers
-                  .where({ projectId, trackId, sectionId: nextSection.id })
-                  .filter((l) => !l.deletedAt)
-                  .count();
-                const propagatedLayer: LayerRecord = {
-                  id: uuidv4(),
-                  projectId,
-                  trackId,
-                  sectionId: nextSection.id,
-                  audioBlobId,
-                  rawAudioBlobId,
-                  gain,
-                  order: nextActiveCount,
-                  deletedAt: null,
-                };
-                await db.layers.add(propagatedLayer);
-              } else {
-                break;
-              }
-            }
-          }
-        }
+        await this._propagateToLinkedSections(
+          projectId,
+          trackId,
+          sectionId,
+          async (nextSection) => {
+            const nextActiveCount = await db.layers
+              .where({ projectId, trackId, sectionId: nextSection.id })
+              .filter((l) => !l.deletedAt)
+              .count();
+            const propagatedLayer: LayerRecord = {
+              id: uuidv4(),
+              projectId,
+              trackId,
+              sectionId: nextSection.id,
+              audioBlobId,
+              rawAudioBlobId,
+              gain,
+              order: nextActiveCount,
+              deletedAt: null,
+            };
+            await db.layers.add(propagatedLayer);
+          },
+        );
 
         await db.projects.update(projectId, { updatedAt: Date.now() });
       },
@@ -222,38 +245,21 @@ export class ProjectService {
         await db.layers.update(topLayer.id, { deletedAt: Date.now() });
 
         // Propagate to linked downstream sections
-        const section = await db.sections.get(sectionId);
-        const track = await db.tracks.get(trackId);
-        if (section && track) {
-          const trackIndex = track.order;
-          const allSections = await db.sections
-            .where({ projectId })
-            .sortBy("order");
-          const startIndex = allSections.findIndex((s) => s.id === sectionId);
-          if (startIndex !== -1) {
-            for (let i = startIndex + 1; i < allSections.length; i++) {
-              const nextSection = allSections[i];
-              const isLinked = nextSection.trackLinks
-                ? nextSection.trackLinks[trackIndex]
-                : true;
-              if (isLinked) {
-                const nextActiveLayers = await db.layers
-                  .where({ projectId, trackId, sectionId: nextSection.id })
-                  .filter((l) => !l.deletedAt)
-                  .sortBy("order");
-                if (nextActiveLayers.length > 0) {
-                  const nextTopLayer =
-                    nextActiveLayers[nextActiveLayers.length - 1];
-                  await db.layers.update(nextTopLayer.id, {
-                    deletedAt: Date.now(),
-                  });
-                }
-              } else {
-                break;
-              }
+        await this._propagateToLinkedSections(
+          projectId,
+          trackId,
+          sectionId,
+          async (nextSection) => {
+            const nextActiveLayers = await db.layers
+              .where({ projectId, trackId, sectionId: nextSection.id })
+              .filter((l) => !l.deletedAt)
+              .sortBy("order");
+            if (nextActiveLayers.length > 0) {
+              const nextTopLayer = nextActiveLayers[nextActiveLayers.length - 1];
+              await db.layers.update(nextTopLayer.id, { deletedAt: Date.now() });
             }
-          }
-        }
+          },
+        );
 
         await db.projects.update(projectId, { updatedAt: Date.now() });
         return true;
@@ -274,38 +280,19 @@ export class ProjectService {
         await db.layers.delete(layerId);
 
         // Propagate deletion to downstream linked sections
-        const section = await db.sections.get(sectionId);
-        const track = await db.tracks.get(trackId);
-        if (section && track) {
-          const trackIndex = track.order;
-          const allSections = await db.sections
-            .where({ projectId })
-            .sortBy("order");
-          const startIndex = allSections.findIndex((s) => s.id === sectionId);
-          if (startIndex !== -1) {
-            for (let i = startIndex + 1; i < allSections.length; i++) {
-              const nextSection = allSections[i];
-              const isLinked = nextSection.trackLinks
-                ? nextSection.trackLinks[trackIndex]
-                : true;
-              if (isLinked) {
-                const matchingLayers = await db.layers
-                  .where({
-                    projectId,
-                    trackId,
-                    sectionId: nextSection.id,
-                    audioBlobId,
-                  })
-                  .toArray();
-                for (const ml of matchingLayers) {
-                  await db.layers.delete(ml.id);
-                }
-              } else {
-                break;
-              }
+        await this._propagateToLinkedSections(
+          projectId,
+          trackId,
+          sectionId,
+          async (nextSection) => {
+            const matchingLayers = await db.layers
+              .where({ projectId, trackId, sectionId: nextSection.id, audioBlobId })
+              .toArray();
+            for (const ml of matchingLayers) {
+              await db.layers.delete(ml.id);
             }
-          }
-        }
+          },
+        );
 
         if (audioBlobId) {
           const referencedCount = await db.layers
@@ -332,7 +319,7 @@ export class ProjectService {
         order: count,
         lengthSamples: 0,
         lengthInBars: 4,
-        trackLinks: [true, true, true, true],
+        trackLinks: Array(TRACK_COUNT).fill(true),
       };
       await db.sections.add(section);
       await db.projects.update(projectId, { updatedAt: Date.now() });
@@ -402,12 +389,7 @@ export class ProjectService {
         // Update the trackLinks field on the target section
         const targetSection = await db.sections.get(toSectionId);
         if (targetSection) {
-          targetSection.trackLinks = targetSection.trackLinks || [
-            true,
-            true,
-            true,
-            true,
-          ];
+          targetSection.trackLinks = targetSection.trackLinks || Array(TRACK_COUNT).fill(true);
           targetSection.trackLinks[trackIndex] = enabled;
           await db.sections.put(targetSection);
         }

@@ -1,7 +1,7 @@
 import React from "react";
 import { useLooperStore } from "../store/useLooperStore";
-import { TRACK_COLORS } from "./TrackControls";
 import { LevelMeter } from "@live-looper/ui";
+import { TRACK_COLORS } from "./track/trackColors";
 
 export const ChannelLevels: React.FC = () => {
   const { inputLevels } = useLooperStore();

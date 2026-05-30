@@ -7,6 +7,7 @@ import type {
   WorkletEvent,
   WorkletMessage,
 } from "@live-looper/types";
+import { TRACK_COUNT } from "@live-looper/types";
 
 const DEFAULT_SECTIONS: SectionConfig[] = [
   {
@@ -14,27 +15,29 @@ const DEFAULT_SECTIONS: SectionConfig[] = [
     index: 0,
     name: "Verse",
     lengthInBars: 4,
-    trackLinks: [true, true, true, true],
+    trackLinks: Array(TRACK_COUNT).fill(true),
   },
   {
     id: "default-2",
     index: 1,
     name: "Chorus",
     lengthInBars: 8,
-    trackLinks: [true, true, true, true],
+    trackLinks: Array(TRACK_COUNT).fill(true),
   },
   {
     id: "default-3",
     index: 2,
     name: "Bridge",
     lengthInBars: 4,
-    trackLinks: [true, true, true, true],
+    trackLinks: Array(TRACK_COUNT).fill(true),
   },
 ];
 
 const DEFAULT_BPM = 100;
 
 import { TrackFXChain } from "./TrackFXChain";
+import { MasterClock } from "./MasterClock";
+import { engineEvents } from "./EventBus";
 import { MasterBus } from "./MasterBus";
 import { db, projectService } from "@live-looper/storage";
 import { FXBuilder } from "@live-looper/types";
@@ -55,7 +58,7 @@ class AudioEngine {
 
   /** Shadow of each track's current mute state inside the worklet. Used by applySolo/setMute
    *  to determine whether a MUTE_TRACK toggle is actually needed. */
-  private _workletMuteState: boolean[] = [false, false, false, false];
+  private _workletMuteState: boolean[] = Array(TRACK_COUNT).fill(false);
   /** Shadow of the metronome's current on/off state in the worklet. Defaults to true (on). */
   private _metronomeOn: boolean = true;
 
@@ -66,13 +69,15 @@ class AudioEngine {
   private sessionPlaybackSource: AudioBufferSourceNode | null = null;
 
   // Storage Context
-  private currentProjectId: string | null = null;
+  public currentProjectId: string | null = null;
+  public latencySamples: number = 0;
+  public channelMapping: (string | null | undefined)[] = [];
   private trackIdMap: string[] = []; // index 0-3 -> UUID
   private sectionIdMap: string[] = []; // index 0-N -> UUID
   private savedProjectId: string | null = null;
   private smartSnapEnabled: boolean = true;
+  private _masterOutLevel: number = 0;
 
-  private listeners: ((event: EngineEvent) => void)[] = [];
   private static instance: AudioEngine;
 
   private constructor() {}
@@ -83,14 +88,17 @@ class AudioEngine {
   }
 
   subscribe(listener: (event: EngineEvent) => void) {
-    this.listeners.push(listener);
+    engineEvents.on("engine_event", listener);
     return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
+      engineEvents.off("engine_event", listener);
     };
   }
 
   private notify(event: EngineEvent) {
-    this.listeners.forEach((l) => l(event));
+    // Fire the specific event for targeted listeners
+    engineEvents.emit(event.type, "payload" in event ? event.payload : undefined);
+    // Fire the catch-all for legacy subscribers
+    engineEvents.emit("engine_event", event);
   }
 
   async init(
@@ -126,10 +134,10 @@ class AudioEngine {
         this.context,
         "live-looper-processor",
         {
-          // Support up to 4 separate audio inputs (one per track)
-          numberOfInputs: 4,
-          numberOfOutputs: 5,
-          outputChannelCount: [2, 2, 2, 2, 2],
+          // Support up to TRACK_COUNT separate audio inputs (one per track)
+          numberOfInputs: TRACK_COUNT,
+          numberOfOutputs: TRACK_COUNT + 1, // TRACK_COUNT tracks + 1 metronome
+          outputChannelCount: Array(TRACK_COUNT + 1).fill(2),
         },
       );
 
@@ -149,7 +157,7 @@ class AudioEngine {
       );
       this.performerSource.connect(this.performerContext.destination);
 
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < TRACK_COUNT; i++) {
         const chain = new TrackFXChain(this.context);
         this.trackFX.push(chain);
 
@@ -167,12 +175,12 @@ class AudioEngine {
       this.liveTrackFX.output.connect(this.masterBus.input);
       this.liveTrackFX.output.connect(this.performerBus);
 
-      // Metronome (output 4) routing based on dual output mode
+      // Metronome (output TRACK_COUNT) routing based on dual output mode
       if (this.dualOutputEnabled) {
-        this.workletNode.connect(this.performerBus, 4);
+        this.workletNode.connect(this.performerBus, TRACK_COUNT);
         // Context will be resumed in start()
       } else {
-        this.workletNode.connect(this.masterBus.input, 4);
+        this.workletNode.connect(this.masterBus.input, TRACK_COUNT);
         this.performerContext.suspend();
       }
 
@@ -187,23 +195,19 @@ class AudioEngine {
         this.notify({ type: "ENGINE_CRASHED" });
       };
 
-      const savedLatency = localStorage.getItem("looper_rtl_samples");
-      const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
-
       this.workletNode.port.postMessage({
         type: "CONFIG",
         payload: {
           sampleRate: this.context.sampleRate,
           bpm,
           sections,
-          latencySamples,
+          latencySamples: this.latencySamples,
           smartSnapEnabled: this.smartSnapEnabled,
         },
       });
 
       console.log(
-        "AudioEngine initialized with Multi-Output FX Chain. Latency Comp:",
-        latencySamples,
+        "AudioEngine initialized with Multi-Output FX Chain.",
       );
     } catch (e) {
       console.error("Failed to load AudioWorklet", e);
@@ -213,15 +217,13 @@ class AudioEngine {
   /** Re-send CONFIG to the worklet without tearing down the AudioContext. */
   reconfigure(sections: SectionConfig[], bpm: number) {
     if (!this.context || !this.workletNode) return;
-    const savedLatency = localStorage.getItem("looper_rtl_samples");
-    const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
     this.workletNode.port.postMessage({
       type: "CONFIG",
       payload: {
         sampleRate: this.context.sampleRate,
         bpm,
         sections,
-        latencySamples,
+        latencySamples: this.latencySamples,
         smartSnapEnabled: this.smartSnapEnabled,
         quantization: { snapToGrid: false, gridResolution: 16 }, // Initial fallback
       },
@@ -250,22 +252,22 @@ class AudioEngine {
   }
 
   // Array to hold per-channel MediaStreamAudioSourceNodes
-  private inputSources: (MediaStreamAudioSourceNode | null)[] = [
-    null,
-    null,
-    null,
-    null,
-  ];
+  private inputSources: (MediaStreamAudioSourceNode | null)[] = Array(
+    TRACK_COUNT,
+  ).fill(null);
 
   /**
    * Initialize multiple input devices and connect each to its corresponding worklet input channel.
    * @param deviceIds Array of device IDs, indexed by channel (0-3). If an entry is undefined/null, the default device is used for that channel.
    */
-  async initInputs(deviceIds: (string | null | undefined)[] = []) {
+  async initInputs(deviceIds?: (string | null | undefined)[]) {
     if (!this.context) return;
+    if (deviceIds) {
+      this.channelMapping = deviceIds;
+    }
 
     // Clean up any existing sources
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < TRACK_COUNT; i++) {
       const src = this.inputSources[i];
       if (src) {
         src.disconnect();
@@ -274,7 +276,7 @@ class AudioEngine {
     }
 
     // Collect all currently used device IDs to determine what to stop
-    const usedDeviceIds = new Set(deviceIds.map((id) => id || "default"));
+    const usedDeviceIds = new Set(this.channelMapping.map((id) => id || "default"));
 
     // Stop and remove streams that are no longer in use
     this.activeStreams.forEach((stream, deviceId) => {
@@ -284,8 +286,8 @@ class AudioEngine {
       }
     });
 
-    for (let i = 0; i < 4; i++) {
-      const deviceId = deviceIds[i] || "default";
+    for (let i = 0; i < TRACK_COUNT; i++) {
+      const deviceId = this.channelMapping[i] || "default";
       try {
         let stream: MediaStream;
 
@@ -372,17 +374,17 @@ class AudioEngine {
       return;
 
     try {
-      this.workletNode.disconnect(4); // Disconnect metronome from its current bus
+      this.workletNode.disconnect(TRACK_COUNT); // Disconnect metronome from its current bus
     } catch (e) {
       // Might throw if not connected, safe to ignore
     }
 
     if (enabled) {
-      this.workletNode.connect(this.performerBus, 4);
+      this.workletNode.connect(this.performerBus, TRACK_COUNT);
       if (this.performerContext.state === "suspended")
         this.performerContext.resume();
     } else {
-      this.workletNode.connect(this.masterBus.input, 4);
+      this.workletNode.connect(this.masterBus.input, TRACK_COUNT);
       this.performerContext.suspend();
     }
   }
@@ -403,10 +405,7 @@ class AudioEngine {
     if (this.context?.state === "suspended") this.context.resume();
     if (this.dualOutputEnabled && this.performerContext?.state === "suspended")
       this.performerContext.resume();
-    // Retrieve channel mapping from the store (fallback to empty array for defaults)
-    const mapping =
-      (globalThis as any).looperStore?.getState().channelMapping ?? [];
-    this.initInputs(mapping);
+    this.initInputs();
     this.workletNode?.port.postMessage({ type: "START" });
   }
 
@@ -420,7 +419,7 @@ class AudioEngine {
   }
 
   setLatencyCompensation(samples: number) {
-    localStorage.setItem("looper_rtl_samples", samples.toString());
+    this.latencySamples = samples;
     this.workletNode?.port.postMessage({
       type: "SET_LATENCY",
       payload: { latencySamples: samples },
@@ -453,7 +452,7 @@ class AudioEngine {
    */
   applySolo(soloedIds: number[], muteStates: boolean[]) {
     const hasSolo = soloedIds.length > 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < TRACK_COUNT; i++) {
       const effectiveMuted = hasSolo
         ? !soloedIds.includes(i) // solo active: mute unless in solo set
         : (muteStates[i] ?? false); // no solo: restore individual mute
@@ -715,7 +714,6 @@ class AudioEngine {
     if (!project) return;
 
     this.currentProjectId = projectId;
-    localStorage.setItem("looper_current_project_id", projectId);
 
     const tracks = await db.tracks.where({ projectId }).sortBy("order");
     this.trackIdMap = tracks.map((t: any) => t.id);
@@ -723,8 +721,6 @@ class AudioEngine {
     const rawSections = await db.sections.where({ projectId }).sortBy("order");
     this.sectionIdMap = rawSections.map((s: any) => s.id);
 
-    const savedLatency = localStorage.getItem("looper_rtl_samples");
-    const latencySamples = savedLatency ? parseInt(savedLatency, 10) : 0;
     const sampleRate = this.context!.sampleRate;
 
     // Build SectionConfig[] once — used for BOTH the worklet CONFIG message
@@ -762,7 +758,7 @@ class AudioEngine {
         sampleRate,
         bpm: project.bpm,
         sections: sectionConfigs,
-        latencySamples,
+        latencySamples: this.latencySamples,
         smartSnapEnabled: projectSmartSnap,
         quantization: { snapToGrid: true, gridResolution: 16 }, // We could let store manage this later, hardcoding for now so WSOLA uses 1/16th.
       },
@@ -779,7 +775,7 @@ class AudioEngine {
 
     // Restore persisted mute state — worklet starts all tracks unmuted after
     // clearAllTracks, so we send MUTE_TRACK for any track that was saved as muted.
-    this._workletMuteState = [false, false, false, false];
+    this._workletMuteState = Array(TRACK_COUNT).fill(false);
     tracks.forEach((t: any, i: number) => {
       const shouldBeMuted = t.muted ?? false;
       if (shouldBeMuted) {

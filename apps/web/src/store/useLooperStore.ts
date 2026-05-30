@@ -11,6 +11,7 @@ import type {
   LiveTrackState,
   FXPreset,
 } from "@live-looper/types";
+import { TRACK_COUNT } from "@live-looper/types";
 import {
   DEFAULT_SECTIONS,
   DEFAULT_BPM,
@@ -154,7 +155,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   currentSectionIndex: 0,
   queuedSectionIndex: null,
   sections: DEFAULT_SECTIONS,
-  tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+  tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
   liveTrack: {
     isMuted: false,
     fx: defaultTrack().fx,
@@ -173,14 +174,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   outputDeviceId: null,
   performerOutputDeviceId: null,
   engineCrashed: false,
-  channelMapping: [null, null, null, null],
-  trackChannelConfig: {
-    0: { mode: "stereo" },
-    1: { mode: "stereo" },
-    2: { mode: "stereo" },
-    3: { mode: "stereo" },
-  },
-  inputLevels: [0, 0, 0, 0],
+  channelMapping: Array(TRACK_COUNT).fill(null),
+  trackChannelConfig: Object.fromEntries(
+    Array.from({ length: TRACK_COUNT }, (_, i) => [i, { mode: "stereo" as const }]),
+  ),
+  inputLevels: Array(TRACK_COUNT).fill(0),
 
   fxPresets: [],
   fetchFXPresets: async () => {
@@ -499,7 +497,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   loadProject: async (id) => {
     // Reset current tracks before loading to avoid flicker/stale data
     set({
-      tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+      tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
       isPlaying: false,
     });
     await audioEngine.loadProject(id);
@@ -509,7 +507,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
   loadDemoData: async () => {
     set({
-      tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+      tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
       isPlaying: false,
     });
     await audioEngine.loadDemoData();
@@ -527,7 +525,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     set({
       currentProject: null,
       isPlaying: false,
-      tracks: [defaultTrack(), defaultTrack(), defaultTrack(), defaultTrack()],
+      tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
     });
   },
 
@@ -550,21 +548,37 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   },
 
   addSection: async (name: string) => {
-    const { currentProject, loadProject } = get();
+    const { currentProject, sections, bpm } = get();
     if (!currentProject?.id) return;
-    await projectService.addSection(currentProject.id, name);
-    await loadProject(currentProject.id);
+    const newSectionId = await projectService.addSection(currentProject.id, name);
+    // Targeted update: append to in-memory sections, send CONFIG to worklet.
+    // No full reload needed — audio data is unchanged.
+    const { TRACK_COUNT: TC } = await import("@live-looper/types");
+    const newSection = {
+      id: newSectionId,
+      index: sections.length,
+      name,
+      lengthInBars: 4,
+      trackLinks: Array(TC).fill(true) as boolean[],
+    };
+    const updatedSections = [...sections, newSection];
+    set({ sections: updatedSections });
+    audioEngine.reconfigure(updatedSections, bpm);
   },
 
   renameSection: async (sectionId: string, newName: string) => {
-    const { currentProject, loadProject } = get();
+    const { currentProject, sections } = get();
     if (!currentProject?.id) return;
     await projectService.updateSectionName(
       currentProject.id,
       sectionId,
       newName,
     );
-    await loadProject(currentProject.id);
+    // Targeted update: patch only the name in-memory. No audio data changes.
+    const updatedSections = sections.map((s) =>
+      s.id === sectionId ? { ...s, name: newName } : s,
+    );
+    set({ sections: updatedSections });
   },
 
   deleteSection: async (sectionId: string) => {
@@ -575,10 +589,20 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   },
 
   reorderSections: async (sectionIds: string[]) => {
-    const { currentProject, loadProject } = get();
+    const { currentProject, sections, bpm } = get();
     if (!currentProject?.id) return;
     await projectService.reorderSections(currentProject.id, sectionIds);
-    await loadProject(currentProject.id);
+    // Targeted update: re-sort in-memory array, update indices, send CONFIG.
+    // No audio data changes — worklet just needs the new section order.
+    const idToSection = new Map(sections.map((s) => [s.id, s]));
+    const reordered = sectionIds
+      .map((id, i) => {
+        const s = idToSection.get(id);
+        return s ? { ...s, index: i } : null;
+      })
+      .filter(Boolean) as typeof sections;
+    set({ sections: reordered });
+    audioEngine.reconfigure(reordered, bpm);
   },
 
   carryForwardTrack: async (
@@ -881,7 +905,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         });
         set({
           jitter: event.jitter || 0,
-          inputLevels: event.inputLevels || [0, 0, 0, 0],
+          inputLevels: event.inputLevels || Array(TRACK_COUNT).fill(0),
         });
         break;
       case "RECORD_START":
@@ -939,18 +963,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         const metronomeOn = savedSettings.metronomeOn ?? true;
         const showLayers = savedSettings.showLayers ?? true;
         const smartSnapEnabled = savedSettings.smartSnapEnabled ?? true;
-        const channelMapping = savedSettings.channelMapping ?? [
-          null,
-          null,
-          null,
-          null,
-        ];
-        const trackChannelConfig = savedSettings.trackChannelConfig ?? {
-          0: { mode: "stereo" },
-          1: { mode: "stereo" },
-          2: { mode: "stereo" },
-          3: { mode: "stereo" },
-        };
+        const channelMapping = savedSettings.channelMapping ??
+          Array(TRACK_COUNT).fill(null);
+        const trackChannelConfig = savedSettings.trackChannelConfig ??
+          Object.fromEntries(
+            Array.from({ length: TRACK_COUNT }, (_, i) => [i, { mode: "stereo" as const }]),
+          );
 
         set({
           bpm: project.bpm,
@@ -1167,7 +1185,6 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   },
 }));
 
-(globalThis as any).looperStore = useLooperStore;
 
 // Initialize compensation from localStorage
 const savedComp = localStorage.getItem("looper_rtl_samples");
@@ -1270,3 +1287,17 @@ useLooperStore.subscribe((state, prevState) => {
     else audioEngine.stop();
   }
 });
+
+// ─── Slice Re-exports ──────────────────────────────────────────────────────────
+// These focused stores are the forward-looking home for each domain.
+// They can be imported directly for new code, or via useLooperStore for
+// backward compatibility with existing components.
+export { useTransportStore } from "./useTransportStore";
+export type { TransportState } from "./useTransportStore";
+export { useUIStore } from "./useUIStore";
+export type { UIState } from "./useUIStore";
+export { useDeviceStore } from "./useDeviceStore";
+export type { DeviceState } from "./useDeviceStore";
+export { useLatencyStore } from "./useLatencyStore";
+export type { LatencyState } from "./useLatencyStore";
+

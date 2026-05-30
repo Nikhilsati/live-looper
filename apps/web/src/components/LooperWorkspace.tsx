@@ -37,7 +37,6 @@ export const LooperWorkspace: React.FC = () => {
   };
 
   const isLive = mode === "live";
-  const isPractice = mode === "practice";
 
   return (
     <Stack

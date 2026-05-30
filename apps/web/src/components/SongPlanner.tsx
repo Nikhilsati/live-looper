@@ -15,8 +15,9 @@ import {
   CaretLeftIcon,
   CaretRightIcon,
 } from "@live-looper/icons";
-import { TRACK_COLORS } from "./TrackControls";
+import { TRACK_COLORS } from "./track/trackColors";
 import { audioEngine } from "@live-looper/audio-engine";
+import { can } from "@live-looper/mode-controller";
 
 const EditableSectionName = ({
   initialName,
@@ -120,8 +121,6 @@ export const SongPlanner = () => {
     carryForwardTrack,
   } = useLooperStore();
 
-  const isPlan = mode === "planning";
-
   const handleAdd = async () => {
     const newName = `Section ${sections.length + 1}`;
     await addSection(newName);
@@ -162,7 +161,7 @@ export const SongPlanner = () => {
   };
 
   const handleSectionClick = (sectionIndex: number) => {
-    if (isPlan) return;
+    if (!can("trigger-section", mode)) return;
     if (!isPlaying) {
       useLooperStore.getState().setCurrentSection(sectionIndex);
     } else {
@@ -185,7 +184,7 @@ export const SongPlanner = () => {
     <Stack style={{ gap: 16 }}>
       <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
         <Heading style={{ fontSize: 24, margin: 0 }}>Timeline</Heading>
-        {isPlan && (
+        {can("add-section", mode) && (
           <Button
             onClick={handleAdd}
             size="sm"
@@ -222,9 +221,9 @@ export const SongPlanner = () => {
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <Card
                   onClick={() => handleSectionClick(idx)}
-                  className={`timeline-section-card ${isActive ? "active" : ""} ${isQueued ? "queued" : ""} ${!isPlan ? "clickable" : ""}`}
+                  className={`timeline-section-card ${isActive ? "active" : ""} ${isQueued ? "queued" : ""} ${can("trigger-section", mode) ? "clickable" : ""}`}
                   title={
-                    isPlan
+                    !can("trigger-section", mode)
                       ? undefined
                       : isPlaying
                         ? "Queue section to play next"
@@ -251,38 +250,42 @@ export const SongPlanner = () => {
                         onRename={(newName) =>
                           renameSection(section.id, newName)
                         }
-                        disabled={!isPlan}
+                        disabled={!can("rename-section", mode)}
                       />
                       <Label>{section.lengthInBars} Bars</Label>
                     </Stack>
-                    {isPlan && (
-                      <Row style={{ gap: 4 }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMoveLeft(idx);
-                          }}
-                          disabled={idx === 0}
-                          style={{ padding: "4px 8px" }}
-                          title="Move section left"
-                        >
-                          <CaretLeftIcon size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMoveRight(idx);
-                          }}
-                          disabled={idx === sections.length - 1}
-                          style={{ padding: "4px 8px" }}
-                          title="Move section right"
-                        >
-                          <CaretRightIcon size={16} />
-                        </Button>
+                    <Row style={{ gap: 4 }}>
+                      {can("reorder-sections", mode) && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveLeft(idx);
+                            }}
+                            disabled={idx === 0}
+                            style={{ padding: "4px 8px" }}
+                            title="Move section left"
+                          >
+                            <CaretLeftIcon size={16} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveRight(idx);
+                            }}
+                            disabled={idx === sections.length - 1}
+                            style={{ padding: "4px 8px" }}
+                            title="Move section right"
+                          >
+                            <CaretRightIcon size={16} />
+                          </Button>
+                        </>
+                      )}
+                      {can("remove-section", mode) && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -299,13 +302,13 @@ export const SongPlanner = () => {
                             style={{ color: "var(--color-danger)" }}
                           />
                         </Button>
-                      </Row>
-                    )}
+                      )}
+                    </Row>
                   </Row>
                 </Card>
 
                 {/* Left-edge port dots (receive carry-forward from previous section) */}
-                {isPlan &&
+                {can("change-routing", mode) &&
                   idx > 0 &&
                   DOT_POSITIONS.map((y, trackIndex) => {
                     const isLinked = section.trackLinks?.[trackIndex] ?? true;
@@ -340,7 +343,7 @@ export const SongPlanner = () => {
                   })}
 
                 {/* Right-edge port dots (signal exits towards next section) */}
-                {isPlan &&
+                {can("change-routing", mode) &&
                   idx < sections.length - 1 &&
                   nextSection &&
                   DOT_POSITIONS.map((y, trackIndex) => {

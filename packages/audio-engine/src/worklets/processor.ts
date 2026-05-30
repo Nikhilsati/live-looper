@@ -1,4 +1,4 @@
-import { type AudioWorkletProcessor } from "@live-looper/types";
+import { type AudioWorkletProcessor, TRACK_COUNT } from "@live-looper/types";
 
 declare var AudioWorkletProcessor: {
   prototype: AudioWorkletProcessor;
@@ -138,7 +138,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
 
-    for (let id = 0; id < 4; id++) {
+    for (let id = 0; id < TRACK_COUNT; id++) {
       this.tracks.push({
         id,
         state: "IDLE",
@@ -155,7 +155,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         index: 0,
         name: "Initial",
         lengthInBars: 8,
-        trackLinks: [true, true, true, true],
+        trackLinks: Array(TRACK_COUNT).fill(true),
       },
     ];
 

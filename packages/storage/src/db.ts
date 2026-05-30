@@ -39,6 +39,12 @@ export class LiveLooperDB extends Dexie {
     this.version(4).stores({
       fxPresets: "id, type, name, moduleType",
     });
+    // v5: indexes audioBlobId on layers for O(1) ref-count queries in deleteLayer().
+    //     Also adds sampleRate index on audioBlobs for future "find blobs at 48kHz" queries.
+    this.version(5).stores({
+      layers: "id, projectId, trackId, sectionId, deletedAt, audioBlobId",
+      audioBlobs: "id, projectId, sampleRate",
+    });
   }
 }
 

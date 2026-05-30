@@ -1,12 +1,19 @@
 /// <reference path="./oat.d.ts" />
 /// <reference path="./audio-worklet.d.ts" />
 
+/**
+ * Single source of truth for the number of looper tracks.
+ * Changing this constant is the only thing required to scale to more tracks.
+ * Every consumer (engine, worklet, store, storage) derives from this value.
+ */
+export const TRACK_COUNT = 4;
+
 export interface SectionConfig {
   id: string;
   index: number;
   name: string;
   lengthInBars: number;
-  trackLinks: boolean[]; // length 4 — which tracks play in this section
+  trackLinks: boolean[]; // length TRACK_COUNT — which tracks play in this section
 }
 
 export interface EQSettings {
