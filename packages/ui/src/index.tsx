@@ -557,3 +557,160 @@ export const Knob = ({
     </div>
   );
 };
+
+// ─── Level Meter ──────────────────────────────────────────────────────────────
+
+export interface LevelMeterProps {
+  value?: number; // 0 to 1
+  values?: number[]; // Array of 0 to 1 values for multi-channel
+  analyser?: AnalyserNode | null; // Optional AnalyserNode for live mic input
+  vertical?: boolean;
+  bars?: number; // Number of LED bars (for segmented layout), default 16
+  variant?: "segmented" | "continuous";
+  color?: string | string[]; // Accent color override (single color, or array of colors per channel)
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+export const LevelMeter = ({
+  value = 0,
+  values,
+  analyser,
+  vertical = false,
+  bars = 16,
+  variant = "segmented",
+  color,
+  className = "",
+  style,
+}: LevelMeterProps) => {
+  const [localLevel, setLocalLevel] = React.useState(0);
+  const rafRef = React.useRef<number>(0);
+  const bufRef = React.useRef<Uint8Array | null>(null);
+
+  React.useEffect(() => {
+    if (!analyser) {
+      setLocalLevel(value);
+      return;
+    }
+    bufRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(bufRef.current as any);
+      let peak = 0;
+      for (let i = 0; i < bufRef.current!.length; i++) {
+        const v = Math.abs(bufRef.current![i] - 128) / 128;
+        if (v > peak) peak = v;
+      }
+      setLocalLevel(peak);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [analyser, value]);
+
+  const channels = values !== undefined ? values : [analyser ? localLevel : value];
+
+  return (
+    <div
+      className={`ui-level-meter ${vertical ? "vertical" : "horizontal"} ${className}`}
+      style={{
+        display: "flex",
+        flexDirection: vertical ? "row" : "column", // Channels side-by-side or stacked
+        gap: 8,
+        width: vertical ? undefined : "100%",
+        height: vertical ? "100%" : undefined,
+        boxSizing: "border-box",
+        ...style,
+      }}
+    >
+      {channels.map((chVal, chIdx) => {
+        const level = Math.min(1, Math.max(0, chVal));
+        const isPeaking = level > 0.95;
+        const channelColor = Array.isArray(color) ? color[chIdx] : color;
+
+        if (variant === "continuous") {
+          const sizePct = Math.pow(level, 0.45) * 100;
+          const activeColor = channelColor || (isPeaking ? "#ef4444" : level > 0.75 ? "#fbbf24" : "#4ade80");
+          const glowColor = channelColor ? `${channelColor}80` : (isPeaking ? "#ef444480" : level > 0.75 ? "#fbbf2480" : "#4ade8080");
+
+          return (
+            <div
+              key={chIdx}
+              className={`ui-level-meter-channel continuous ${vertical ? "vertical" : "horizontal"}`}
+              style={{
+                position: "relative",
+                flex: 1,
+                background: "rgba(255, 255, 255, 0.05)",
+                borderRadius: 2,
+                overflow: "hidden",
+                height: vertical ? "100%" : 8,
+                width: vertical ? undefined : "100%",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: vertical ? 0 : "auto",
+                  left: 0,
+                  top: vertical ? "auto" : 0,
+                  width: vertical ? "100%" : `${sizePct}%`,
+                  height: vertical ? `${sizePct}%` : "100%",
+                  background: activeColor,
+                  boxShadow: level > 0.02 ? `0 0 6px ${glowColor}` : "none",
+                  transition: "height 0.05s ease-out, width 0.05s ease-out, background 0.1s ease",
+                }}
+              />
+            </div>
+          );
+        }
+
+        // Segmented LED look
+        const activeBarsCount = Math.round(level * bars);
+        return (
+          <div
+            key={chIdx}
+            className={`ui-level-meter-channel segmented ${vertical ? "vertical" : "horizontal"}`}
+            style={{
+              display: "flex",
+              flexDirection: vertical ? "column-reverse" : "row",
+              alignItems: "center",
+              gap: 2,
+              flex: 1,
+              height: vertical ? "100%" : undefined,
+              width: vertical ? undefined : "100%",
+            }}
+          >
+            {Array.from({ length: bars }).map((_, barIdx) => {
+              const active = barIdx < activeBarsCount;
+              const pct = barIdx / (bars - 1);
+              
+              let barColor = channelColor || "#4ade80"; // green
+              if (!channelColor) {
+                if (pct > 0.9) barColor = "#ef4444"; // red
+                else if (pct > 0.72) barColor = "#fbbf24"; // amber
+              }
+
+              const widthStyle = vertical
+                ? { width: "100%", height: `calc(${100 / bars}% - 2px)` }
+                : { height: "100%", width: `calc(${100 / bars}% - 2px)` };
+
+              return (
+                <div
+                  key={barIdx}
+                  className="ui-level-meter-bar"
+                  style={{
+                    ...widthStyle,
+                    borderRadius: 1,
+                    background: active ? barColor : "rgba(255, 255, 255, 0.06)",
+                    boxShadow: active ? `0 0 4px ${barColor}80` : "none",
+                    transition: "background 0.05s ease, box-shadow 0.05s ease",
+                  }}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+};

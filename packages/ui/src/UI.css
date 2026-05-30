@@ -589,3 +589,19 @@ oat-dialog::part(panel) {
     z-index: 0;
     transition: width 0.1s linear;
 }
+
+/* ─── LevelMeter ────────────────────────────────────────────────────────── */
+.ui-level-meter {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: var(--ui-radius-sm);
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ui-level-meter-channel {
+    transition: all 0.15s ease;
+}
+
+.ui-level-meter-bar {
+    transition: background 0.05s ease, box-shadow 0.05s ease;
+}

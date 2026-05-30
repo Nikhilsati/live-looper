@@ -17,85 +17,11 @@ import {
   ArrowLeftIcon,
   SettingsIcon,
 } from "@live-looper/icons";
-import { Button } from "@live-looper/ui";
+import { Button, LevelMeter } from "@live-looper/ui";
 import { SettingsPopover } from "./SettingsPopover";
 
-// ─── VU Meter ────────────────────────────────────────────────────────────────
-const VU_BARS = 28;
+// VU Meter component removed in favor of shared LevelMeter component
 
-const VuMeter = ({
-  analyser,
-  vertical = false,
-}: {
-  analyser: AnalyserNode | null;
-  vertical?: boolean;
-}) => {
-  const [level, setLevel] = useState(0); // 0–1
-  const rafRef = useRef<number>(0);
-  const bufRef = useRef<Uint8Array | null>(null);
-
-  useEffect(() => {
-    if (!analyser) return;
-    bufRef.current = new Uint8Array(analyser.frequencyBinCount);
-
-    const tick = () => {
-      analyser.getByteTimeDomainData(bufRef.current as any);
-      let peak = 0;
-      for (let i = 0; i < bufRef.current!.length; i++) {
-        const v = Math.abs(bufRef.current![i] - 128) / 128;
-        if (v > peak) peak = v;
-      }
-      setLevel(peak);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [analyser]);
-
-  const activeBars = Math.round(level * VU_BARS);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: vertical ? "column-reverse" : "row",
-        alignItems: vertical ? "center" : "flex-end",
-        gap: 3,
-        width: vertical ? "100%" : undefined,
-        height: vertical ? "100%" : 40,
-        padding: vertical ? "4px 0" : "0 4px",
-      }}
-    >
-      {Array.from({ length: VU_BARS }).map((_, i) => {
-        const active = i < activeBars;
-        // Color gradient: green → amber → red
-        const pct = i / (VU_BARS - 1);
-        let color = "#4ade80"; // green
-        if (pct > 0.75) color = "#ef4444";
-        else if (pct > 0.5) color = "#fbbf24";
-        return (
-          <div
-            key={i}
-            style={{
-              flex: 1,
-              ...(vertical
-                ? {
-                    width: `${30 + (i / VU_BARS) * 70}%`,
-                  }
-                : {
-                    height: `${30 + (i / VU_BARS) * 70}%`,
-                  }),
-              borderRadius: 2,
-              background: active ? color : "rgba(255,255,255,0.07)",
-              boxShadow: active ? `0 0 6px ${color}80` : "none",
-              transition: "background 0.05s ease",
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-};
 
 // ─── BPM Tap Tempo ────────────────────────────────────────────────────────────
 function useTapTempo(onBpm: (bpm: number) => void) {
@@ -530,7 +456,13 @@ export const GuitarPracticeView: React.FC = () => {
                       DENIED
                     </div>
                   ) : (
-                    <VuMeter analyser={isRunning ? analyser : null} vertical />
+                    <LevelMeter
+                      analyser={isRunning ? analyser : null}
+                      vertical
+                      bars={28}
+                      variant="segmented"
+                      style={{ background: "transparent", border: "none", padding: 0 }}
+                    />
                   )}
                 </div>
 
