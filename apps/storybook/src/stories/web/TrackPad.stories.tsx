@@ -79,6 +79,39 @@ export const ArmedTrack: Story = {
   },
 };
 
+export const RecordingTrack: Story = {
+  args: {
+    trackId: 0,
+    onOpenFX: (id) => console.log("Open FX for track", id),
+  },
+  render: (args) => {
+    useEffect(() => {
+      useLooperStore.setState({
+        mode: "planning",
+        isPlaying: true,
+        tracks: [
+          {
+            isMuted: false,
+            isSoloed: false,
+            isRecording: true,
+            isArmed: false,
+            hasAudio: false,
+            layerCount: 0,
+            waveformData: [],
+            fx: new FXBuilder().build(),
+          },
+        ] as any,
+      });
+    }, []);
+
+    return (
+      <div style={{ maxWidth: "280px" }}>
+        <TrackPad {...args} />
+      </div>
+    );
+  },
+};
+
 export const LiveTrack: StoryObj<typeof LiveTrackPad> = {
   render: () => {
     useEffect(() => {
