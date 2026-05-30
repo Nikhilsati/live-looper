@@ -203,7 +203,7 @@ const MiniWaveform = ({ data, accent }: { data: number[]; accent: string }) => {
   );
 };
 
-const LayersDrawer = ({
+export const LayersDrawer = ({
   trackId,
   accent,
   onClose,
@@ -616,7 +616,7 @@ const LayerRow = ({
 };
 
 // ─── Track Pad ─────────────────────────────────────────────────────────────────
-const TrackPad = ({
+export const TrackPad = ({
   trackId,
   onOpenFX,
 }: {
@@ -1277,7 +1277,7 @@ const TrackPad = ({
 };
 
 // ─── Section Progress Ring ─────────────────────────────────────────────────────
-const ProgressRing = ({
+export const ProgressRing = ({
   progress,
   bar,
   beat,
@@ -1425,7 +1425,7 @@ const SectionNavigator = () => {
 };
 
 // ─── Metronome Button ──────────────────────────────────────────────────────────
-const MetronomeButton = () => {
+export const MetronomeButton = () => {
   const { metronomeOn, setMetronomeOn } = useLooperStore();
   return (
     <Button
@@ -1522,7 +1522,7 @@ export const HeaderIndications = () => {
 };
 
 // ─── BPM Edit Popup ───────────────────────────────────────────────────────────
-const BpmEditPopup = ({ onClose }: { onClose: () => void }) => {
+export const BpmEditPopup = ({ onClose }: { onClose: () => void }) => {
   const { bpm, isPlaying } = useLooperStore();
   const bpmInputRef = useRef<HTMLInputElement>(null);
 
@@ -2014,7 +2014,7 @@ export const GlobalActionBar = () => {
 };
 
 // ─── Live Track Pad ────────────────────────────────────────────────────────
-const LiveTrackPad = ({ onOpenFX }: { onOpenFX: (id: "live") => void }) => {
+export const LiveTrackPad = ({ onOpenFX }: { onOpenFX: (id: "live") => void }) => {
   const { mode, liveTrack, setLiveTrackState, isPlaying } = useLooperStore();
   const isLive = mode === "live";
 

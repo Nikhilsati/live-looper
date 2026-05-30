@@ -1122,7 +1122,7 @@ interface FxModuleProps {
   onLoadPreset?: (state: any) => void;
 }
 
-const FxModule = ({
+export const FxModule = ({
   name,
   color,
   enabled,
