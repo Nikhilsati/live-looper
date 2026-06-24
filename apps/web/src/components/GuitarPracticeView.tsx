@@ -113,11 +113,12 @@ export const GuitarPracticeView: React.FC = () => {
       trackLinks: [false, false, false, false],
     };
     await audioEngine.init([dummySection], bpm);
+    audioEngine.updateLiveTrackFX(liveTrack.fx, bpm);
     audioEngine.clearAllTracks(); // Wipe any lingering audio buffers from the last open project
     audioEngine.start();
     setIsRunning(true);
     await buildAnalyser();
-  }, [bpm, buildAnalyser]);
+  }, [bpm, buildAnalyser, liveTrack.fx]);
 
   const handleStop = useCallback(() => {
     audioEngine.stop();
@@ -222,6 +223,7 @@ export const GuitarPracticeView: React.FC = () => {
           <Button
             variant="ghost"
             onClick={handleBack}
+            data-testid="practice-exit-btn"
             title="Exit practice view and return to dashboard"
             style={{
               width: 44,

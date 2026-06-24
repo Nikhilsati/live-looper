@@ -183,7 +183,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   fxPresets: [],
   fetchFXPresets: async () => {
     let presets = await db.fxPresets.toArray();
-    if (presets.length === 0) {
+    const seeded = localStorage.getItem("looper_fx_presets_seeded");
+    if (!seeded || presets.length === 0) {
       // Seed default presets
       await presetService.savePreset(
         "Basic Ping Pong",
@@ -399,6 +400,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           .build(),
       );
 
+      localStorage.setItem("looper_fx_presets_seeded", "true");
       presets = await db.fxPresets.toArray();
     }
     set({ fxPresets: presets });
@@ -657,6 +659,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     sessionRecorder.logEvent("PLAY");
 
     await audioEngine.init(sections, bpm);
+    audioEngine.updateLiveTrackFX(get().liveTrack.fx, bpm);
     audioEngine.start();
     setIsPlaying(true);
   },
@@ -790,7 +793,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         ? "clear-track"
         : "modify-track";
     if (
-      state.isRecording !== undefined &&
+      state.isRecording === true &&
       !modeController.isActionAllowed(action)
     )
       return;
@@ -1006,9 +1009,10 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           audioEngine.setTrackChannelMode(Number(trackId), config.mode);
         });
 
-        // Re-apply persisted Live Track mute state
+        // Re-apply persisted Live Track mute and FX state
         if (event.payload.liveTrack) {
           audioEngine.setLiveTrackMute(event.payload.liveTrack.isMuted);
+          audioEngine.updateLiveTrackFX(event.payload.liveTrack.fx, project.bpm);
         }
         break;
       }

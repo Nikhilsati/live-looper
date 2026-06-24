@@ -25,7 +25,7 @@ export const MODE_PERMISSIONS: Record<Mode, string[]> = {
     "unmute",
     "stop-transport",
     "start-transport",
-    "edit-bpm",
+    "change-tempo",
     "record-session",
   ],
   planning: [
@@ -43,7 +43,7 @@ export const MODE_PERMISSIONS: Record<Mode, string[]> = {
     "unmute",
     "stop-transport",
     "start-transport",
-    "edit-bpm",
+    "change-tempo",
   ],
 };
 

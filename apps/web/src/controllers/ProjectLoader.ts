@@ -133,7 +133,10 @@ export class ProjectLoader {
       }
     }
 
-    const liveTrack = project.settings?.liveTrack || {
+    const liveTrack = project.settings?.liveTrack ? {
+      ...project.settings.liveTrack,
+      fx: new FXBuilder(project.settings.liveTrack.fx).build(),
+    } : {
       isMuted: false,
       fx: new FXBuilder().build(),
     };

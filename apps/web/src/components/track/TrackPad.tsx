@@ -387,6 +387,7 @@ export const TrackPad = ({
       {/* Main pad — styled according to mockup */}
       <Button
         onClick={handleArm}
+        data-testid={`track-pad-${trackId}`}
         title={
           track.isArmed
             ? "Disarm recording"

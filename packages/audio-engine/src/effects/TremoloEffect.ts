@@ -23,7 +23,7 @@ export class TremoloEffect extends BaseEffect {
 
     // LFO Gain (controls depth)
     this.lfoGain = this.context.createGain();
-    this.lfoGain.gain.value = 0.5; // default depth
+    this.lfoGain.gain.value = 0.0; // default depth (0.0 means bypassed/disabled initially)
 
     // The target Gain node for amplitude modulation
     this.tremoloGain = this.context.createGain();

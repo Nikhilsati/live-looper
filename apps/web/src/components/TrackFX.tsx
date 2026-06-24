@@ -85,8 +85,14 @@ const PresetMenu = ({
         setIsOpen(false);
       }
     };
-    const handleScroll = () => {
-      if (isOpen) setIsOpen(false);
+    const handleScroll = (e: Event) => {
+      if (
+        isOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
     };
 
     if (isOpen) {

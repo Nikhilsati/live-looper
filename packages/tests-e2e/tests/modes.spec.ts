@@ -2,10 +2,12 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Mode System", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Create Project" }).click();
+    await page.goto("/#/looper");
+    await page.getByRole("button").filter({ hasText: "Create Project" }).click();
     await page.getByPlaceholder("Project Name...").fill("Mode Test");
     await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(page).toHaveURL(/\/#\/projects\/.+/);
+    await expect(page.locator("h1").filter({ hasText: "Mode Test" })).toBeVisible();
   });
 
   test("should switch between modes", async ({ page }) => {

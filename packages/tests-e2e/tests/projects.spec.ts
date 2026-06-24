@@ -2,10 +2,10 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Project Management", () => {
   test("should create and delete a project", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#/looper");
 
     // Create project
-    await page.getByRole("button", { name: "Create Project" }).click();
+    await page.getByRole("button").filter({ hasText: "Create Project" }).click();
     const projectName = `Test Project ${Date.now()}`;
     await page.getByPlaceholder("Project Name...").fill(projectName);
     await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -18,7 +18,7 @@ test.describe("Project Management", () => {
     ).toBeVisible();
 
     // Go back to dashboard
-    await page.goto("/");
+    await page.goto("/#/looper");
 
     // Delete project
     const projectCard = page
