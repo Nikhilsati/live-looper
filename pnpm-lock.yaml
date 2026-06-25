@@ -99,6 +99,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@knadh/oat':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@live-looper/audio-engine':
         specifier: workspace:*
         version: link:../../packages/audio-engine
