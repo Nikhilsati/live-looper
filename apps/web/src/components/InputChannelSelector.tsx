@@ -22,6 +22,7 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
     trackChannelConfig,
     setChannelMapping,
     setTrackChannelMode,
+    mode,
   } = useLooperStore();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -372,6 +373,8 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
     </div>
   );
 
+  const isLive = mode === "live";
+
   return (
     <div style={{ position: "relative", display: "inline-block" }}>
       <button
@@ -381,8 +384,9 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          padding: "4px 10px",
+          justifyContent: "center",
+          gap: isLive ? 0 : 8,
+          padding: isLive ? "6px" : "4px 10px",
           borderRadius: 8,
           border: isOpen
             ? "1px solid rgba(255,255,255,0.2)"
@@ -399,24 +403,28 @@ export const InputChannelSelector: React.FC<InputChannelSelectorProps> = ({
           size={14}
           style={{ color: currentDeviceId ? "#a855f7" : "inherit" }}
         />
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 900,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}
-        >
-          {currentMode}
-        </span>
-        <CaretDownIcon
-          size={10}
-          style={{
-            opacity: 0.3,
-            transform: isOpen ? "rotate(180deg)" : "none",
-            transition: "transform 0.2s",
-          }}
-        />
+        {!isLive && (
+          <>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 900,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {currentMode}
+            </span>
+            <CaretDownIcon
+              size={10}
+              style={{
+                opacity: 0.3,
+                transform: isOpen ? "rotate(180deg)" : "none",
+                transition: "transform 0.2s",
+              }}
+            />
+          </>
+        )}
       </button>
 
       {isOpen && createPortal(popoverContent, document.body)}

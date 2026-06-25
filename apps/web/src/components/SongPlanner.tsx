@@ -180,23 +180,27 @@ export const SongPlanner = () => {
   // Center = ~48px. 4 dots spaced 14px apart around center.
   const DOT_POSITIONS = [-21, -7, 7, 21].map((offset) => 48 + offset); // [27, 41, 55, 69]
 
+  const isLive = mode === "live";
+
   return (
-    <Stack style={{ gap: 16 }}>
-      <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <Heading style={{ fontSize: 24, margin: 0 }}>Timeline</Heading>
-        {can("add-section", mode) && (
-          <Button
-            onClick={handleAdd}
-            size="sm"
-            variant="ghost"
-            title="Add a new song section to the timeline"
-          >
-            <Row style={{ alignItems: "center", gap: 6 }}>
-              <PlusIcon size={14} /> Add Section
-            </Row>
-          </Button>
-        )}
-      </Row>
+    <Stack style={{ gap: isLive ? 0 : 16 }}>
+      {!isLive && (
+        <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <Heading style={{ fontSize: 24, margin: 0 }}>Timeline</Heading>
+          {can("add-section", mode) && (
+            <Button
+              onClick={handleAdd}
+              size="sm"
+              variant="ghost"
+              title="Add a new song section to the timeline"
+            >
+              <Row style={{ alignItems: "center", gap: 6 }}>
+                <PlusIcon size={14} /> Add Section
+              </Row>
+            </Button>
+          )}
+        </Row>
+      )}
 
       <div
         style={{

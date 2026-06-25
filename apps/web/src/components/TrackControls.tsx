@@ -128,7 +128,6 @@ export const MetronomeButton = () => {
   return (
     <Button
       onClick={() => {
-        audioEngine.toggleMetronome();
         setMetronomeOn(!metronomeOn);
       }}
       size="sm"
@@ -190,31 +189,24 @@ export const HeaderIndications = () => {
         </div>
       </Stack>
 
-      {/* Beat/bar ring — full size in Live mode, scaled down otherwise */}
-      {isLive ? (
+      {/* Beat/bar ring — scaled down slightly in Live mode to optimize vertical space, more in normal mode */}
+      <div
+        style={{
+          transform: isLive ? "scale(0.75)" : "scale(0.5)",
+          width: isLive ? 120 : 80,
+          height: isLive ? 120 : 80,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
         <ProgressRing
           progress={sectionProgress}
           bar={currentBar}
           beat={currentBeat}
         />
-      ) : (
-        <div
-          style={{
-            transform: "scale(0.5)",
-            width: 80,
-            height: 80,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <ProgressRing
-            progress={sectionProgress}
-            bar={currentBar}
-            beat={currentBeat}
-          />
-        </div>
-      )}
+      </div>
     </Row>
   );
 };

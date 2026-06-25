@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { db } from "./db";
+import { db, safeAddAudioBlob, prepareBlobForIndexedDB } from "./db";
 import { encodePCM16WAV } from "./wav-encoder";
 import type {
   ProjectRecord,
@@ -126,6 +126,7 @@ export class ProjectService {
     } = params;
 
     const wavBlob = encodePCM16WAV(audioData, sampleRate);
+    const preparedWav = await prepareBlobForIndexedDB(wavBlob);
     const audioBlobId = uuidv4();
     const layerId = uuidv4();
 
@@ -136,9 +137,11 @@ export class ProjectService {
 
     let rawAudioBlobId: string | undefined;
     let rawWavBlob: Blob | undefined;
+    let preparedRawWav: Blob | Uint8Array | undefined;
 
     if (rawAudioData) {
       rawWavBlob = encodePCM16WAV(rawAudioData, sampleRate);
+      preparedRawWav = await prepareBlobForIndexedDB(rawWavBlob);
       rawAudioBlobId = uuidv4();
     }
 
@@ -149,23 +152,23 @@ export class ProjectService {
         const audioBlob: AudioBlobRecord = {
           id: audioBlobId,
           projectId,
-          blob: wavBlob,
+          blob: preparedWav as any,
           sampleRate,
           channels: 1,
           lengthSamples: audioData.length,
         };
-        await db.audioBlobs.add(audioBlob);
+        await safeAddAudioBlob(audioBlob);
 
-        if (rawWavBlob && rawAudioBlobId && rawAudioData) {
+        if (preparedRawWav && rawAudioBlobId && rawAudioData) {
           const rawAudioBlob: AudioBlobRecord = {
             id: rawAudioBlobId,
             projectId,
-            blob: rawWavBlob,
+            blob: preparedRawWav as any,
             sampleRate,
             channels: 1,
             lengthSamples: rawAudioData.length,
           };
-          await db.audioBlobs.add(rawAudioBlob);
+          await safeAddAudioBlob(rawAudioBlob);
         }
 
         // Only count active (non-deleted) layers for the order field.

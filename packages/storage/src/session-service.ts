@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { db } from "./db";
+import { db, safeAddAudioBlob, prepareBlobForIndexedDB } from "./db";
 import type {
   SessionRecord,
   SessionEvent,
@@ -20,10 +20,11 @@ export const sessionService = {
 
     if (liveAudioBlob) {
       liveAudioBlobId = uuidv4();
-      await db.audioBlobs.add({
+      const preparedLiveAudio = await prepareBlobForIndexedDB(liveAudioBlob);
+      await safeAddAudioBlob({
         id: liveAudioBlobId,
         projectId,
-        blob: liveAudioBlob,
+        blob: preparedLiveAudio as any,
         sampleRate: 48000, // Not super critical for playback, just for record keeping
         channels: 1,
         lengthSamples: 0, // We don't strictly need this for linear playback

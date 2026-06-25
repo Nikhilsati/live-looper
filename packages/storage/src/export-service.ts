@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "./db";
+import { db, safeAddAudioBlob, prepareBlobForIndexedDB } from "./db";
 import type {
   ProjectRecord,
   TrackRecord,
@@ -106,6 +106,21 @@ export class ExportService {
       updatedAt: Date.now(),
     };
 
+    // Prepare zip blobs before transaction to avoid Dexie PrematureCommitError due to native async operations inside transaction.
+    const preparedBlobsMap = new Map<string, Blob | Uint8Array>();
+    for (const l of oldLayers) {
+      if (l.deletedAt) continue;
+      const oldAudioBlobId = l.audioBlobId;
+      if (!preparedBlobsMap.has(oldAudioBlobId)) {
+        const fileEntry = zip.file(`audio/${oldAudioBlobId}.wav`);
+        if (fileEntry) {
+          const blobData = await fileEntry.async("blob");
+          const preparedBlob = await prepareBlobForIndexedDB(blobData);
+          preparedBlobsMap.set(oldAudioBlobId, preparedBlob);
+        }
+      }
+    }
+
     return await db.transaction(
       "rw",
       [db.projects, db.tracks, db.sections, db.layers, db.audioBlobs],
@@ -147,10 +162,8 @@ export class ExportService {
             blobIdMap.set(oldAudioBlobId, newAudioBlobId);
 
             // Import audio blob
-            const blobData = await zip
-              .file(`audio/${oldAudioBlobId}.wav`)
-              ?.async("blob");
-            if (blobData) {
+            const preparedBlob = preparedBlobsMap.get(oldAudioBlobId);
+            if (preparedBlob) {
               const oldMeta = oldAudioBlobs.find(
                 (b) => b.id === oldAudioBlobId,
               );
@@ -158,12 +171,12 @@ export class ExportService {
               const audioBlob: AudioBlobRecord = {
                 id: newAudioBlobId,
                 projectId: newProjectId,
-                blob: blobData,
+                blob: preparedBlob as any,
                 sampleRate: oldMeta?.sampleRate || 44100,
                 channels: oldMeta?.channels || 1,
                 lengthSamples: oldMeta?.lengthSamples || 0,
               };
-              await db.audioBlobs.add(audioBlob);
+              await safeAddAudioBlob(audioBlob);
             }
           }
 

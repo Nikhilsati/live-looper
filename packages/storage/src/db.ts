@@ -45,7 +45,35 @@ export class LiveLooperDB extends Dexie {
       layers: "id, projectId, trackId, sectionId, deletedAt, audioBlobId",
       audioBlobs: "id, projectId, sampleRate",
     });
+
+    // Add transparent reading hook to convert stored Uint8Array back to Blob
+    this.audioBlobs.hook("reading", (obj) => {
+      if (obj && obj.blob && !(obj.blob instanceof Blob)) {
+        obj.blob = new Blob([obj.blob], { type: "audio/wav" });
+      }
+      return obj;
+    });
   }
 }
 
 export const db = new LiveLooperDB();
+
+export function isWebKit(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    /AppleWebKit\/([\d.]+)/.test(navigator.userAgent) &&
+    !/Chrome\/([\d.]+)/.test(navigator.userAgent)
+  );
+}
+
+export async function prepareBlobForIndexedDB(blob: Blob): Promise<Blob | Uint8Array> {
+  if (isWebKit()) {
+    const arrayBuffer = await blob.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  }
+  return blob;
+}
+
+export async function safeAddAudioBlob(record: AudioBlobRecord): Promise<void> {
+  await db.audioBlobs.add(record);
+}

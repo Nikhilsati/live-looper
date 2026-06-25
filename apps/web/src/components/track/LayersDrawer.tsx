@@ -3,6 +3,7 @@ import { LayersIcon, XIcon } from "@live-looper/icons";
 import { useLooperStore } from "../../store";
 import { db } from "@live-looper/storage";
 import { audioEngine } from "@live-looper/audio-engine";
+import { engineEvents } from "@live-looper/audio-engine/src/EventBus";
 import type { LayerRecord } from "@live-looper/types";
 
 interface LayerEntry {
@@ -57,7 +58,9 @@ export const LayersDrawer = ({
   accent: string;
   onClose: () => void;
 }) => {
-  const { currentProject, sections, currentSectionIndex } = useLooperStore();
+  const { currentProject, sections, currentSectionIndex, tracks } = useLooperStore();
+  const track = tracks[trackId];
+  const layerCount = track?.layerCount ?? 0;
   const [layers, setLayers] = useState<LayerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const sectionName = sections[currentSectionIndex]?.name ?? "Section";
@@ -127,10 +130,18 @@ export const LayersDrawer = ({
     } finally {
       setLoading(false);
     }
-  }, [currentProject?.id, trackId, currentSectionIndex]);
+  }, [currentProject?.id, trackId, currentSectionIndex, layerCount]);
 
   useEffect(() => {
     loadLayers();
+
+    const handleDbUpdate = () => {
+      loadLayers();
+    };
+    engineEvents.on("DB_UPDATE", handleDbUpdate);
+    return () => {
+      engineEvents.off("DB_UPDATE", handleDbUpdate);
+    };
   }, [loadLayers]);
 
   return (

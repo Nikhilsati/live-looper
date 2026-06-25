@@ -95,7 +95,7 @@ class AudioEngine {
 
   private notify(event: EngineEvent) {
     // Fire the specific event for targeted listeners
-    engineEvents.emit(event.type, "payload" in event ? event.payload : undefined);
+    engineEvents.emit(event.type, "payload" in event ? event.payload : event);
     // Fire the catch-all for legacy subscribers
     engineEvents.emit("engine_event", event);
   }
@@ -204,6 +204,22 @@ class AudioEngine {
           smartSnapEnabled: this.smartSnapEnabled,
         },
       });
+
+      // Synchronize initial metronome state to the newly created worklet node
+      this.workletNode.port.postMessage({
+        type: "SET_METRONOME",
+        payload: { enabled: this._metronomeOn },
+      });
+
+      // Synchronize track mute states to the newly created worklet node
+      for (let i = 0; i < TRACK_COUNT; i++) {
+        if (this._workletMuteState[i]) {
+          this.workletNode.port.postMessage({
+            type: "MUTE_TRACK",
+            payload: { trackId: i, muted: true },
+          });
+        }
+      }
 
       console.log(
         "AudioEngine initialized with Multi-Output FX Chain.",
@@ -480,9 +496,11 @@ class AudioEngine {
   }
 
   setMetronome(on: boolean) {
-    if (this._metronomeOn === on) return;
     this._metronomeOn = on;
-    this.workletNode?.port.postMessage({ type: "MUTE_METRONOME" });
+    this.workletNode?.port.postMessage({
+      type: "SET_METRONOME",
+      payload: { enabled: on },
+    });
   }
 
   toggleMetronome() {

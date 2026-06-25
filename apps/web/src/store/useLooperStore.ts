@@ -458,6 +458,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         updatedAt: Date.now(),
       });
     }
+    audioEngine.setMetronome(v);
   },
   smartSnapEnabled: true,
   setSmartSnapEnabled: (v) => {

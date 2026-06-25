@@ -30,3 +30,7 @@ packages/tests-e2e/test-results/
 packages/tests-e2e/playwright-report/
 packages/tests-e2e/.cache/
 
+
+apps/storybook/storybook-static/
+apps/storybook/storybook-static/*
+apps/storybook/.storybook/*

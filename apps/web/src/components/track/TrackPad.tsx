@@ -188,14 +188,14 @@ export const TrackPad = ({
   if (currentState === "idle") {
     cardBorder = "1.5px solid #2d2d4a";
   } else if (currentState === "armed") {
-    cardBorder = "1.5px solid #7c3aed";
+    cardBorder = `1.5px solid ${palette.border}`;
     cardAnimation = "armed-blink 1.1s ease-in-out infinite";
   } else if (currentState === "recording") {
     cardBorder = "1.5px solid #dc2626";
     cardAnimation = "record-pulse 1.2s ease-in-out infinite";
   } else if (currentState === "playing") {
-    cardBorder = "1.5px solid #7c3aed";
-    cardAnimation = "playing-border 2.5s ease-in-out infinite";
+    cardBorder = `1.5px solid ${palette.border}`;
+    cardAnimation = "none";
   } else if (currentState === "muted") {
     cardBorder = "1.5px solid #3a3a5c";
   } else if (currentState === "overdubbing") {
@@ -212,15 +212,15 @@ export const TrackPad = ({
     padBg = "#1a1a2e";
     padBorder = "1.5px solid #2d2d4a";
   } else if (currentState === "armed") {
-    padBg = "#2d1a4a";
-    padBorder = "1.5px solid #7c3aed";
+    padBg = palette.idle;
+    padBorder = `1.5px solid ${palette.border}`;
     padAnimation = "armed-blink 1.1s ease-in-out infinite";
   } else if (currentState === "recording") {
     padBg = "#2a1010";
     padBorder = "1.5px solid #dc2626";
   } else if (currentState === "playing") {
-    padBg = "rgba(124, 58, 237, 0.15)";
-    padBorder = "2px solid #7c3aed";
+    padBg = palette.haudio;
+    padBorder = `2px solid ${palette.border}`;
   } else if (currentState === "muted") {
     padBg = "#1c1c2a";
     padBorder = "1.5px solid #2a2a42";
@@ -443,7 +443,7 @@ export const TrackPad = ({
         {currentState === "armed" && (
           <div
             style={{
-              color: "#7c3aed",
+              color: palette.accent,
               fontSize: 15,
               textAlign: "center",
               padding: "0 10px",
@@ -607,7 +607,18 @@ export const TrackPad = ({
             size="md"
             variant={track.isSoloed ? "active-primary" : "outline"}
             title={track.isSoloed ? "Clear solo" : "Solo this track"}
-            style={{ flex: 1, height: "100%" }}
+            style={{
+              flex: 1,
+              height: "100%",
+              ...(track.isSoloed
+                ? {
+                    background: palette.border,
+                    borderColor: palette.border,
+                    color: "#ffffff",
+                    boxShadow: `0 0 10px ${palette.border}40`,
+                  }
+                : {}),
+            }}
           >
             S
           </Button>
@@ -624,6 +635,14 @@ export const TrackPad = ({
             height: 60,
             borderRadius: 16,
             opacity: track.layerCount === 0 ? 0.2 : 1,
+            ...(track.layerCount > 0
+              ? {
+                  background: palette.border,
+                  borderColor: palette.border,
+                  color: "#ffffff",
+                  boxShadow: `0 0 8px ${palette.border}50`,
+                }
+              : {}),
           }}
         >
           <UndoIcon size={22} />

@@ -5,35 +5,48 @@ import { audioEngine } from "@live-looper/audio-engine";
 
 export class StorageController {
   static init() {
-    engineEvents.on("RECORD_STOP", async (data: any) => {
-      const store = useLooperStore.getState();
-      const currentProjectId = store.currentProject?.id;
-      if (!currentProjectId || !data.buffer) return;
+    engineEvents.on("RECORD_STOP", async (data) => {
+      try {
+        const store = useLooperStore.getState();
+        const currentProjectId = store.currentProject?.id;
+        if (!currentProjectId || !data.buffer) return;
 
-      const trackRecord = await db.tracks
-        .where({ projectId: currentProjectId, order: data.trackId })
-        .first();
-      const sectionRecord = await db.sections
-        .where({ projectId: currentProjectId, order: data.sectionIndex })
-        .first();
+        const trackRecord = await db.tracks
+          .where({ projectId: currentProjectId, order: data.trackId })
+          .first();
+        const sectionRecord = await db.sections
+          .where({ projectId: currentProjectId, order: data.sectionIndex })
+          .first();
 
-      if (trackRecord?.id && sectionRecord?.id) {
-        await projectService.saveLayer({
-          projectId: currentProjectId,
-          trackId: trackRecord.id,
-          sectionId: sectionRecord.id,
-          audioData: data.buffer,
-          rawAudioData: data.rawBuffer,
-          sampleRate: audioEngine.context?.sampleRate ?? 48000,
-        });
-        console.log(
-          "StorageController: Layer saved to IndexedDB" +
-            (data.rawBuffer ? " (with raw snap data)" : "")
-        );
+        if (trackRecord?.id && sectionRecord?.id) {
+          await projectService.saveLayer({
+            projectId: currentProjectId,
+            trackId: trackRecord.id,
+            sectionId: sectionRecord.id,
+            audioData: data.buffer,
+            rawAudioData: data.rawBuffer,
+            sampleRate: audioEngine.context?.sampleRate ?? 48000,
+          });
+          console.log(
+            "StorageController: Layer saved to IndexedDB" +
+              (data.rawBuffer ? " (with raw snap data)" : "")
+          );
+          engineEvents.emit("DB_UPDATE");
+        } else {
+          console.warn("StorageController: trackRecord or sectionRecord not found", {
+            trackRecord: !!trackRecord,
+            sectionRecord: !!sectionRecord,
+            currentProjectId,
+            trackId: data.trackId,
+            sectionIndex: data.sectionIndex
+          });
+        }
+      } catch (err: any) {
+        console.error("StorageController: Error in RECORD_STOP name:", err?.name, "message:", err?.message, "stack:", err?.stack);
       }
     });
 
-    engineEvents.on("UNDO_LAYER", async (data: any) => {
+    engineEvents.on("UNDO_LAYER", async (data) => {
       const store = useLooperStore.getState();
       const currentProjectId = store.currentProject?.id;
       if (!currentProjectId) return;
@@ -57,6 +70,7 @@ export class StorageController {
             removed ? "succeeded" : "nothing to remove"
           } (track=${data.trackId})`
         );
+        engineEvents.emit("DB_UPDATE");
       }
     });
   }

@@ -371,6 +371,10 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           this.queuedSectionIndex = null;
           break;
 
+        case "SET_METRONOME":
+          this.metronomeEnabled = payload.enabled;
+          break;
+
         case "MUTE_METRONOME":
           this.metronomeEnabled = !this.metronomeEnabled;
           break;

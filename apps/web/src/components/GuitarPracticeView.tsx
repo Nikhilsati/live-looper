@@ -145,7 +145,6 @@ export const GuitarPracticeView: React.FC = () => {
   }, [liveTrack.isMuted, setLiveTrackState]);
 
   const handleMetronomeToggle = useCallback(() => {
-    audioEngine.toggleMetronome();
     setMetronomeOn(!metronomeOn);
   }, [metronomeOn, setMetronomeOn]);
 

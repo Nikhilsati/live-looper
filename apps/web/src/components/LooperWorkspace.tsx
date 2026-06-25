@@ -55,7 +55,7 @@ export const LooperWorkspace: React.FC = () => {
           width: "100%",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: isLive ? 20 : 32,
+          marginBottom: isLive ? 8 : 32,
           transition: "margin 0.3s ease",
         }}
       >
