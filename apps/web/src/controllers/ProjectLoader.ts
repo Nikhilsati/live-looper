@@ -167,11 +167,12 @@ export class ProjectLoader {
     const ctx = audioEngine.context!;
     const exactLen = (audioEngine as any).sectionLenSamples(2, 100);
 
+    const base = import.meta.env.BASE_URL;
     const samples = [
-      "/samples/looperman-l-2148602-0151263-secret-trap-drumloop-100bpm.wav",
-      "/samples/looperman-l-6590395-0406745-zaytoven-2.wav",
-      "/samples/looperman-l-0498019-0103176-tumbleweed-100-e-acoustic-guitar-mute-rhythm.wav",
-      "/samples/looperman-l-0498019-0079454-tumbleweed-100-e-d-a-d-clean-strat-rhythm.wav",
+      `${base}samples/looperman-l-2148602-0151263-secret-trap-drumloop-100bpm.wav`,
+      `${base}samples/looperman-l-6590395-0406745-zaytoven-2.wav`,
+      `${base}samples/looperman-l-0498019-0103176-tumbleweed-100-e-acoustic-guitar-mute-rhythm.wav`,
+      `${base}samples/looperman-l-0498019-0079454-tumbleweed-100-e-d-a-d-clean-strat-rhythm.wav`,
     ];
 
     const loadAndDecode = async (url: string) => {

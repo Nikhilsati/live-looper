@@ -27,11 +27,6 @@ export const StateBadge = ({ state }: { state: "idle" | "armed" | "recording" | 
     color = "#fbbf24";
     dotColor = "#d97706";
     animation = "armed-blink 0.8s ease-in-out infinite";
-  } else if (state === "playing") {
-    label = "Playing";
-    bg = "#1e1433";
-    color = "#a78bfa"
-    dotColor = "#7c3aed";
   } else if (state === "muted") {
     label = "Muted";
     bg = "#1e1e30";
