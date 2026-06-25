@@ -34,12 +34,12 @@ test.describe("Latency Compensation & Performance", () => {
   });
 
   test("should toggle Smart Snap in settings popover", async ({ page }) => {
-    const settingsBtn = page.getByTitle("Settings", { exact: true });
+    const settingsBtn = page.locator('[title="Settings"], [data-tooltip="Settings"]').first();
     await expect(settingsBtn).toBeVisible();
     await settingsBtn.click();
 
     // Find smart snap checkbox
-    const snapCheckbox = page.getByTitle("Toggle auto-aligning of recorded loops to the nearest bar boundary");
+    const snapCheckbox = page.locator('input[title="Toggle auto-aligning of recorded loops to the nearest bar boundary"]');
     await expect(snapCheckbox).toBeVisible();
 
     // Toggle snap state
@@ -54,4 +54,39 @@ test.describe("Latency Compensation & Performance", () => {
     await settingsBtn.click();
     await expect(snapCheckbox).not.toBeVisible();
   });
+
+  test("should toggle Separate Cue Mix and show/hide performer output selection", async ({ page }) => {
+    // Open Settings popover using a robust selector
+    const settingsBtn = page.locator('[title="Settings"], [data-tooltip="Settings"]').first();
+    await expect(settingsBtn).toBeVisible();
+    await settingsBtn.click();
+
+    // Verify Performer Output header is not visible initially
+    const performerOutputHeader = page.getByText("Performer Output");
+    await expect(performerOutputHeader).not.toBeVisible();
+
+    // Find and check Separate Cue Mix checkbox
+    const cueMixCheckbox = page.locator('input[title="Toggle separate routing for performer monitoring (cue mix) vs main audience mix"]');
+    await expect(cueMixCheckbox).toBeVisible();
+    await expect(cueMixCheckbox).not.toBeChecked();
+
+    // Check it
+    await cueMixCheckbox.click();
+    await expect(cueMixCheckbox).toBeChecked();
+
+    // Verify Performer Output header is now visible
+    await expect(performerOutputHeader).toBeVisible();
+
+    // Uncheck it
+    await cueMixCheckbox.click();
+    await expect(cueMixCheckbox).not.toBeChecked();
+
+    // Verify Performer Output header is hidden again
+    await expect(performerOutputHeader).not.toBeVisible();
+
+    // Close settings popover
+    await settingsBtn.click();
+    await expect(cueMixCheckbox).not.toBeVisible();
+  });
 });
+

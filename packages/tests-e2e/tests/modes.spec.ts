@@ -22,4 +22,30 @@ test.describe("Mode System", () => {
     await page.getByRole("button", { name: "● LIVE" }).click();
     await expect(page.getByText("LIVE MODE")).toBeVisible();
   });
+
+  test("should enforce interface visibility constraints in Live Mode", async ({ page }) => {
+    // Verify "Settings" button and "Add Section" buttons are visible in Planning Mode
+    const settingsBtn = page.getByTitle("Settings", { exact: true });
+    await expect(settingsBtn).toBeVisible();
+
+    const addSectionBtn = page.getByRole("button", { name: "Add Section" });
+    await expect(addSectionBtn).toBeVisible();
+
+    // Switch to LIVE mode
+    await page.getByRole("button", { name: "● LIVE" }).click();
+    await expect(page.getByText("LIVE MODE")).toBeVisible();
+
+    // Verify "Settings" button and "Add Section" button are hidden
+    await expect(settingsBtn).not.toBeVisible();
+    await expect(addSectionBtn).not.toBeVisible();
+
+    // Switch back to Planning Mode
+    await page.getByRole("button", { name: "Plan", exact: true }).click();
+    await expect(page.getByText("PLANNING MODE")).toBeVisible();
+
+    // Verify buttons are restored to visible
+    await expect(settingsBtn).toBeVisible();
+    await expect(addSectionBtn).toBeVisible();
+  });
 });
+

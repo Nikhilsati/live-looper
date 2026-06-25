@@ -52,9 +52,37 @@ test.describe("Song Timeline & Sections", () => {
     await expect(page.getByTitle(/Track 1 carry-forward/).first()).toBeVisible();
 
     // Delete Section
-    const deleteBtn = initialSections.nth(2).getByTitle("Delete section");
+    const deleteBtn = initialSections.nth(2).locator('[title="Delete section"], [data-tooltip="Delete section"]');
     await deleteBtn.click();
     await expect(page.locator(".timeline-section-card")).toHaveCount(3);
     await expect(page.locator(".timeline-section-card").filter({ hasText: "Outro" })).not.toBeVisible();
   });
+
+  test("should prevent deleting the last remaining section", async ({ page }) => {
+    // Assert 1 default section exists (Verse)
+    const sections = page.locator(".timeline-section-card");
+    await expect(sections).toHaveCount(1);
+
+    // Verify "Delete section" button for the only section is disabled
+    const firstSectionDeleteBtn = sections.nth(0).locator('[title="Delete section"], [data-tooltip="Delete section"]');
+    await expect(firstSectionDeleteBtn).toBeDisabled();
+
+    // Add Section -> Section 2
+    await page.getByRole("button", { name: "Add Section" }).click();
+    await expect(sections).toHaveCount(2);
+
+    // Verify both "Delete section" buttons are now enabled
+    const deleteBtn1 = sections.nth(0).locator('[title="Delete section"], [data-tooltip="Delete section"]');
+    const deleteBtn2 = sections.nth(1).locator('[title="Delete section"], [data-tooltip="Delete section"]');
+    await expect(deleteBtn1).toBeEnabled();
+    await expect(deleteBtn2).toBeEnabled();
+
+    // Delete Section 2
+    await deleteBtn2.click();
+    await expect(sections).toHaveCount(1);
+
+    // Verify that the remaining section's delete button is disabled again
+    await expect(deleteBtn1).toBeDisabled();
+  });
 });
+

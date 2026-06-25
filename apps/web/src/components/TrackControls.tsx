@@ -685,27 +685,30 @@ export const GlobalActionBar = () => {
           )}
 
           {/* ── Settings gear ── */}
-          <div style={{ position: "relative" }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSettings((p) => !p)}
-              title="Settings"
-              style={{
-                width: 36,
-                height: 36,
-                padding: 0,
-                borderRadius: 10,
-                opacity: 0.5,
-              }}
-            >
-              <SettingsIcon size={20} />
-            </Button>
-            {showSettings && (
-              <SettingsPopover onClose={() => setShowSettings(false)} />
-            )}
-          </div>
+          {!isLive && (
+            <div style={{ position: "relative" }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettings((p) => !p)}
+                title="Settings"
+                style={{
+                  width: 36,
+                  height: 36,
+                  padding: 0,
+                  borderRadius: 10,
+                  opacity: 0.5,
+                }}
+              >
+                <SettingsIcon size={20} />
+              </Button>
+              {showSettings && (
+                <SettingsPopover onClose={() => setShowSettings(false)} />
+              )}
+            </div>
+          )}
         </Row>
+
       </div>
       {showBpmPopup && <BpmEditPopup onClose={() => setShowBpmPopup(false)} />}
       {showPerformance && <LatencyMonitor />}
