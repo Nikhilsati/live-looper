@@ -8,6 +8,10 @@ import type {
   WorkletMessage,
 } from "@live-looper/types";
 import { TRACK_COUNT } from "@live-looper/types";
+// @ts-ignore
+import rawProcessorUrl from "./worklets/processor.ts?worker&url";
+// @ts-ignore
+import rawGateUrl from "./worklets/noise-gate-processor.ts?worker&url";
 
 const DEFAULT_SECTIONS: SectionConfig[] = [
   {
@@ -113,17 +117,8 @@ class AudioEngine {
 
     this.context = new AudioContext();
 
-    // @ts-ignore
-    const processorUrl = new URL("./worklets/processor.ts", import.meta.url)
-      .href;
-    // @ts-ignore
-    const gateUrl = new URL(
-      "./worklets/noise-gate-processor.ts",
-      import.meta.url,
-    ).href;
-
-    const bustedUrl = processorUrl + "?t=" + Date.now();
-    const bustedGateUrl = gateUrl + "?t=" + Date.now();
+    const bustedUrl = rawProcessorUrl + "?t=" + Date.now();
+    const bustedGateUrl = rawGateUrl + "?t=" + Date.now();
 
     try {
       await this.context.audioWorklet.addModule(bustedUrl);
