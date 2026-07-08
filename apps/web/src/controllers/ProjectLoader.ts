@@ -132,6 +132,26 @@ export class ProjectLoader {
         }
       }
     }
+    // Load backing track if it exists in project settings
+    const backingTrack = project.settings?.backingTrack;
+    if (backingTrack && backingTrack.audioBlobId) {
+      const blobRecord = await db.audioBlobs.get(backingTrack.audioBlobId);
+      if (blobRecord && audioEngine.context) {
+        try {
+          const arrayBuffer = await blobRecord.blob.arrayBuffer();
+          const audioBuffer = await audioEngine.context.decodeAudioData(arrayBuffer);
+          const data = audioBuffer.getChannelData(0);
+          audioEngine.setBackingTrackBuffer(data);
+          audioEngine.setBackingTrackVolume(backingTrack.volume);
+          audioEngine.setBackingTrackLoop(backingTrack.loop);
+          audioEngine.setBackingTrackRouting(backingTrack.monitorOnly);
+        } catch (e) {
+          console.error("Error loading backing track blob into engine", e);
+        }
+      }
+    } else {
+      audioEngine.setBackingTrackBuffer(null);
+    }
 
     const liveTrack = project.settings?.liveTrack ? {
       ...project.settings.liveTrack,

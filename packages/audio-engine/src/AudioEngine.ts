@@ -50,6 +50,9 @@ class AudioEngine {
   workletNode: AudioWorkletNode | null = null;
   trackFX: TrackFXChain[] = [];
   liveTrackFX: TrackFXChain | null = null;
+  backingTrackBus: GainNode | null = null;
+  backingTrackMasterGain: GainNode | null = null;
+  backingTrackPerformerGain: GainNode | null = null;
   masterBus: MasterBus | null = null;
   performerBus: GainNode | null = null;
   performerDestination: MediaStreamAudioDestinationNode | null = null;
@@ -130,8 +133,8 @@ class AudioEngine {
         {
           // Support up to TRACK_COUNT separate audio inputs (one per track)
           numberOfInputs: TRACK_COUNT,
-          numberOfOutputs: TRACK_COUNT + 1, // TRACK_COUNT tracks + 1 metronome
-          outputChannelCount: Array(TRACK_COUNT + 1).fill(2),
+          numberOfOutputs: TRACK_COUNT + 2, // TRACK_COUNT tracks + 1 metronome + 1 backing track
+          outputChannelCount: Array(TRACK_COUNT + 2).fill(2),
         },
       );
 
@@ -177,6 +180,18 @@ class AudioEngine {
         this.workletNode.connect(this.masterBus.input, TRACK_COUNT);
         this.performerContext.suspend();
       }
+
+      // Backing Track Routing Setup
+      this.backingTrackBus = this.context.createGain();
+      this.backingTrackMasterGain = this.context.createGain();
+      this.backingTrackPerformerGain = this.context.createGain();
+
+      this.workletNode.connect(this.backingTrackBus, TRACK_COUNT + 1);
+      this.backingTrackBus.connect(this.backingTrackMasterGain);
+      this.backingTrackBus.connect(this.backingTrackPerformerGain);
+
+      this.backingTrackMasterGain.connect(this.masterBus.input);
+      this.backingTrackPerformerGain.connect(this.performerBus);
 
       this.workletNode.port.onmessage = (event) => {
         const data = event.data as WorkletEvent;
@@ -712,6 +727,45 @@ class AudioEngine {
       sampleRate: this.context.sampleRate,
       state: this.context.state,
     };
+  }
+
+  setBackingTrackBuffer(buffer: Float32Array | null) {
+    this.workletNode?.port.postMessage({
+      type: "SET_BACKING_TRACK",
+      payload: { buffer },
+    });
+  }
+
+  setBackingTrackLoop(loop: boolean) {
+    this.workletNode?.port.postMessage({
+      type: "SET_BACKING_TRACK_LOOP",
+      payload: { loop },
+    });
+  }
+
+  setBackingTrackVolume(volume: number) {
+    if (this.backingTrackBus && this.context) {
+      this.backingTrackBus.gain.setTargetAtTime(
+        volume,
+        this.context.currentTime,
+        0.01,
+      );
+    }
+  }
+
+  setBackingTrackRouting(monitorOnly: boolean) {
+    if (this.backingTrackMasterGain && this.backingTrackPerformerGain && this.context) {
+      this.backingTrackMasterGain.gain.setTargetAtTime(
+        monitorOnly ? 0 : 1,
+        this.context.currentTime,
+        0.01,
+      );
+      this.backingTrackPerformerGain.gain.setTargetAtTime(
+        1,
+        this.context.currentTime,
+        0.01,
+      );
+    }
   }
 }
 

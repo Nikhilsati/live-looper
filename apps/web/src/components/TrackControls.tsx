@@ -53,6 +53,7 @@ import { TRACK_COLORS } from "./track/trackColors";
 import { TrackPad } from "./track/TrackPad";
 import { LiveTrackPad } from "./track/LiveTrackPad";
 import { ProgressRing } from "./track/ProgressRing";
+import { BackingTrackRow } from "./track/BackingTrackRow";
 
 export const ICON_SIZE = 22;
 export const MAX_LAYER_INDICATOR_BARS = 4;
@@ -713,7 +714,15 @@ export const TrackControls = () => {
   const [activeFXTrack, setActiveFXTrack] = useState<number | null>(null);
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -749,6 +758,8 @@ export const TrackControls = () => {
           </Grid>
         </div>
       </div>
+
+      <BackingTrackRow />
 
       {activeFXTrack !== null && (
         <Modal onClose={() => setActiveFXTrack(null)}>

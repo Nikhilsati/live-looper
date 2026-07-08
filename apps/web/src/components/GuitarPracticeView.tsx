@@ -19,6 +19,7 @@ import {
 } from "@live-looper/icons";
 import { Button, LevelMeter } from "@live-looper/ui";
 import { SettingsPopover } from "./SettingsPopover";
+import { BackingTrackRow } from "./track/BackingTrackRow";
 
 // VU Meter component removed in favor of shared LevelMeter component
 
@@ -397,6 +398,8 @@ export const GuitarPracticeView: React.FC = () => {
               {showFX ? "Hide" : "Show"}
             </button>
           </div>
+
+          <BackingTrackRow />
 
           {showFX && (
             <div

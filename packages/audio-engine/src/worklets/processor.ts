@@ -135,6 +135,11 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
   private inputCount: number = 0;
   private smartSnapEnabled: boolean = false;
 
+  // Backing Track State
+  private backingTrackBuffer: Float32Array | null = null;
+  private backingTrackPlaybackSample: number = 0;
+  private backingTrackLoop: boolean = true;
+
   constructor() {
     super();
 
@@ -169,18 +174,29 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           this.sectionSampleOffset = 0;
           this.currentSectionIndex = 0;
           this.queuedSectionIndex = null;
+          this.backingTrackPlaybackSample = 0;
           break;
 
         case "STOP":
           this.isPlaying = false;
           this.currentSample = 0;
           this.sectionSampleOffset = 0;
+          this.backingTrackPlaybackSample = 0;
           for (const track of this.tracks) {
             if (track.state === "RECORDING" || track.state === "POST_ROLL") {
               const sd = track.sections.get(this.currentSectionIndex);
               track.state = (sd && sd.layers.length > 0) ? "PLAYING" : "IDLE";
             }
           }
+          break;
+
+        case "SET_BACKING_TRACK":
+          this.backingTrackBuffer = payload.buffer;
+          this.backingTrackPlaybackSample = 0;
+          break;
+
+        case "SET_BACKING_TRACK_LOOP":
+          this.backingTrackLoop = payload.loop;
           break;
 
         case "CONFIG": {
@@ -966,6 +982,26 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         if (systemOutput[1]) systemOutput[1][i] = systemSample;
       }
 
+      // Backing track on output 5
+      const backingTrackOutput = outputs[5];
+      if (backingTrackOutput && this.backingTrackBuffer && this.isPlaying) {
+        let backingSample = 0;
+        if (this.backingTrackPlaybackSample < this.backingTrackBuffer.length) {
+          backingSample = this.backingTrackBuffer[this.backingTrackPlaybackSample];
+          this.backingTrackPlaybackSample++;
+        } else if (this.backingTrackLoop) {
+          this.backingTrackPlaybackSample = 0;
+          backingSample = this.backingTrackBuffer[this.backingTrackPlaybackSample];
+          this.backingTrackPlaybackSample++;
+        }
+
+        if (backingTrackOutput[0]) backingTrackOutput[0][i] = backingSample;
+        if (backingTrackOutput[1]) backingTrackOutput[1][i] = backingSample;
+      } else if (backingTrackOutput) {
+        if (backingTrackOutput[0]) backingTrackOutput[0][i] = 0;
+        if (backingTrackOutput[1]) backingTrackOutput[1][i] = 0;
+      }
+
       // ── 2. Recording Logic ────────────────────────────────────────────
       for (const track of this.tracks) {
         // Quantized start at section boundary
@@ -1145,6 +1181,9 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         sectionIndex: this.currentSectionIndex,
         sectionProgress,
         inputLevels,
+        backingTrackProgress: (this.backingTrackBuffer && this.backingTrackBuffer.length > 0)
+          ? this.backingTrackPlaybackSample / this.backingTrackBuffer.length
+          : 0,
       });
     }
 

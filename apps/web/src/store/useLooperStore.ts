@@ -120,6 +120,18 @@ interface LooperStore extends EngineState {
   setLiveTrackState: (state: Partial<LiveTrackState>) => void;
   engineCrashed: boolean;
   setEngineCrashed: (v: boolean) => void;
+  // Backing Track State
+  backingTrackName: string | null;
+  backingTrackVolume: number;
+  backingTrackLoop: boolean;
+  backingTrackMonitorOnly: boolean;
+  backingTrackProgress: number;
+  backingTrackDuration: number;
+  // Backing Track Actions
+  setBackingTrackFile: (file: File) => Promise<void>;
+  removeBackingTrack: () => Promise<void>;
+  updateBackingTrackSettings: (settings: Partial<{ volume: number; loop: boolean; monitorOnly: boolean }>) => Promise<void>;
+
   // Multi-channel I/O
   channelMapping: (string | null)[];
   trackChannelConfig: { [trackId: number]: { mode: "mono" | "stereo" } };
@@ -179,6 +191,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     Array.from({ length: TRACK_COUNT }, (_, i) => [i, { mode: "stereo" as const }]),
   ),
   inputLevels: Array(TRACK_COUNT).fill(0),
+  backingTrackName: null,
+  backingTrackVolume: 0.8,
+  backingTrackLoop: true,
+  backingTrackMonitorOnly: false,
+  backingTrackProgress: 0,
+  backingTrackDuration: 0,
 
   fxPresets: [],
   fetchFXPresets: async () => {
@@ -517,11 +535,18 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
   closeProject: () => {
     audioEngine.stop();
+    audioEngine.setBackingTrackBuffer(null);
     localStorage.removeItem("looper_current_project_id");
     set({
       currentProject: null,
       isPlaying: false,
       tracks: Array.from({ length: TRACK_COUNT }, defaultTrack),
+      backingTrackName: null,
+      backingTrackVolume: 0.8,
+      backingTrackLoop: true,
+      backingTrackMonitorOnly: false,
+      backingTrackProgress: 0,
+      backingTrackDuration: 0,
     });
   },
 
@@ -870,6 +895,175 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     });
   },
 
+  setBackingTrackFile: async (file: File) => {
+    const { currentProject } = get();
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      if (!audioEngine.context) {
+        await audioEngine.init();
+      }
+      const audioContext = audioEngine.context!;
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const data = audioBuffer.getChannelData(0);
+      
+      if (currentProject?.id) {
+        const blobId = `backing-${currentProject.id}-${Date.now()}`;
+        
+        const { prepareBlobForIndexedDB, safeAddAudioBlob } = await import("@live-looper/storage");
+        const idbBlob = await prepareBlobForIndexedDB(file);
+        await safeAddAudioBlob({
+          id: blobId,
+          projectId: currentProject.id,
+          blob: idbBlob as Blob,
+          sampleRate: audioBuffer.sampleRate,
+          channels: audioBuffer.numberOfChannels,
+          lengthSamples: audioBuffer.length,
+        });
+
+        const oldBlobId = currentProject.settings?.backingTrack?.audioBlobId;
+        if (oldBlobId) {
+          await db.audioBlobs.delete(oldBlobId);
+        }
+
+        const backingTrackSettings = {
+          audioBlobId: blobId,
+          name: file.name,
+          volume: get().backingTrackVolume,
+          loop: get().backingTrackLoop,
+          monitorOnly: get().backingTrackMonitorOnly,
+          duration: audioBuffer.duration,
+        };
+
+        const newSettings = {
+          ...(currentProject.settings ?? {}),
+          backingTrack: backingTrackSettings,
+        };
+
+        set({
+          backingTrackName: file.name,
+          backingTrackDuration: audioBuffer.duration,
+          backingTrackProgress: 0,
+          currentProject: {
+            ...currentProject,
+            settings: newSettings,
+          },
+        });
+
+        await db.projects.update(currentProject.id, {
+          settings: newSettings,
+          updatedAt: Date.now(),
+        });
+      } else {
+        // In-memory temp load for practice view when no project loaded
+        set({
+          backingTrackName: file.name,
+          backingTrackDuration: audioBuffer.duration,
+          backingTrackProgress: 0,
+        });
+      }
+
+      audioEngine.setBackingTrackBuffer(data);
+      audioEngine.setBackingTrackVolume(get().backingTrackVolume);
+      audioEngine.setBackingTrackLoop(get().backingTrackLoop);
+      audioEngine.setBackingTrackRouting(get().backingTrackMonitorOnly);
+    } catch (e) {
+      console.error("Failed to load and decode backing track", e);
+      uiAlert("Failed to load backing track audio file. Please try another format (.mp3 or .wav).");
+    }
+  },
+
+  removeBackingTrack: async () => {
+    const { currentProject } = get();
+
+    if (currentProject?.id) {
+      const oldBlobId = currentProject.settings?.backingTrack?.audioBlobId;
+      if (oldBlobId) {
+        try {
+          await db.audioBlobs.delete(oldBlobId);
+        } catch (e) {
+          console.error("Failed to delete backing track audio blob", e);
+        }
+      }
+
+      const settings = { ...(currentProject.settings ?? {}) };
+      delete settings.backingTrack;
+
+      set({
+        backingTrackName: null,
+        backingTrackDuration: 0,
+        backingTrackProgress: 0,
+        currentProject: {
+          ...currentProject,
+          settings,
+        },
+      });
+
+      await db.projects.update(currentProject.id, {
+        settings,
+        updatedAt: Date.now(),
+      });
+    } else {
+      set({
+        backingTrackName: null,
+        backingTrackDuration: 0,
+        backingTrackProgress: 0,
+      });
+    }
+
+    audioEngine.setBackingTrackBuffer(null);
+  },
+
+  updateBackingTrackSettings: async (settings) => {
+    const { currentProject } = get();
+
+    set((prev) => {
+      const updates: any = {};
+      if (settings.volume !== undefined) {
+        updates.backingTrackVolume = settings.volume;
+        audioEngine.setBackingTrackVolume(settings.volume);
+      }
+      if (settings.loop !== undefined) {
+        updates.backingTrackLoop = settings.loop;
+        audioEngine.setBackingTrackLoop(settings.loop);
+      }
+      if (settings.monitorOnly !== undefined) {
+        updates.backingTrackMonitorOnly = settings.monitorOnly;
+        audioEngine.setBackingTrackRouting(settings.monitorOnly);
+      }
+
+      if (currentProject?.id) {
+        const currentBacking = prev.currentProject?.settings?.backingTrack;
+        if (currentBacking) {
+          const updatedBacking = {
+            ...currentBacking,
+            ...settings,
+          };
+
+          const newSettings = {
+            ...(prev.currentProject?.settings ?? {}),
+            backingTrack: updatedBacking,
+          };
+
+          db.projects.update(currentProject.id, {
+            settings: newSettings,
+            updatedAt: Date.now(),
+          }).catch(e => console.error("Failed to update project backing track settings", e));
+
+          return {
+            ...updates,
+            currentProject: {
+              ...prev.currentProject!,
+              settings: newSettings,
+            },
+          };
+        }
+      }
+
+      return updates;
+    });
+  },
+
   calibrateLatency: () => {
     if (get().mode === "live") return;
     set({ isCalibratingLatency: true });
@@ -903,6 +1097,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         set({
           jitter: event.jitter || 0,
           inputLevels: event.inputLevels || Array(TRACK_COUNT).fill(0),
+          backingTrackProgress: event.backingTrackProgress ?? 0,
         });
         break;
       case "RECORD_START":
@@ -967,6 +1162,13 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
             Array.from({ length: TRACK_COUNT }, (_, i) => [i, { mode: "stereo" as const }]),
           );
 
+        const backingTrack = savedSettings.backingTrack;
+        const backingTrackName = backingTrack?.name ?? null;
+        const backingTrackVolume = backingTrack?.volume ?? 0.8;
+        const backingTrackLoop = backingTrack?.loop ?? true;
+        const backingTrackMonitorOnly = backingTrack?.monitorOnly ?? false;
+        const backingTrackDuration = backingTrack?.duration ?? 0;
+
         set({
           bpm: project.bpm,
           sections,
@@ -977,6 +1179,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           channelMapping,
           trackChannelConfig,
           liveTrack: event.payload.liveTrack,
+          backingTrackName,
+          backingTrackVolume,
+          backingTrackLoop,
+          backingTrackMonitorOnly,
+          backingTrackDuration,
+          backingTrackProgress: 0,
           tracks: tracks.map((t: any, i: number) => {
             const count = layerCounts?.[i] || 0;
             return {
@@ -1015,6 +1223,11 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           audioEngine.setLiveTrackMute(event.payload.liveTrack.isMuted);
           audioEngine.updateLiveTrackFX(event.payload.liveTrack.fx, project.bpm);
         }
+
+        // Apply backing track settings
+        audioEngine.setBackingTrackVolume(backingTrackVolume);
+        audioEngine.setBackingTrackLoop(backingTrackLoop);
+        audioEngine.setBackingTrackRouting(backingTrackMonitorOnly);
         break;
       }
     }

@@ -160,6 +160,14 @@ export interface ProjectRecord {
     liveTrack?: LiveTrackState;
     channelMapping?: (string | null)[];
     trackChannelConfig?: { [trackId: number]: { mode: "mono" | "stereo" } };
+    backingTrack?: {
+      audioBlobId?: string;
+      name: string;
+      volume: number;
+      loop: boolean;
+      monitorOnly: boolean;
+      duration: number;
+    };
   };
 }
 
@@ -279,7 +287,9 @@ export type WorkletMessage =
   | {
       type: "CONFIG_CHANNELS";
       payload: { trackConfigs: { trackId: number; mode: "mono" | "stereo" }[] };
-    };
+    }
+  | { type: "SET_BACKING_TRACK"; payload: { buffer: Float32Array | null } }
+  | { type: "SET_BACKING_TRACK_LOOP"; payload: { loop: boolean } };
 
 export type WorkletEvent =
   | ({ type: "TICK" } & Pick<
@@ -289,7 +299,7 @@ export type WorkletEvent =
       | "sectionProgress"
       | "jitter"
       | "inputLevels"
-    > & { sectionIndex: number })
+    > & { sectionIndex: number; backingTrackProgress?: number })
   | {
       type: "RECORD_START";
       trackId: number;
