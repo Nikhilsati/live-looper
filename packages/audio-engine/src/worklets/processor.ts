@@ -2,7 +2,7 @@ import { type AudioWorkletProcessor, TRACK_COUNT } from "@live-looper/types";
 
 declare var AudioWorkletProcessor: {
   prototype: AudioWorkletProcessor;
-  new (options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
+  new(options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
 };
 
 declare function registerProcessor(
@@ -101,6 +101,88 @@ function adaptBufferToLength(
   return out;
 }
 
+// ─── Metronome Helper ──────────────────────────────────────────────────────────
+class Metronome {
+  private sampleRate: number;
+
+  constructor(sampleRate: number) {
+    this.sampleRate = sampleRate;
+  }
+
+  setSampleRate(rate: number) {
+    this.sampleRate = rate;
+  }
+
+  generateSample(
+    currentSample: number,
+    sectionSampleOffset: number,
+    sectionLen: number,
+    samplesPerBeat: number,
+    beatsPerBar: number,
+    lengthInBars: number
+  ): number {
+    if (sectionLen <= 0 || samplesPerBeat <= 0 || beatsPerBar <= 0) {
+      return 0;
+    }
+
+    const sectionRelative = currentSample - sectionSampleOffset;
+    const sectionSample0 = (sectionRelative - 1 + sectionLen) % sectionLen;
+    const totalBeats = lengthInBars * beatsPerBar;
+
+    let k = Math.floor(sectionSample0 / samplesPerBeat);
+    if (k < 0) k = 0;
+    if (k >= totalBeats) k = totalBeats - 1;
+
+    while (k + 1 < totalBeats && sectionSample0 >= Math.floor(samplesPerBeat * (k + 1))) {
+      k++;
+    }
+    while (k > 0 && sectionSample0 < Math.floor(samplesPerBeat * k)) {
+      k--;
+    }
+
+    const beatStartSample = Math.floor(samplesPerBeat * k);
+    const beatSample = sectionSample0 - beatStartSample;
+    const clickDurationSamples = Math.floor(this.sampleRate * 0.08);
+
+    if (beatSample < clickDurationSamples) {
+      const beatOfBar = (k % beatsPerBar) + 1;
+      const isLastBarDownbeat = k === (lengthInBars - 1) * beatsPerBar;
+      const isNormalBarDownbeat = beatOfBar === 1 && !isLastBarDownbeat;
+
+      const t = beatSample / this.sampleRate;
+
+      if (isLastBarDownbeat) {
+        const freq = 600;
+        const decay = 80;
+        const env = Math.exp(-decay * t);
+        return (
+          Math.sin(2 * Math.PI * freq * t) +
+          0.5 * Math.sin(2 * Math.PI * freq * 1.5 * t) +
+          0.25 * Math.sin(2 * Math.PI * freq * 2 * t)
+        ) * env * 0.5;
+      } else if (isNormalBarDownbeat) {
+        const freq = 1200;
+        const decay = 150;
+        const env = Math.exp(-decay * t);
+        return (
+          Math.sin(2 * Math.PI * freq * t) +
+          0.3 * Math.sin(2 * Math.PI * freq * 2 * t)
+        ) * env * 0.4;
+      } else {
+        const freq = 900;
+        const decay = 220;
+        const env = Math.exp(-decay * t);
+        return (
+          Math.sin(2 * Math.PI * freq * t) +
+          0.2 * Math.sin(2 * Math.PI * freq * 2 * t)
+        ) * env * 0.25;
+      }
+    }
+
+    return 0;
+  }
+}
+
 // ─── Processor ─────────────────────────────────────────────────────────────────
 class LiveLooperProcessor extends AudioWorkletProcessor {
   private currentSample: number = 0;
@@ -110,6 +192,15 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
   private tracks: Track[] = [];
   private metronomeEnabled: boolean = true;
   private lastProcessTime: number = 0;
+  private metronome: Metronome;
+  private beatsPerBar: number = 4;
+
+  private getBeatsPerBar(): number {
+    if (typeof this.beatsPerBar === "number" && !isNaN(this.beatsPerBar) && this.beatsPerBar > 0) {
+      return this.beatsPerBar;
+    }
+    return 4;
+  }
 
   // RTL & Compensation
   private rtlTestActive: boolean = false;
@@ -142,6 +233,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
 
   constructor() {
     super();
+    this.metronome = new Metronome(this.sampleRate);
 
     for (let id = 0; id < TRACK_COUNT; id++) {
       this.tracks.push({
@@ -207,7 +299,8 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
             latencySamples,
             smartSnapEnabled,
             quantization,
-          } = payload;
+            beatsPerBar,
+          } = payload as any;
           this.sampleRate = sampleRate;
           this.samplesPerBeat = (sampleRate * 60) / bpm;
           if (sections && sections.length > 0) {
@@ -225,6 +318,10 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           if (quantization) {
             this.quantization = quantization;
           }
+          if (typeof beatsPerBar === "number") {
+            this.beatsPerBar = beatsPerBar;
+          }
+          this.metronome.setSampleRate(this.sampleRate);
           // Initialize the pre-roll / post-roll window size (e.g. 250ms)
           this.smartSnapWindowSamples = Math.floor(
             (this.sampleRate * 250) / 1000,
@@ -404,7 +501,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           const secConfig = this.sections.find((s) => s.index === sectionIndex);
           const sectionLen =
             secConfig && this.samplesPerBeat > 0
-              ? Math.floor(this.samplesPerBeat * 4 * secConfig.lengthInBars)
+              ? Math.floor(this.samplesPerBeat * this.getBeatsPerBar() * secConfig.lengthInBars)
               : rawBuf.length;
 
           const layerBuf = adaptBufferToLength(rawBuf, sectionLen);
@@ -444,7 +541,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
   private currentSectionLen(): number {
     const sec = this.sections[this.currentSectionIndex];
     if (!sec || this.samplesPerBeat === 0) return 0;
-    return Math.floor(this.samplesPerBeat * 4 * sec.lengthInBars);
+    return Math.floor(this.samplesPerBeat * this.getBeatsPerBar() * sec.lengthInBars);
   }
 
   private commitLayerStandard(track: Track, sectionLen: number) {
@@ -490,7 +587,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
       const nextSec = this.sections.find((s) => s.index === i);
       if (nextSec && nextSec.trackLinks && nextSec.trackLinks[track.id]) {
         const nextLen = Math.floor(
-          this.samplesPerBeat * 4 * nextSec.lengthInBars,
+          this.samplesPerBeat * this.getBeatsPerBar() * nextSec.lengthInBars,
         );
         if (nextLen > 0) {
           const nextSd = getOrCreateSectionData(track, i, nextLen);
@@ -562,7 +659,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         if (!secConfig) return;
 
         const newSectionLen = Math.floor(
-          newSamplesPerBeat * 4 * secConfig.lengthInBars,
+          newSamplesPerBeat * this.getBeatsPerBar() * secConfig.lengthInBars,
         );
         if (newSectionLen === 0) return;
 
@@ -707,6 +804,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
 
   private commitLayerWithSmartSnap(track: Track, sectionLen: number) {
     const recSectionIndex = track.recordingSectionIndex ?? this.currentSectionIndex;
+    const recSectionConfig = this.sections.find((s) => s.index === recSectionIndex);
     const sd = getOrCreateSectionData(
       track,
       recSectionIndex,
@@ -747,7 +845,8 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     const quantizedOnsets = onsets.map((onset) => {
       const relativeOffset = onset - this.smartSnapWindowSamples;
       const gridRes = this.quantization?.gridResolution || 16;
-      const samplesPerGrid = this.samplesPerBeat * (4 / gridRes);
+      const bpb = this.getBeatsPerBar();
+      const samplesPerGrid = this.samplesPerBeat * (bpb / gridRes);
 
       const gridIndex = Math.round(relativeOffset / samplesPerGrid);
       let quantizedIdx =
@@ -815,7 +914,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
       const nextSec = this.sections.find((s) => s.index === i);
       if (nextSec && nextSec.trackLinks && nextSec.trackLinks[track.id]) {
         const nextLen = Math.floor(
-          this.samplesPerBeat * 4 * nextSec.lengthInBars,
+          this.samplesPerBeat * this.getBeatsPerBar() * nextSec.lengthInBars,
         );
         if (nextLen > 0) {
           const nextSd = getOrCreateSectionData(track, i, nextLen);
@@ -967,16 +1066,17 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
       const systemOutput = outputs[4];
       if (systemOutput && !this.rtlTestActive) {
         let systemSample = 0;
-        if (
-          this.metronomeEnabled &&
-          this.samplesPerBeat > 0 &&
-          this.currentSample % Math.floor(this.samplesPerBeat) === 0
-        ) {
-          const totalBeats = Math.floor(
-            this.currentSample / this.samplesPerBeat,
+        if (this.metronomeEnabled) {
+          const currentSection = this.sections[this.currentSectionIndex];
+          const lengthInBars = currentSection ? currentSection.lengthInBars : 4;
+          systemSample = this.metronome.generateSample(
+            this.currentSample,
+            this.sectionSampleOffset,
+            this.currentSectionLen(),
+            this.samplesPerBeat,
+            this.getBeatsPerBar(),
+            lengthInBars
           );
-          const isBarOne = totalBeats % 4 === 0;
-          systemSample = isBarOne ? 0.7 : 0.35;
         }
         if (systemOutput[0]) systemOutput[0][i] = systemSample;
         if (systemOutput[1]) systemOutput[1][i] = systemSample;
@@ -1041,7 +1141,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           const recSectionIndex = track.recordingSectionIndex ?? this.currentSectionIndex;
           const recSectionConfig = this.sections.find((s) => s.index === recSectionIndex);
           const recSectionLen = recSectionConfig && this.samplesPerBeat > 0
-            ? Math.floor(this.samplesPerBeat * 4 * recSectionConfig.lengthInBars)
+            ? Math.floor(this.samplesPerBeat * this.getBeatsPerBar() * recSectionConfig.lengthInBars)
             : sectionLen;
 
           const elapsedSamples = this.currentSample - (track.recordingStartSample ?? 0);
@@ -1075,7 +1175,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           const recSectionIndex = track.recordingSectionIndex ?? this.currentSectionIndex;
           const recSectionConfig = this.sections.find((s) => s.index === recSectionIndex);
           const recSectionLen = recSectionConfig && this.samplesPerBeat > 0
-            ? Math.floor(this.samplesPerBeat * 4 * recSectionConfig.lengthInBars)
+            ? Math.floor(this.samplesPerBeat * this.getBeatsPerBar() * recSectionConfig.lengthInBars)
             : sectionLen;
 
           const tInput = trackInputs[track.id];
@@ -1157,8 +1257,10 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
       const sectionRelative = this.currentSample - this.sectionSampleOffset;
       const sectionLen2 = this.currentSectionLen();
       const sectionBeat = Math.floor(sectionRelative / this.samplesPerBeat);
-      const bar = Math.floor(sectionBeat / 4) + 1;
-      const beat = (sectionBeat % 4) + 1;
+      const currentSection = this.sections[this.currentSectionIndex];
+      const bpb = this.getBeatsPerBar();
+      const bar = Math.floor(sectionBeat / bpb) + 1;
+      const beat = (sectionBeat % bpb) + 1;
       const sectionProgress =
         sectionLen2 > 0 ? (sectionRelative % sectionLen2) / sectionLen2 : 0;
       const currentBar = bar;
