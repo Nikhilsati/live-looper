@@ -1,4 +1,8 @@
 import React, { useRef, useState } from "react";
+
+const BackingTrackAdvancedPanel = React.lazy(() =>
+  import("./BackingTrackAdvancedPanel").then((m) => ({ default: m.BackingTrackAdvancedPanel }))
+);
 import {
   MuteIcon,
   VolumeHighIcon,
@@ -7,6 +11,7 @@ import {
   WaveformIcon,
   TrashIcon,
   LoopIcon,
+  SettingsIcon,
 } from "@live-looper/icons";
 import { useLooperStore } from "../../store";
 import {
@@ -22,12 +27,16 @@ export const BackingTrackRow: React.FC = () => {
   const {
     mode,
     isPlaying,
+    bpm,
     backingTrackName,
     backingTrackVolume,
     backingTrackLoop,
     backingTrackMonitorOnly,
     backingTrackProgress,
     backingTrackDuration,
+    backingTrackTrimStart,
+    backingTrackTrimEnd,
+    backingTrackWaveform,
     setBackingTrackFile,
     removeBackingTrack,
     updateBackingTrackSettings,
@@ -36,6 +45,8 @@ export const BackingTrackRow: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const isLive = mode === "live";
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,14 +86,23 @@ export const BackingTrackRow: React.FC = () => {
         borderRadius: 20,
         boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
         display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 24,
+        flexDirection: "column",
+        gap: showAdvanced ? 20 : 0,
         position: "relative",
         minHeight: 88,
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
+      <Row
+        style={{
+          width: "100%",
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 24,
+        }}
+      >
       <input
         type="file"
         ref={fileInputRef}
@@ -222,19 +242,28 @@ export const BackingTrackRow: React.FC = () => {
                 padding: "0 16px",
                 opacity: 0.15,
                 pointerEvents: "none",
+                height: "100%",
               }}
             >
-              {Array.from({ length: 48 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    width: 2,
-                    height: `${Math.sin(idx * 0.4) * 12 + 18}px`,
-                    background: "white",
-                    borderRadius: 1,
-                  }}
-                />
-              ))}
+              {(backingTrackWaveform && backingTrackWaveform.length > 0
+                ? backingTrackWaveform.filter((_, i) => i % 3 === 0).slice(0, 64)
+                : Array.from({ length: 64 }).map((_, idx) => (Math.sin(idx * 0.2) * 0.3 + 0.5) * 0.4)
+              ).map((val, idx) => {
+                const height = backingTrackWaveform && backingTrackWaveform.length > 0
+                  ? Math.max(3, val * 26) // container is 36px high
+                  : Math.max(3, val * 30);
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      width: 2,
+                      height: `${height}px`,
+                      background: "white",
+                      borderRadius: 1,
+                    }}
+                  />
+                );
+              })}
             </div>
 
             {/* Glowing Active Progress Bar */}
@@ -250,6 +279,37 @@ export const BackingTrackRow: React.FC = () => {
                 boxShadow: "0 0 10px rgba(99, 102, 241, 0.4)",
                 transition: isPlaying ? "width 0.1s linear" : "none",
                 pointerEvents: "none",
+                zIndex: 2,
+              }}
+            />
+
+            {/* Shaded Out-Of-Bounds (Trimmed) Areas on Main Waveform */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: `${(backingTrackTrimStart / (backingTrackDuration || 1)) * 100}%`,
+                background: "rgba(255, 255, 255, 0.15)",
+                backdropFilter: "grayscale(100%)",
+                borderRight: "1px solid rgba(255, 255, 255, 0.2)",
+                pointerEvents: "none",
+                zIndex: 3,
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: `${(backingTrackTrimEnd / (backingTrackDuration || 1)) * 100}%`,
+                right: 0,
+                background: "rgba(255, 255, 255, 0.15)",
+                backdropFilter: "grayscale(100%)",
+                borderLeft: "1px solid rgba(255, 255, 255, 0.2)",
+                pointerEvents: "none",
+                zIndex: 3,
               }}
             />
 
@@ -343,6 +403,25 @@ export const BackingTrackRow: React.FC = () => {
               <HeadphonesIcon size={18} />
             </Button>
 
+            {/* Advanced Tuning Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: showAdvanced ? "rgba(99,102,241,0.12)" : "transparent",
+                border: `1px solid ${showAdvanced ? "rgba(99,102,241,0.3)" : "transparent"}`,
+                color: showAdvanced ? "#818cf8" : "rgba(255,255,255,0.4)",
+                padding: 0,
+              }}
+              title="Advanced Tuning & Trimming"
+            >
+              <SettingsIcon size={18} />
+            </Button>
+
             {/* Delete button */}
             <Button
               variant="ghost"
@@ -416,6 +495,13 @@ export const BackingTrackRow: React.FC = () => {
           </Row>
         )}
       </Row>
+      </Row>
+
+      {showAdvanced && backingTrackName && (
+        <React.Suspense fallback={<div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, padding: 10, textAlign: "center" }}>Loading advanced controls...</div>}>
+          <BackingTrackAdvancedPanel />
+        </React.Suspense>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (

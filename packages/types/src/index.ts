@@ -169,6 +169,9 @@ export interface ProjectRecord {
       loop: boolean;
       monitorOnly: boolean;
       duration: number;
+      trimStart?: number;
+      trimEnd?: number;
+      waveform?: number[];
     };
   };
 }

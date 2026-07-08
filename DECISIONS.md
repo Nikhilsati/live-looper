@@ -78,6 +78,20 @@ This file tracks the major product and architectural decisions made for the Live
 
 ---
 
+## 2026-07-09
+
+### Advanced Backing Track Trim & Grid Alignment
+
+**Status:** Accepted
+**Context:** Musicians often import backing tracks that have silent lead-ins or are off-beat relative to the metronome, making it difficult to align loop recordings with the backing track.
+**Decision:** Implement a visual range trimmer with dual drag handles, precise time editor inputs (ms), nudge offsets, and bar-grid snap calculations based on the active BPM. Process audio loop boundaries inside the AudioWorklet to ensure exact sample accuracy.
+**Consequences:**
+
+- **Pros:** High-fidelity visual editing, precise alignment of off-beat files, automated bar math matching metronome grid, and seamless worklet loop boundaries.
+- **Cons:** Increases configuration state payload stored in IndexedDB.
+
+---
+
 ## Template for New Decisions
 
 ### [Decision Title]

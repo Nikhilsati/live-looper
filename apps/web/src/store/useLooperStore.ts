@@ -127,10 +127,13 @@ interface LooperStore extends EngineState {
   backingTrackMonitorOnly: boolean;
   backingTrackProgress: number;
   backingTrackDuration: number;
+  backingTrackTrimStart: number;
+  backingTrackTrimEnd: number;
+  backingTrackWaveform: number[];
   // Backing Track Actions
   setBackingTrackFile: (file: File) => Promise<void>;
   removeBackingTrack: () => Promise<void>;
-  updateBackingTrackSettings: (settings: Partial<{ volume: number; loop: boolean; monitorOnly: boolean }>) => Promise<void>;
+  updateBackingTrackSettings: (settings: Partial<{ volume: number; loop: boolean; monitorOnly: boolean; trimStart: number; trimEnd: number }>) => Promise<void>;
 
   // Multi-channel I/O
   channelMapping: (string | null)[];
@@ -201,6 +204,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   backingTrackMonitorOnly: false,
   backingTrackProgress: 0,
   backingTrackDuration: 0,
+  backingTrackTrimStart: 0,
+  backingTrackTrimEnd: 0,
+  backingTrackWaveform: [],
 
   fxPresets: [],
   fetchFXPresets: async () => {
@@ -551,6 +557,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
       backingTrackMonitorOnly: false,
       backingTrackProgress: 0,
       backingTrackDuration: 0,
+      backingTrackTrimStart: 0,
+      backingTrackTrimEnd: 0,
+      backingTrackWaveform: [],
     });
   },
 
@@ -958,6 +967,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           await db.audioBlobs.delete(oldBlobId);
         }
 
+        const waveform = audioEngine.computeWaveform(data, 200);
+
         const backingTrackSettings = {
           audioBlobId: blobId,
           name: file.name,
@@ -965,6 +976,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           loop: get().backingTrackLoop,
           monitorOnly: get().backingTrackMonitorOnly,
           duration: audioBuffer.duration,
+          trimStart: 0,
+          trimEnd: audioBuffer.duration,
+          waveform,
         };
 
         const newSettings = {
@@ -976,6 +990,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           backingTrackName: file.name,
           backingTrackDuration: audioBuffer.duration,
           backingTrackProgress: 0,
+          backingTrackTrimStart: 0,
+          backingTrackTrimEnd: audioBuffer.duration,
+          backingTrackWaveform: waveform,
           currentProject: {
             ...currentProject,
             settings: newSettings,
@@ -987,11 +1004,15 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           updatedAt: Date.now(),
         });
       } else {
+        const waveform = audioEngine.computeWaveform(data, 200);
         // In-memory temp load for practice view when no project loaded
         set({
           backingTrackName: file.name,
           backingTrackDuration: audioBuffer.duration,
           backingTrackProgress: 0,
+          backingTrackTrimStart: 0,
+          backingTrackTrimEnd: audioBuffer.duration,
+          backingTrackWaveform: waveform,
         });
       }
 
@@ -999,6 +1020,7 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
       audioEngine.setBackingTrackVolume(get().backingTrackVolume);
       audioEngine.setBackingTrackLoop(get().backingTrackLoop);
       audioEngine.setBackingTrackRouting(get().backingTrackMonitorOnly);
+      audioEngine.setBackingTrackTrim(0, audioBuffer.duration);
     } catch (e) {
       console.error("Failed to load and decode backing track", e);
       uiAlert("Failed to load backing track audio file. Please try another format (.mp3 or .wav).");
@@ -1025,6 +1047,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         backingTrackName: null,
         backingTrackDuration: 0,
         backingTrackProgress: 0,
+        backingTrackTrimStart: 0,
+        backingTrackTrimEnd: 0,
         currentProject: {
           ...currentProject,
           settings,
@@ -1040,6 +1064,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         backingTrackName: null,
         backingTrackDuration: 0,
         backingTrackProgress: 0,
+        backingTrackTrimStart: 0,
+        backingTrackTrimEnd: 0,
       });
     }
 
@@ -1062,6 +1088,18 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
       if (settings.monitorOnly !== undefined) {
         updates.backingTrackMonitorOnly = settings.monitorOnly;
         audioEngine.setBackingTrackRouting(settings.monitorOnly);
+      }
+      if (settings.trimStart !== undefined) {
+        updates.backingTrackTrimStart = settings.trimStart;
+      }
+      if (settings.trimEnd !== undefined) {
+        updates.backingTrackTrimEnd = settings.trimEnd;
+      }
+
+      if (settings.trimStart !== undefined || settings.trimEnd !== undefined) {
+        const nextTrimStart = settings.trimStart !== undefined ? settings.trimStart : prev.backingTrackTrimStart;
+        const nextTrimEnd = settings.trimEnd !== undefined ? settings.trimEnd : prev.backingTrackTrimEnd;
+        audioEngine.setBackingTrackTrim(nextTrimStart, nextTrimEnd);
       }
 
       if (currentProject?.id) {
@@ -1200,6 +1238,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
         const backingTrackLoop = backingTrack?.loop ?? true;
         const backingTrackMonitorOnly = backingTrack?.monitorOnly ?? false;
         const backingTrackDuration = backingTrack?.duration ?? 0;
+        const backingTrackTrimStart = backingTrack?.trimStart ?? 0;
+        const backingTrackTrimEnd = backingTrack?.trimEnd ?? backingTrackDuration;
+        const backingTrackWaveform = backingTrack?.waveform ?? [];
 
         set({
           bpm: project.bpm,
@@ -1216,6 +1257,9 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           backingTrackLoop,
           backingTrackMonitorOnly,
           backingTrackDuration,
+          backingTrackTrimStart,
+          backingTrackTrimEnd,
+          backingTrackWaveform,
           backingTrackProgress: 0,
           tracks: tracks.map((t: any, i: number) => {
             const count = layerCounts?.[i] || 0;

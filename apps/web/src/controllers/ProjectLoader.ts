@@ -147,6 +147,11 @@ export class ProjectLoader {
           audioEngine.setBackingTrackVolume(backingTrack.volume);
           audioEngine.setBackingTrackLoop(backingTrack.loop);
           audioEngine.setBackingTrackRouting(backingTrack.monitorOnly);
+          audioEngine.setBackingTrackTrim(backingTrack.trimStart ?? 0, backingTrack.trimEnd ?? 0);
+          
+          // Compute backing track waveform
+          const waveform = audioEngine.computeWaveform(data, 200);
+          useLooperStore.setState({ backingTrackWaveform: waveform });
         } catch (e) {
           console.error("Error loading backing track blob into engine", e);
         }

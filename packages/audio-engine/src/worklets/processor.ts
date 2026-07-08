@@ -230,6 +230,8 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
   private backingTrackBuffer: Float32Array | null = null;
   private backingTrackPlaybackSample: number = 0;
   private backingTrackLoop: boolean = true;
+  private backingTrackTrimStart: number = 0; // in seconds
+  private backingTrackTrimEnd: number = 0; // in seconds (0 means end of buffer)
 
   constructor() {
     super();
@@ -266,14 +268,14 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
           this.sectionSampleOffset = 0;
           this.currentSectionIndex = 0;
           this.queuedSectionIndex = null;
-          this.backingTrackPlaybackSample = 0;
+          this.backingTrackPlaybackSample = Math.floor(this.backingTrackTrimStart * this.sampleRate);
           break;
 
         case "STOP":
           this.isPlaying = false;
           this.currentSample = 0;
           this.sectionSampleOffset = 0;
-          this.backingTrackPlaybackSample = 0;
+          this.backingTrackPlaybackSample = Math.floor(this.backingTrackTrimStart * this.sampleRate);
           for (const track of this.tracks) {
             if (track.state === "RECORDING" || track.state === "POST_ROLL") {
               const sd = track.sections.get(this.currentSectionIndex);
@@ -284,8 +286,29 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
 
         case "SET_BACKING_TRACK":
           this.backingTrackBuffer = payload.buffer;
-          this.backingTrackPlaybackSample = 0;
+          this.backingTrackPlaybackSample = Math.floor(this.backingTrackTrimStart * this.sampleRate);
           break;
+
+        case "SET_BACKING_TRACK_TRIM": {
+          const prevTrimStart = this.backingTrackTrimStart;
+          this.backingTrackTrimStart = payload.trimStart;
+          this.backingTrackTrimEnd = payload.trimEnd;
+          
+          const trimStartSamples = Math.floor(payload.trimStart * this.sampleRate);
+          if (!this.isPlaying) {
+            this.backingTrackPlaybackSample = trimStartSamples;
+          } else {
+            // If playing, only nudge the playhead if it's currently out of bounds
+            const trimEndSamples = payload.trimEnd > 0 
+              ? Math.floor(payload.trimEnd * this.sampleRate) 
+              : (this.backingTrackBuffer ? this.backingTrackBuffer.length : 0);
+            
+            if (this.backingTrackPlaybackSample < trimStartSamples || this.backingTrackPlaybackSample > trimEndSamples) {
+              this.backingTrackPlaybackSample = trimStartSamples;
+            }
+          }
+          break;
+        }
 
         case "SET_BACKING_TRACK_LOOP":
           this.backingTrackLoop = payload.loop;
@@ -1086,13 +1109,24 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
       const backingTrackOutput = outputs[5];
       if (backingTrackOutput && this.backingTrackBuffer && this.isPlaying) {
         let backingSample = 0;
-        if (this.backingTrackPlaybackSample < this.backingTrackBuffer.length) {
+        const trimStartSamples = Math.floor(this.backingTrackTrimStart * this.sampleRate);
+        const trimEndSamples = this.backingTrackTrimEnd > 0
+          ? Math.min(Math.floor(this.backingTrackTrimEnd * this.sampleRate), this.backingTrackBuffer.length)
+          : this.backingTrackBuffer.length;
+
+        if (this.backingTrackPlaybackSample < trimStartSamples) {
+          this.backingTrackPlaybackSample = trimStartSamples;
+        }
+
+        if (this.backingTrackPlaybackSample < trimEndSamples) {
           backingSample = this.backingTrackBuffer[this.backingTrackPlaybackSample];
           this.backingTrackPlaybackSample++;
         } else if (this.backingTrackLoop) {
-          this.backingTrackPlaybackSample = 0;
-          backingSample = this.backingTrackBuffer[this.backingTrackPlaybackSample];
-          this.backingTrackPlaybackSample++;
+          this.backingTrackPlaybackSample = trimStartSamples;
+          if (this.backingTrackPlaybackSample < trimEndSamples) {
+            backingSample = this.backingTrackBuffer[this.backingTrackPlaybackSample];
+            this.backingTrackPlaybackSample++;
+          }
         }
 
         if (backingTrackOutput[0]) backingTrackOutput[0][i] = backingSample;

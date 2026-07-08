@@ -819,6 +819,13 @@ class AudioEngine {
     });
   }
 
+  setBackingTrackTrim(trimStart: number, trimEnd: number) {
+    this.workletNode?.port.postMessage({
+      type: "SET_BACKING_TRACK_TRIM",
+      payload: { trimStart, trimEnd },
+    });
+  }
+
   setBackingTrackLoop(loop: boolean) {
     this.workletNode?.port.postMessage({
       type: "SET_BACKING_TRACK_LOOP",
