@@ -20,6 +20,7 @@ import {
   Waveform,
   Label,
   Stack,
+  Slider,
 } from "@live-looper/ui";
 import { TRACK_COLORS } from "./trackColors";
 import { LayerIndicator } from "./LayerIndicator";
@@ -575,6 +576,66 @@ export const TrackPad = ({
           </div>
         )}
       </Button>
+
+      {/* Input / Output Gain Sliders */}
+      <Row style={{ gap: 16, width: "100%", alignItems: "center", padding: "0 4px", marginTop: 4, marginBottom: 4 }}>
+        <Stack
+          onDoubleClick={() => {
+            useLooperStore.getState().setTrackState(trackId, { inputGain: 1.0 });
+          }}
+          title="Double-click to reset input gain to 100%"
+          style={{ flex: 1, gap: 2, cursor: "pointer" }}
+        >
+          <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <Label style={{ fontSize: 9, opacity: 0.5 }}>IN</Label>
+            <span style={{ fontSize: 9, opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>
+              {Math.round((track.inputGain ?? 1.0) * 100)}%
+            </span>
+          </Row>
+          <Slider
+            min="0"
+            max="1.5"
+            step="0.05"
+            value={track.inputGain ?? 1.0}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              useLooperStore.getState().setTrackState(trackId, { inputGain: val });
+            }}
+            style={{
+              "--ui-color-primary-light": palette.accent,
+              height: 4,
+            } as any}
+          />
+        </Stack>
+        <Stack
+          onDoubleClick={() => {
+            useLooperStore.getState().setTrackState(trackId, { outputGain: 1.0 });
+          }}
+          title="Double-click to reset output gain to 100%"
+          style={{ flex: 1, gap: 2, cursor: "pointer" }}
+        >
+          <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <Label style={{ fontSize: 9, opacity: 0.5 }}>OUT</Label>
+            <span style={{ fontSize: 9, opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>
+              {Math.round((track.outputGain ?? 1.0) * 100)}%
+            </span>
+          </Row>
+          <Slider
+            min="0"
+            max="1.5"
+            step="0.05"
+            value={track.outputGain ?? 1.0}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              useLooperStore.getState().setTrackState(trackId, { outputGain: val });
+            }}
+            style={{
+              "--ui-color-primary-light": palette.accent,
+              height: 4,
+            } as any}
+          />
+        </Stack>
+      </Row>
 
       {/* Bottom controls — M/S pill + Undo */}
       <Row style={{ gap: 10 }}>

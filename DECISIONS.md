@@ -64,6 +64,20 @@ This file tracks the major product and architectural decisions made for the Live
 
 ---
 
+## 2026-07-09
+
+### Track Input/Output Gain Sliders
+
+**Status:** Accepted
+**Context:** During live performance, artists need to balance input signals to prevent clipping, and output signals to adjust the mix levels of individual loops and live input on-the-fly.
+**Decision:** Implement separate Input (IN) and Output (OUT) sliders directly on each track card and the Live Input card. Route inputs through new GainNodes before the worklet, and control output volumes using the TrackFXChain output gain nodes. Override the slider's theme color inline with track-specific accent colors for rich visual feedback.
+**Consequences:**
+
+- **Pros:** Full real-time mix and input gain control. Visually cohesive color-matched sliders. Persists values to IndexedDB automatically.
+- **Cons:** Increases visual control density slightly on each track pad.
+
+---
+
 ## Template for New Decisions
 
 ### [Decision Title]

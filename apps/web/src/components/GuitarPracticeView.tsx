@@ -92,8 +92,8 @@ export const GuitarPracticeView: React.FC = () => {
       node.fftSize = 1024;
       node.smoothingTimeConstant = 0.6;
       source.connect(node);
-      if (audioEngine.liveTrackFX) {
-        source.connect(audioEngine.liveTrackFX.input);
+      if (audioEngine.liveInputGain) {
+        source.connect(audioEngine.liveInputGain);
       }
       analyserSourceRef.current = source;
       analyserRef.current = node;

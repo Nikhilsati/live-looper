@@ -86,6 +86,8 @@ export class ProjectService {
             muted: false,
             solo: false,
             fx: this.getDefaultFX(),
+            inputGain: 1.0,
+            outputGain: 1.0,
           };
           await db.tracks.add(track);
         }

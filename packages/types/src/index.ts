@@ -91,6 +91,8 @@ export interface FXState {
 export interface Track {
   isMuted: boolean;
   fx: FXState;
+  inputGain: number;
+  outputGain: number;
 }
 
 export interface TrackState extends Track {
@@ -210,6 +212,8 @@ export interface TrackRecord {
   muted: boolean;
   solo: boolean;
   fx?: FXState;
+  inputGain?: number;
+  outputGain?: number;
 }
 
 export interface SectionRecord {

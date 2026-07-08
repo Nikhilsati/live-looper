@@ -155,6 +155,8 @@ const defaultTrack = (): TrackState => ({
   layerCount: 0,
   waveformData: [],
   fx: new FXBuilder().build(),
+  inputGain: 1.0,
+  outputGain: 1.0,
 });
 
 export const useLooperStore = create<LooperStore>((set, get) => ({
@@ -171,6 +173,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
   liveTrack: {
     isMuted: false,
     fx: defaultTrack().fx,
+    inputGain: 1.0,
+    outputGain: 1.0,
   },
   latencyMeasuredSamples: 0,
   latencyCompensationSamples: 0,
@@ -684,7 +688,18 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
 
     sessionRecorder.logEvent("PLAY");
 
-    await audioEngine.init(sections, bpm);
+    await audioEngine.init(
+      sections,
+      bpm,
+      {
+        tracks: get().tracks.map((t) => ({ inputGain: t.inputGain ?? 1.0, outputGain: t.outputGain ?? 1.0 })),
+        liveTrack: {
+          inputGain: get().liveTrack.inputGain ?? 1.0,
+          outputGain: get().liveTrack.outputGain ?? 1.0,
+          isMuted: get().liveTrack.isMuted ?? false,
+        },
+      }
+    );
     audioEngine.updateLiveTrackFX(get().liveTrack.fx, bpm);
     audioEngine.start();
     setIsPlaying(true);
@@ -879,6 +894,12 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
       if (state.fx !== undefined) {
         audioEngine.updateLiveTrackFX(state.fx, prev.bpm);
       }
+      if (state.inputGain !== undefined) {
+        audioEngine.setLiveTrackInputGain(state.inputGain);
+      }
+      if (state.outputGain !== undefined) {
+        audioEngine.setLiveTrackOutputGain(state.outputGain);
+      }
 
       // Persist
       const projectId = prev.currentProject?.id;
@@ -901,7 +922,18 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
     try {
       const arrayBuffer = await file.arrayBuffer();
       if (!audioEngine.context) {
-        await audioEngine.init();
+        await audioEngine.init(
+          get().sections,
+          get().bpm,
+          {
+            tracks: get().tracks.map((t) => ({ inputGain: t.inputGain ?? 1.0, outputGain: t.outputGain ?? 1.0 })),
+            liveTrack: {
+              inputGain: get().liveTrack.inputGain ?? 1.0,
+              outputGain: get().liveTrack.outputGain ?? 1.0,
+              isMuted: get().liveTrack.isMuted ?? false,
+            },
+          }
+        );
       }
       const audioContext = audioEngine.context!;
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -1195,6 +1227,8 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
               hasAudio: count > 0,
               layerCount: count,
               waveformData: waveformDataMap?.[i] ?? [],
+              inputGain: t.inputGain ?? 1.0,
+              outputGain: t.outputGain ?? 1.0,
             };
           }),
         });
@@ -1212,14 +1246,26 @@ export const useLooperStore = create<LooperStore>((set, get) => ({
           );
         }
 
+        // Apply track output gains
+        tracks.forEach((t: any, i: number) => {
+          audioEngine.setTrackOutputGain(i, t.outputGain ?? 1.0);
+        });
+
         // Apply multi-channel input settings
-        audioEngine.initInputs(channelMapping);
+        audioEngine.initInputs(
+          channelMapping,
+          tracks.map((t: any) => t.inputGain ?? 1.0)
+        );
         Object.entries(trackChannelConfig).forEach(([trackId, config]) => {
           audioEngine.setTrackChannelMode(Number(trackId), config.mode);
         });
 
         // Re-apply persisted Live Track mute and FX state
         if (event.payload.liveTrack) {
+          const liveInGain = event.payload.liveTrack.inputGain ?? 1.0;
+          const liveOutGain = event.payload.liveTrack.outputGain ?? 1.0;
+          audioEngine.setLiveTrackInputGain(liveInGain);
+          audioEngine.setLiveTrackOutputGain(liveOutGain);
           audioEngine.setLiveTrackMute(event.payload.liveTrack.isMuted);
           audioEngine.updateLiveTrackFX(event.payload.liveTrack.fx, project.bpm);
         }
@@ -1456,6 +1502,35 @@ useLooperStore.subscribe((state, prevState) => {
   // Sync Track FX
   state.tracks.forEach((track, i) => {
     const prevTrack = prevState.tracks[i];
+    
+    // Sync Input Gain
+    if (track.inputGain !== prevTrack?.inputGain) {
+      audioEngine.setTrackInputGain(i, track.inputGain ?? 1.0);
+      const projectId = state.currentProject?.id;
+      if (projectId) {
+        db.tracks
+          .where({ projectId, order: i })
+          .first()
+          .then((t) => {
+            if (t) db.tracks.update(t.id, { inputGain: track.inputGain });
+          });
+      }
+    }
+
+    // Sync Output Gain
+    if (track.outputGain !== prevTrack?.outputGain) {
+      audioEngine.setTrackOutputGain(i, track.outputGain ?? 1.0);
+      const projectId = state.currentProject?.id;
+      if (projectId) {
+        db.tracks
+          .where({ projectId, order: i })
+          .first()
+          .then((t) => {
+            if (t) db.tracks.update(t.id, { outputGain: track.outputGain });
+          });
+      }
+    }
+
     if (track.fx !== prevTrack?.fx || state.bpm !== prevState.bpm) {
       audioEngine.updateFX(i, track.fx, state.bpm);
 

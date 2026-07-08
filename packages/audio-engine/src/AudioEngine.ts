@@ -50,6 +50,10 @@ class AudioEngine {
   workletNode: AudioWorkletNode | null = null;
   trackFX: TrackFXChain[] = [];
   liveTrackFX: TrackFXChain | null = null;
+  private inputGains: GainNode[] = [];
+  liveInputGain: GainNode | null = null;
+  private liveTrackOutputGain: number = 1.0;
+  private liveTrackMuted: boolean = false;
   backingTrackBus: GainNode | null = null;
   backingTrackMasterGain: GainNode | null = null;
   backingTrackPerformerGain: GainNode | null = null;
@@ -110,6 +114,10 @@ class AudioEngine {
   async init(
     sections: SectionConfig[] = DEFAULT_SECTIONS,
     bpm: number = DEFAULT_BPM,
+    initialGains?: {
+      tracks: { inputGain: number; outputGain: number }[];
+      liveTrack: { inputGain: number; outputGain: number; isMuted: boolean };
+    },
   ) {
     if (this.context) {
       // Already initialised — just re-send CONFIG with the provided sections/bpm
@@ -164,6 +172,10 @@ class AudioEngine {
 
         // Performer Mix (raw track audio - bypass MasterBus for zero latency)
         this.workletNode.connect(this.performerBus, i);
+
+        // Set initial output gain
+        const outGain = initialGains?.tracks?.[i]?.outputGain ?? 1.0;
+        chain.output.gain.setValueAtTime(outGain, this.context.currentTime);
       }
 
       // Live Track FX Chain
@@ -171,6 +183,22 @@ class AudioEngine {
       // Connect Live Track directly to Master, and also into Performer Bus
       this.liveTrackFX.output.connect(this.masterBus.input);
       this.liveTrackFX.output.connect(this.performerBus);
+
+      // Create liveInputGain and connect to liveTrackFX.input
+      this.liveInputGain = this.context.createGain();
+      const liveInGain = initialGains?.liveTrack?.inputGain ?? 1.0;
+      this.liveInputGain.gain.setValueAtTime(liveInGain, this.context.currentTime);
+      this.liveInputGain.connect(this.liveTrackFX.input);
+
+      // Set initial live track output gain
+      const liveOutGain = initialGains?.liveTrack?.outputGain ?? 1.0;
+      this.liveTrackOutputGain = liveOutGain;
+      const liveMuted = initialGains?.liveTrack?.isMuted ?? false;
+      this.liveTrackMuted = liveMuted;
+      this.liveTrackFX.output.gain.setValueAtTime(
+        liveMuted ? 0 : liveOutGain,
+        this.context.currentTime
+      );
 
       // Metronome (output TRACK_COUNT) routing based on dual output mode
       if (this.dualOutputEnabled) {
@@ -284,8 +312,12 @@ class AudioEngine {
   /**
    * Initialize multiple input devices and connect each to its corresponding worklet input channel.
    * @param deviceIds Array of device IDs, indexed by channel (0-3). If an entry is undefined/null, the default device is used for that channel.
+   * @param trackInputGains Optional array of initial input gain levels for each track
    */
-  async initInputs(deviceIds?: (string | null | undefined)[]) {
+  async initInputs(
+    deviceIds?: (string | null | undefined)[],
+    trackInputGains?: number[],
+  ) {
     if (!this.context) return;
     if (deviceIds) {
       this.channelMapping = deviceIds;
@@ -335,12 +367,21 @@ class AudioEngine {
 
         const source = this.context.createMediaStreamSource(stream);
         this.inputSources[i] = source;
-        // Connect this source to the worklet's input channel i
-        if (this.workletNode) {
-          source.connect(this.workletNode, 0, i);
+        
+        if (!this.inputGains[i]) {
+          this.inputGains[i] = this.context.createGain();
         }
-        // Also route raw input to performer bus for zero‑latency monitoring
-        source.connect(this.performerBus!);
+        const inputGain = this.inputGains[i];
+        inputGain.disconnect();
+
+        const gainVal = trackInputGains?.[i] ?? 1.0;
+        inputGain.gain.setValueAtTime(gainVal, this.context.currentTime);
+
+        source.connect(inputGain);
+        if (this.workletNode) {
+          inputGain.connect(this.workletNode, 0, i);
+        }
+        inputGain.connect(this.performerBus!);
       } catch (e) {
         console.error(`Failed to acquire input for channel ${i}`, e);
       }
@@ -557,13 +598,55 @@ class AudioEngine {
   }
 
   setLiveTrackMute(muted: boolean) {
+    this.liveTrackMuted = muted;
     if (this.liveTrackFX) {
       // Disconnect if muted, connect if unmuted.
       // But an easier way is to just control the gain of the output node.
       this.liveTrackFX.output.gain.setTargetAtTime(
-        muted ? 0 : 1,
+        muted ? 0 : this.liveTrackOutputGain,
         this.context!.currentTime,
         0.05,
+      );
+    }
+  }
+
+  setTrackInputGain(trackId: number, gain: number) {
+    if (this.context && this.inputGains[trackId]) {
+      this.inputGains[trackId].gain.setTargetAtTime(
+        gain,
+        this.context.currentTime,
+        0.01,
+      );
+    }
+  }
+
+  setTrackOutputGain(trackId: number, gain: number) {
+    if (this.context && this.trackFX[trackId]) {
+      this.trackFX[trackId].output.gain.setTargetAtTime(
+        gain,
+        this.context.currentTime,
+        0.01,
+      );
+    }
+  }
+
+  setLiveTrackInputGain(gain: number) {
+    if (this.context && this.liveInputGain) {
+      this.liveInputGain.gain.setTargetAtTime(
+        gain,
+        this.context.currentTime,
+        0.01,
+      );
+    }
+  }
+
+  setLiveTrackOutputGain(gain: number) {
+    this.liveTrackOutputGain = gain;
+    if (this.context && this.liveTrackFX) {
+      this.liveTrackFX.output.gain.setTargetAtTime(
+        this.liveTrackMuted ? 0 : gain,
+        this.context.currentTime,
+        0.01,
       );
     }
   }

@@ -731,7 +731,7 @@ export const TrackControls = () => {
           alignItems: "stretch",
         }}
       >
-        <div style={{ flex: "0 0 80px" }}>
+        <div style={{ flex: "0 0 120px" }}>
           <LiveTrackPad
             onOpenFX={(id) => setActiveFXTrack(id as unknown as number)}
           />

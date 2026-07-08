@@ -19,6 +19,8 @@ export class ProjectLoader {
       layerCount: 0,
       waveformData: [],
       fx: new FXBuilder().build(),
+      inputGain: 1.0,
+      outputGain: 1.0,
     });
 
     useLooperStore.setState({
@@ -156,9 +158,13 @@ export class ProjectLoader {
     const liveTrack = project.settings?.liveTrack ? {
       ...project.settings.liveTrack,
       fx: new FXBuilder(project.settings.liveTrack.fx).build(),
+      inputGain: project.settings.liveTrack.inputGain ?? 1.0,
+      outputGain: project.settings.liveTrack.outputGain ?? 1.0,
     } : {
       isMuted: false,
       fx: new FXBuilder().build(),
+      inputGain: 1.0,
+      outputGain: 1.0,
     };
 
     useLooperStore.setState({ currentProject: project || null });
