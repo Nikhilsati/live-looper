@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLooperStore } from "../store/useLooperStore";
 import { Stack, Row, Heading, Text, Button, StatusDot } from "@live-looper/ui";
 import {
@@ -11,18 +11,27 @@ import { SongPlanner } from "./SongPlanner";
 import { KeyboardCheatSheet } from "./KeyboardCheatSheet";
 import { DevInspector } from "./DevInspector";
 import { ModeSwitcher } from "./ModeSwitcher";
-import { ArrowLeftIcon } from "@live-looper/icons";
+import { RemotePanel } from "./RemotePanel";
+import { ArrowLeftIcon, BroadcastIcon } from "@live-looper/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useRemoteHost } from "../hooks/useRemoteHost";
+import { useRemoteStore } from "../store/useRemoteStore";
 
 export const LooperWorkspace: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentProject, mode, closeProject, loadProject } = useLooperStore();
+  const [showRemotePanel, setShowRemotePanel] = useState(false);
+  const remotePeers = useRemoteStore((s) => s.peers);
+  const isRemoteActive = useRemoteStore((s) => s.isSessionActive);
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
+
+  // Bridge remote host commands ↔ looper store
+  useRemoteHost();
 
   useEffect(() => {
     if (id && currentProject?.id !== id) {
@@ -122,6 +131,47 @@ export const LooperWorkspace: React.FC = () => {
 
         <Row style={{ gap: 24, alignItems: "center" }}>
           <ModeSwitcher />
+
+          {/* Remote Button */}
+          <div style={{ position: "relative" }}>
+            <Button
+              variant="ghost"
+              onClick={() => setShowRemotePanel(!showRemotePanel)}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                border: isRemoteActive
+                  ? "1px solid rgba(139, 92, 246, 0.3)"
+                  : "1px solid rgba(255,255,255,0.08)",
+                background: isRemoteActive
+                  ? "rgba(139, 92, 246, 0.1)"
+                  : "transparent",
+              }}
+            >
+              <BroadcastIcon size={16} />
+              {remotePeers.length > 0 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#22c55e",
+                    minWidth: 16,
+                    textAlign: "center",
+                  }}
+                >
+                  {remotePeers.length}
+                </span>
+              )}
+            </Button>
+
+            {showRemotePanel && (
+              <RemotePanel onClose={() => setShowRemotePanel(false)} />
+            )}
+          </div>
+
           <StatusDot />
         </Row>
       </Row>

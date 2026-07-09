@@ -356,3 +356,99 @@ export interface AudioWorkletProcessor {
     parameters: Record<string, Float32Array>,
   ): boolean;
 }
+
+// ── Remote Communication Types ──────────────────────────────────
+
+/**
+ * Commands sent from a remote client to the desktop host.
+ * Mirrors SessionEventType but is a separate union so remote-only
+ * commands (e.g., future REQUEST_FULL_STATE) don't pollute session recordings.
+ */
+export type RemoteCommandType =
+  | "PLAY"
+  | "STOP"
+  | "ARM_TRACK"
+  | "MUTE_TRACK"
+  | "SOLO_TRACK"
+  | "SECTION_CHANGE"
+  | "SET_BPM"
+  | "UNDO_LAYER"
+  | "CLEAR_TRACK"
+  | "CLEAR_ALL_TRACKS"
+  | "SET_INPUT_GAIN"
+  | "SET_OUTPUT_GAIN"
+  | "MUTE_LIVE_TRACK"
+  | "SET_LIVE_TRACK_FX";
+
+/** A single command dispatched from remote → host. */
+export interface RemoteCommand {
+  type: RemoteCommandType;
+  payload?: Record<string, unknown>;
+  /** Monotonic client timestamp (ms) for latency measurement */
+  clientTimestamp: number;
+}
+
+/**
+ * Subset of EngineState pushed from host → remote at each tick.
+ * Kept intentionally lean — no waveform data, no FX state, no audio blobs.
+ */
+export interface RemoteSyncState {
+  isPlaying: boolean;
+  bpm: number;
+  currentBar: number;
+  currentBeat: number;
+  sectionProgress: number;
+  currentSectionIndex: number;
+  queuedSectionIndex: number | null;
+  mode: Mode;
+
+  tracks: Array<{
+    isMuted: boolean;
+    isSoloed: boolean;
+    isArmed: boolean;
+    isRecording: boolean;
+    hasAudio: boolean;
+    layerCount: number;
+    inputGain: number;
+    outputGain: number;
+  }>;
+
+  liveTrack: {
+    isMuted: boolean;
+    inputGain: number;
+    outputGain: number;
+  };
+
+  sections: Array<{
+    id: string;
+    name: string;
+    lengthInBars: number;
+  }>;
+
+  // Performance diagnostics
+  jitter: number;
+  lastHitOffset: number;
+}
+
+export type RemoteConnectionStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error";
+
+/**
+ * Envelope wrapper for all messages over the data channel.
+ * Versioned for forward compatibility — older clients can gracefully
+ * degrade when receiving messages with a higher version number.
+ */
+export interface RemoteMessage<T = unknown> {
+  /** Protocol version for forward compatibility */
+  version: number;
+  /** Message category */
+  kind: "command" | "sync" | "ping" | "pong" | "handshake";
+  /** The typed payload */
+  data: T;
+  /** Sender timestamp (ms) for RTT calculation */
+  timestamp: number;
+}

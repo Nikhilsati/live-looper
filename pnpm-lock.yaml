@@ -111,6 +111,9 @@ importers:
       '@live-looper/mode-controller':
         specifier: workspace:*
         version: link:../../packages/mode-controller
+      '@live-looper/remote':
+        specifier: workspace:*
+        version: link:../../packages/remote
       '@live-looper/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -209,6 +212,19 @@ importers:
         version: 5.9.3
 
   packages/mode-controller:
+    devDependencies:
+      '@live-looper/types':
+        specifier: workspace:*
+        version: link:../types
+      '@live-looper/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+
+  packages/remote:
+    dependencies:
+      mitt:
+        specifier: ^3.0.1
+        version: 3.0.1
     devDependencies:
       '@live-looper/types':
         specifier: workspace:*

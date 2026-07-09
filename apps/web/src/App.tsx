@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Home } from "./components/Home";
 import { ProjectDashboard } from "./components/ProjectDashboard";
@@ -9,6 +9,11 @@ import { useAudioEngine } from "./hooks/useAudioEngine";
 import { GlobalDialog } from "./components/GlobalDialog";
 import { useLooperStore } from "./store/useLooperStore";
 import "./index.css";
+
+// Lazy-loaded: Remote view is only needed when scanning QR code
+const RemoteView = lazy(() =>
+  import("./components/RemoteView").then((m) => ({ default: m.RemoteView })),
+);
 
 function App() {
   useAudioEngine();
@@ -26,6 +31,30 @@ function App() {
         <Route path="/projects/:id" element={<LooperWorkspace />} />
         <Route path="/practice" element={<GuitarPracticeView />} />
         <Route path="/icons" element={<IconShowcase />} />
+        <Route
+          path="/remote"
+          element={
+            <Suspense
+              fallback={
+                <div
+                  style={{
+                    minHeight: "100dvh",
+                    background: "#000",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "rgba(255,255,255,0.4)",
+                    fontSize: 14,
+                  }}
+                >
+                  Loading Remote…
+                </div>
+              }
+            >
+              <RemoteView />
+            </Suspense>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
@@ -35,3 +64,4 @@ function App() {
 }
 
 export default App;
+

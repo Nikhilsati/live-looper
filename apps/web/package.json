@@ -14,6 +14,7 @@
     "@live-looper/audio-engine": "workspace:*",
     "@live-looper/mode-controller": "workspace:*",
     "@live-looper/icons": "workspace:*",
+    "@live-looper/remote": "workspace:*",
     "@live-looper/storage": "workspace:*",
     "@live-looper/types": "workspace:*",
     "@live-looper/ui": "workspace:*",
