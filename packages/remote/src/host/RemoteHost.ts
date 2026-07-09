@@ -172,6 +172,19 @@ export class RemoteHost {
     }
     this.lastBroadcastTime = now;
 
+    this.sendStateToAllPeers(state);
+  }
+
+  /**
+   * Broadcast state immediately, bypassing the throttle.
+   * Used for initial state push to newly connected peers.
+   */
+  broadcastStateImmediate(state: RemoteSyncState): void {
+    this.lastBroadcastTime = Date.now();
+    this.sendStateToAllPeers(state);
+  }
+
+  private sendStateToAllPeers(state: RemoteSyncState): void {
     const encoded = encodeMessage("sync", state);
 
     for (const [peerId, entry] of this.peers) {

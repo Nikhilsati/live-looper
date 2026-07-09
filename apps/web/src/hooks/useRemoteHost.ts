@@ -158,15 +158,52 @@ export function useRemoteHost() {
       host.broadcastState(syncState);
     };
 
-    // Broadcast immediately on mount
-    broadcastCurrentState();
+    const buildSyncState = (): import("@live-looper/types").RemoteSyncState => {
+      const transport = useTransportStore.getState();
+      const looper = useLooperStore.getState();
+      return {
+        isPlaying: transport.isPlaying,
+        bpm: transport.bpm,
+        currentBar: transport.currentBar,
+        currentBeat: transport.currentBeat,
+        sectionProgress: transport.sectionProgress,
+        currentSectionIndex: transport.currentSectionIndex,
+        queuedSectionIndex: transport.queuedSectionIndex,
+        mode: looper.mode,
+        tracks: looper.tracks.map((t) => ({
+          isMuted: t.isMuted,
+          isSoloed: t.isSoloed,
+          isArmed: t.isArmed,
+          isRecording: t.isRecording,
+          hasAudio: t.hasAudio,
+          layerCount: t.layerCount,
+          inputGain: t.inputGain,
+          outputGain: t.outputGain,
+        })),
+        liveTrack: {
+          isMuted: looper.liveTrack.isMuted,
+          inputGain: looper.liveTrack.inputGain,
+          outputGain: looper.liveTrack.outputGain,
+        },
+        sections: looper.sections.map((s) => ({
+          id: s.id,
+          name: s.name,
+          lengthInBars: s.lengthInBars,
+        })),
+        jitter: looper.jitter ?? 0,
+        lastHitOffset: looper.lastHitOffset ?? 0,
+      };
+    };
+
+    // Broadcast immediately on mount (bypasses throttle)
+    host.broadcastStateImmediate(buildSyncState());
 
     // Subscribe to stores for real-time broadcasting
     const unsubTransport = useTransportStore.subscribe(broadcastCurrentState);
     const unsubLooper = useLooperStore.subscribe(broadcastCurrentState);
 
-    // Push initial state to newly connected peers
-    const handlePeerConnected = () => broadcastCurrentState();
+    // Push initial state to newly connected peers (bypasses throttle)
+    const handlePeerConnected = () => host.broadcastStateImmediate(buildSyncState());
     host.on("peer-connected", handlePeerConnected);
 
     return () => {
