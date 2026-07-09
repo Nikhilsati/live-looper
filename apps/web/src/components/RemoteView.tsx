@@ -103,7 +103,7 @@ export const RemoteView: React.FC = () => {
   useEffect(() => {
     if (!sessionCode) return;
 
-    const signaling = new HTTPSignalingChannel(sessionCode, false);
+    const signaling = new HTTPSignalingChannel(sessionCode, false, import.meta.env.VITE_SIGNAL_SERVER_URL);
     const transport = new WebRTCTransport();
     const client = new RemoteClient(transport);
 

@@ -54,7 +54,9 @@ export const useRemoteStore = create<RemoteStore>((set, get) => ({
       state._host.destroy();
     }
 
-    let baseUrl = `${window.location.origin}/remote`;
+    const baseOrigin = window.location.origin;
+    const basePath = window.location.pathname.replace(/\/$/, "");
+    let baseUrl = `${baseOrigin}${basePath}/#/remote`;
 
     // In dev mode, fetch the local IP so the phone can connect
     if (import.meta.env.DEV) {
@@ -62,7 +64,7 @@ export const useRemoteStore = create<RemoteStore>((set, get) => ({
         const res = await fetch("/api/network-info");
         if (res.ok) {
           const { ip, port } = await res.json();
-          baseUrl = `http://${ip}:${port}/remote`;
+          baseUrl = `http://${ip}:${port}/#/remote`;
         }
       } catch (e) {
         console.warn("Failed to get network IP, using origin", e);
@@ -71,6 +73,7 @@ export const useRemoteStore = create<RemoteStore>((set, get) => ({
 
     const broker = new SessionBroker({
       remoteClientBaseUrl: baseUrl,
+      signalingServerUrl: import.meta.env.VITE_SIGNAL_SERVER_URL,
     });
 
     const sessionInfo = broker.createSession();

@@ -28,6 +28,11 @@ export interface SessionBrokerConfig {
    * Example: "https://localhost:5173/remote"
    */
   remoteClientBaseUrl: string;
+  /**
+   * Base URL of the signaling server.
+   * If empty, defaults to a relative path (for local dev).
+   */
+  signalingServerUrl?: string;
 }
 
 /** Characters used for session code generation (uppercase + digits, excluding ambiguous chars). */
@@ -56,10 +61,12 @@ export class HTTPSignalingChannel implements SignalingChannel {
   private handler: ((data: SignalingMessage) => void) | null = null;
   private baseUrl: string;
 
-  constructor(sessionCode: string, isHost: boolean) {
+  constructor(sessionCode: string, isHost: boolean, signalServerUrl: string = "") {
     const senderId = isHost ? "host" : "client";
-    // We use relative URL because we are hosted on the Vite server
-    this.baseUrl = `/api/signal/${sessionCode}/${senderId}`;
+    
+    // Ensure no trailing slash on signalServerUrl
+    const base = signalServerUrl.endsWith('/') ? signalServerUrl.slice(0, -1) : signalServerUrl;
+    this.baseUrl = `${base}/api/signal/${sessionCode}/${senderId}`;
 
     this.eventSource = new EventSource(this.baseUrl);
 
@@ -146,7 +153,7 @@ export class SessionBroker {
       );
     }
 
-    return new HTTPSignalingChannel(this.sessionInfo.sessionCode, true);
+    return new HTTPSignalingChannel(this.sessionInfo.sessionCode, true, this.config.signalingServerUrl);
   }
 
   /** Tear down the current session. */
