@@ -70,8 +70,15 @@ export const RemoteView: React.FC = () => {
   const [state, setState] = useState<RemoteSyncState | null>(null);
   const clientRef = useRef<RemoteClient | null>(null);
   const [isPortrait, setIsPortrait] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastArmedTrackId, setLastArmedTrackId] = useState(0);
   const tapTimesRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
 
   useEffect(() => {
     const update = () => {
@@ -123,6 +130,14 @@ export const RemoteView: React.FC = () => {
     haptic([15, 30]);
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(e => console.warn(e));
+    } else {
+      document.exitFullscreen().catch(e => console.warn(e));
+    }
+  };
+
   // ── Loading / Error ──
   if (!sessionCode || status === "connecting" || status === "disconnected" || status === "error") {
     return (
@@ -163,7 +178,18 @@ export const RemoteView: React.FC = () => {
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
             <span style={{ fontSize: 10, fontWeight: 300, color: "rgba(255,255,255,0.5)" }}>bar {bar} · beat {beat}</span>
           </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#818cf8" }}>{bpm}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#818cf8" }}>{bpm}</span>
+            <button onClick={toggleFullscreen} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", padding: "0 4px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                {isFullscreen ? (
+                  <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                ) : (
+                  <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* 2x2 track grid */}
@@ -250,6 +276,15 @@ export const RemoteView: React.FC = () => {
         <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#818cf8" }}>{bpm}</span>
           <span style={{ fontSize: 10, fontWeight: 300, color: "rgba(255,255,255,0.35)" }}>bar {bar} · beat {beat}</span>
+          <button onClick={toggleFullscreen} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", padding: "0 4px", cursor: "pointer", display: "flex", alignItems: "center", transform: "translateY(2px)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              {isFullscreen ? (
+                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+              ) : (
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+              )}
+            </svg>
+          </button>
         </div>
       </div>
 
