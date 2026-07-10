@@ -127,6 +127,13 @@ class AudioEngine {
     }
 
     this.context = new AudioContext();
+    
+    // Auto-calculate a robust default latency if it hasn't been calibrated yet.
+    // baseLatency (audio block size) + outputLatency (OS output buffer) + 10ms (typical mic/input delay).
+    if (this.latencySamples === 0) {
+      const defaultLatencySecs = this.context.baseLatency + (this.context.outputLatency || 0) + 0.010;
+      this.latencySamples = Math.floor(defaultLatencySecs * this.context.sampleRate);
+    }
 
     const bustedUrl = rawProcessorUrl + "?t=" + Date.now();
     const bustedGateUrl = rawGateUrl + "?t=" + Date.now();

@@ -27,7 +27,6 @@ import { LayerIndicator } from "./LayerIndicator";
 import { LayerRow } from "./LayerRow";
 import { LayersDrawer } from "./LayersDrawer";
 import { db } from "@live-looper/storage";
-import { StateBadge } from "./StateBadge";
 import { InputChannelSelector } from "../InputChannelSelector";
 
 
@@ -262,7 +261,7 @@ export const TrackPad = ({
           >
             TRACK {trackId + 1}
           </Label>
-          <StateBadge state={currentState} />
+          {/* <StateBadge state={currentState} /> */}
         </Stack>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {showHit && isPlaying && (
@@ -673,11 +672,11 @@ export const TrackPad = ({
               height: "100%",
               ...(track.isSoloed
                 ? {
-                    background: palette.border,
-                    borderColor: palette.border,
-                    color: "#ffffff",
-                    boxShadow: `0 0 10px ${palette.border}40`,
-                  }
+                  background: palette.border,
+                  borderColor: palette.border,
+                  color: "#ffffff",
+                  boxShadow: `0 0 10px ${palette.border}40`,
+                }
                 : {}),
             }}
           >
@@ -698,11 +697,11 @@ export const TrackPad = ({
             opacity: track.layerCount === 0 ? 0.2 : 1,
             ...(track.layerCount > 0
               ? {
-                  background: palette.border,
-                  borderColor: palette.border,
-                  color: "#ffffff",
-                  boxShadow: `0 0 8px ${palette.border}50`,
-                }
+                background: palette.border,
+                borderColor: palette.border,
+                color: "#ffffff",
+                boxShadow: `0 0 8px ${palette.border}50`,
+              }
               : {}),
           }}
         >
