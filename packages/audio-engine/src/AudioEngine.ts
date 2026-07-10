@@ -72,7 +72,7 @@ class AudioEngine {
   /** Shadow of the metronome's current on/off state in the worklet. Defaults to true (on). */
   private _metronomeOn: boolean = true;
 
-  // Session Recording & Replay
+  // Session Replay
   private sessionRecorder: MediaRecorder | null = null;
   private sessionAudioChunks: Blob[] = [];
   private sessionAudioResolver: ((blob: Blob) => void) | null = null;
@@ -714,7 +714,7 @@ class AudioEngine {
     // which listens to these events via engineEvents.on(...)
   }
 
-  // --- Session Recording & Replay Methods ---
+  // --- Session Replay Methods ---
 
   startLiveRecording() {
     if (!this.performerDestination) {
@@ -817,6 +817,34 @@ class AudioEngine {
       sampleRate: this.context.sampleRate,
       state: this.context.state,
     };
+  }
+
+  private mediaRecorder: MediaRecorder | null = null;
+  private recordedChunks: Blob[] = [];
+
+  startSessionRecording() {
+    if (!this.context || !this.masterBus) return;
+    const dest = this.context.createMediaStreamDestination();
+    this.masterBus.output.connect(dest);
+    this.mediaRecorder = new MediaRecorder(dest.stream);
+    this.recordedChunks = [];
+    this.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.recordedChunks.push(e.data);
+    };
+    this.mediaRecorder.start();
+  }
+
+  stopSessionRecording(): Promise<Blob> {
+    return new Promise((resolve) => {
+      if (!this.mediaRecorder) return resolve(new Blob());
+      this.mediaRecorder.onstop = () => {
+        const blob = new Blob(this.recordedChunks, { type: "audio/webm" });
+        this.recordedChunks = [];
+        resolve(blob);
+      };
+      this.mediaRecorder.stop();
+      this.mediaRecorder = null;
+    });
   }
 
   setBackingTrackBuffer(buffer: Float32Array | null) {

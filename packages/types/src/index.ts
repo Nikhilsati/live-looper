@@ -362,7 +362,7 @@ export interface AudioWorkletProcessor {
 /**
  * Commands sent from a remote client to the desktop host.
  * Mirrors SessionEventType but is a separate union so remote-only
- * commands (e.g., future REQUEST_FULL_STATE) don't pollute session recordings.
+ * commands (e.g., future REQUEST_FULL_STATE) don't pollute session replays.
  */
 export type RemoteCommandType =
   | "PLAY"

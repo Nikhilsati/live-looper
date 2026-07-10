@@ -39,9 +39,9 @@ test.describe("Keyboard Shortcuts", () => {
     await expect(trackPad1).toHaveAttribute("title", "Arm track for recording");
   });
 
-  test("R shortcut should control session recording depending on mode", async ({ page }) => {
-    // In Planning Mode, the session record button should not be rendered
-    const recordBtn = page.getByTitle("Arm Session Recording");
+  test("R shortcut should control session replay depending on mode", async ({ page }) => {
+    // In Planning Mode, the session replay button should not be rendered
+    const recordBtn = page.getByTitle("Arm Session Replay");
     await expect(recordBtn).not.toBeVisible();
 
     // Pressing 'r' in Planning Mode should do nothing
@@ -55,12 +55,12 @@ test.describe("Keyboard Shortcuts", () => {
     // In Rehearsal Mode, the button should now be visible
     await expect(recordBtn).toBeVisible();
 
-    // In Rehearsal Mode, pressing 'R' should arm session recording
+    // In Rehearsal Mode, pressing 'R' should arm session replay
     await page.keyboard.press("r");
-    await expect(page.getByTitle("Disarm Session Recording")).toBeVisible();
+    await expect(page.getByTitle("Disarm Session Replay")).toBeVisible();
 
-    // Pressing 'R' again should disarm session recording
+    // Pressing 'R' again should disarm session replay
     await page.keyboard.press("r");
-    await expect(page.getByTitle("Arm Session Recording")).toBeVisible();
+    await expect(page.getByTitle("Arm Session Replay")).toBeVisible();
   });
 });

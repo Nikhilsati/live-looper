@@ -380,7 +380,25 @@ export const GlobalActionBar = () => {
   const [showBpmPopup, setShowBpmPopup] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
+  const [isExportRecording, setIsExportRecording] = useState(false);
   const isLive = mode === "live";
+
+  const toggleExportRecording = async () => {
+    if (isExportRecording) {
+      const { audioEngine } = await import("@live-looper/audio-engine");
+      const blob = await audioEngine.stopSessionRecording();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Jam_Session_${Date.now()}.webm`;
+      a.click();
+      setIsExportRecording(false);
+    } else {
+      const { audioEngine } = await import("@live-looper/audio-engine");
+      audioEngine.startSessionRecording();
+      setIsExportRecording(true);
+    }
+  };
 
   const handleToggle = async () => {
     await togglePlayback();
@@ -473,10 +491,10 @@ export const GlobalActionBar = () => {
             onClick={handleRecordClick}
             title={
               isSessionRecording
-                ? "Stop Session Recording"
+                ? "Stop Session Replay"
                 : isSessionArmed
-                  ? "Disarm Session Recording"
-                  : "Arm Session Recording"
+                  ? "Disarm Session Replay"
+                  : "Arm Session Replay"
             }
             style={{
               width: 56,
@@ -676,6 +694,31 @@ export const GlobalActionBar = () => {
               <DebugIcon size={20} />
             </Button>
           )}
+
+          {/* ── Record Performance ── */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleExportRecording}
+            title={isExportRecording ? "Stop Recording" : "Record Performance"}
+            style={{
+              width: 36,
+              height: 36,
+              padding: 0,
+              borderRadius: 10,
+              opacity: isExportRecording ? 1 : 0.5,
+              background: isExportRecording
+                ? "rgba(239, 68, 68, 0.12)"
+                : "transparent",
+              border: isExportRecording
+                ? "1px solid rgba(239, 68, 68, 0.35)"
+                : "1px solid transparent",
+              color: isExportRecording ? "#ef4444" : "inherit",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <SaveIcon size={20} />
+          </Button>
 
           {/* ── Settings gear ── */}
           {!isLive && (

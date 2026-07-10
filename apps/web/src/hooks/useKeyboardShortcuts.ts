@@ -30,7 +30,7 @@ export const useKeyboardShortcuts = () => {
         toggleTrackRecording(trackId);
       }
 
-      // R -> Toggle Session Recording
+      // R -> Toggle Session Replay
       if (e.code === "KeyR") {
         e.preventDefault();
         const { isPlaying, mode } = useLooperStore.getState();

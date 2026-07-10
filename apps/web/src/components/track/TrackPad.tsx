@@ -418,8 +418,8 @@ export const TrackPad = ({
           transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
-        {/* Progress Background (Live Mode) */}
-        {isLive && isPlaying && track.hasAudio && (
+        {/* Progress Background */}
+        {isPlaying && track.hasAudio && (
           <div
             style={{
               position: "absolute",

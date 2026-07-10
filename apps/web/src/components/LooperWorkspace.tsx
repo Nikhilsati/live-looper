@@ -30,6 +30,8 @@ export const LooperWorkspace: React.FC = () => {
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
 
+
+
   // Bridge remote host commands ↔ looper store
   useRemoteHost();
 
@@ -130,6 +132,7 @@ export const LooperWorkspace: React.FC = () => {
         </Row>
 
         <Row style={{ gap: 24, alignItems: "center" }}>
+
           <ModeSwitcher />
 
           {/* Remote Button */}
