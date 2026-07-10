@@ -12,8 +12,8 @@
   "dependencies": {
     "@knadh/oat": "^0.3.0",
     "@live-looper/audio-engine": "workspace:*",
-    "@live-looper/mode-controller": "workspace:*",
     "@live-looper/icons": "workspace:*",
+    "@live-looper/mode-controller": "workspace:*",
     "@live-looper/remote": "workspace:*",
     "@live-looper/storage": "workspace:*",
     "@live-looper/types": "workspace:*",
@@ -21,6 +21,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-qr-code": "^2.2.0",
     "react-router-dom": "^7.13.1",
     "zustand": "^5.0.11"
   },

@@ -9,94 +9,7 @@ interface RemotePanelProps {
   onClose: () => void;
 }
 
-/**
- * Minimal QR code renderer using Canvas.
- * Generates a simple QR-like visual from a URL string.
- * For production, this would use a proper QR library;
- * for now we render the URL as a scannable text-based code.
- */
-function QRCodeCanvas({ value, size = 200 }: { value: string; size?: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const moduleCount = 21;
-    const moduleSize = size / moduleCount;
-
-    // Clear
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
-
-    // Generate a deterministic pattern from the URL
-    ctx.fillStyle = "#000000";
-
-    // Finder patterns (3 corners)
-    const drawFinder = (x: number, y: number) => {
-      for (let r = 0; r < 7; r++) {
-        for (let c = 0; c < 7; c++) {
-          const isOuter =
-            r === 0 || r === 6 || c === 0 || c === 6;
-          const isInner =
-            r >= 2 && r <= 4 && c >= 2 && c <= 4;
-          if (isOuter || isInner) {
-            ctx.fillRect(
-              (x + c) * moduleSize,
-              (y + r) * moduleSize,
-              moduleSize,
-              moduleSize,
-            );
-          }
-        }
-      }
-    };
-
-    drawFinder(0, 0);
-    drawFinder(moduleCount - 7, 0);
-    drawFinder(0, moduleCount - 7);
-
-    // Data modules — deterministic from URL hash
-    let hash = 0;
-    for (let i = 0; i < value.length; i++) {
-      hash = (hash * 31 + value.charCodeAt(i)) & 0x7fffffff;
-    }
-
-    for (let r = 0; r < moduleCount; r++) {
-      for (let c = 0; c < moduleCount; c++) {
-        // Skip finder pattern areas
-        if (r < 8 && c < 8) continue;
-        if (r < 8 && c > moduleCount - 9) continue;
-        if (r > moduleCount - 9 && c < 8) continue;
-
-        hash = (hash * 1103515245 + 12345) & 0x7fffffff;
-        if (hash % 3 !== 0) {
-          ctx.fillRect(
-            c * moduleSize,
-            r * moduleSize,
-            moduleSize,
-            moduleSize,
-          );
-        }
-      }
-    }
-  }, [value, size]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={size}
-      height={size}
-      style={{
-        borderRadius: 12,
-        imageRendering: "pixelated",
-      }}
-    />
-  );
-}
+import QRCode from "react-qr-code";
 
 export const RemotePanel: React.FC<RemotePanelProps> = ({ onClose }) => {
   const {
@@ -268,7 +181,7 @@ export const RemotePanel: React.FC<RemotePanelProps> = ({ onClose }) => {
                 borderRadius: 14,
               }}
             >
-              <QRCodeCanvas
+              <QRCode
                 value={sessionInfo?.connectUrl ?? ""}
                 size={180}
               />
