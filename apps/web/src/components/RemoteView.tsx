@@ -23,7 +23,7 @@ const CSS = `
 @keyframes pulse-rec { 0%,100%{opacity:1} 50%{opacity:.3} }
 @keyframes spin { to{transform:rotate(360deg)} }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{margin:0;padding:0;overflow:hidden;background:#000}
+html,body{margin:0;padding:0;overflow-x:hidden;background:#000}
 :root{--app-h:100dvh}
 @supports not (height:100dvh){:root{--app-h:100vh}}
 
@@ -154,7 +154,7 @@ export const RemoteView: React.FC = () => {
   // ── Portrait: vertical tile grid ──
   if (isPortrait) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "var(--app-h, 100vh)", overflow: "hidden", background: "#000", color: "#fff", fontFamily: "Inter, system-ui, sans-serif", touchAction: "none" }}>
+      <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "var(--app-h, 100vh)", overflowX: "hidden", background: "#000", color: "#fff", fontFamily: "Inter, system-ui, sans-serif", touchAction: "manipulation" }}>
         <style>{CSS}</style>
 
         {/* Status strip */}
@@ -238,7 +238,7 @@ export const RemoteView: React.FC = () => {
 
   // ── Landscape: Metro tile grid ──
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "var(--app-h, 100vh)", overflow: "hidden", background: "#000", color: "#fff", fontFamily: "Inter, system-ui, sans-serif", touchAction: "none" }}>
+    <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "var(--app-h, 100vh)", overflowX: "hidden", background: "#000", color: "#fff", fontFamily: "Inter, system-ui, sans-serif", touchAction: "manipulation" }}>
       <style>{CSS}</style>
 
       {/* Top status — pure typographic */}
