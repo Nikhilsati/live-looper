@@ -42,7 +42,7 @@ export const LooperWorkspace: React.FC = () => {
 
   const handleBack = () => {
     closeProject();
-    navigate("/");
+    navigate("/looper");
   };
 
   const isLive = mode === "live";
