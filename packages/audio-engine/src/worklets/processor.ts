@@ -625,14 +625,15 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     }
 
     const waveformData = computeWaveformData(sd.masterBuffer);
+    const layerBufCopy = new Float32Array(layerBuf);
     this.port.postMessage({
       type: "RECORD_STOP",
       trackId: track.id,
       sectionIndex: recSectionIndex,
       layerCount: sd.layers.length,
       waveformData,
-      buffer: layerBuf,
-    });
+      buffer: layerBufCopy,
+    }, [layerBufCopy.buffer]);
   }
 
   private detectOnsets(buffer: Float32Array): number[] {
@@ -952,15 +953,17 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
     }
 
     const waveformData = computeWaveformData(sd.masterBuffer);
+    const stretchedBufferCopy = new Float32Array(stretchedBuffer);
+    const compensatedBufferCopy = new Float32Array(compensatedBuffer);
     this.port.postMessage({
       type: "RECORD_STOP",
       trackId: track.id,
       sectionIndex: recSectionIndex,
       layerCount: sd.layers.length,
       waveformData,
-      buffer: stretchedBuffer,
-      rawBuffer: compensatedBuffer,
-    });
+      buffer: stretchedBufferCopy,
+      rawBuffer: compensatedBufferCopy,
+    }, [stretchedBufferCopy.buffer, compensatedBufferCopy.buffer]);
   }
 
   process(

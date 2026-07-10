@@ -44,9 +44,10 @@ function floatTo16BitPCM(
   offset: number,
   input: Float32Array,
 ) {
-  for (let i = 0; i < input.length; i++, offset += 2) {
+  const int16View = new Int16Array(output.buffer, output.byteOffset + offset, input.length);
+  for (let i = 0; i < input.length; i++) {
     const s = Math.max(-1, Math.min(1, input[i]));
-    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    int16View[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
 }
 
