@@ -26,6 +26,7 @@ import { TRACK_COLORS } from "./trackColors";
 import { LayerIndicator } from "./LayerIndicator";
 import { LayerRow } from "./LayerRow";
 import { LayersDrawer } from "./LayersDrawer";
+import { StateBadge } from "./StateBadge";
 import { db } from "@live-looper/storage";
 import { InputChannelSelector } from "../InputChannelSelector";
 
@@ -261,7 +262,7 @@ export const TrackPad = ({
           >
             TRACK {trackId + 1}
           </Label>
-          {/* <StateBadge state={currentState} /> */}
+          <StateBadge state={currentState} />
         </Stack>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {showHit && isPlaying && (

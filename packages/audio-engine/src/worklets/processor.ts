@@ -401,7 +401,7 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
         }
 
         case "ARM_TRACK": {
-          const { trackId } = payload;
+          const { trackId, isArmed } = payload;
           const track = this.tracks[trackId];
           if (!track) return;
           const sd = getOrCreateSectionData(
@@ -409,13 +409,22 @@ class LiveLooperProcessor extends AudioWorkletProcessor {
             this.currentSectionIndex,
             this.currentSectionLen(),
           );
-          if (track.state === "IDLE" || track.state === "PLAYING") {
-            track.state = "ARMED";
-          } else if (track.state === "ARMED") {
-            track.state = sd.layers.length > 0 ? "PLAYING" : "IDLE";
-            track.recordingSectionIndex = undefined;
-            track.recordingStartSample = undefined;
+          
+          if (isArmed !== undefined) {
+            if (isArmed) {
+              track.state = "ARMED";
+            } else {
+              track.state = sd.layers.length > 0 ? "PLAYING" : "IDLE";
+            }
+          } else {
+            if (track.state === "IDLE" || track.state === "PLAYING") {
+              track.state = "ARMED";
+            } else if (track.state === "ARMED") {
+              track.state = sd.layers.length > 0 ? "PLAYING" : "IDLE";
+            }
           }
+          track.recordingSectionIndex = undefined;
+          track.recordingStartSample = undefined;
           break;
         }
 
