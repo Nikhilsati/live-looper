@@ -113,6 +113,7 @@ export const Home: React.FC = () => {
       {/* Section 2: Why Live Looper? */}
       <section className="lp-section lp-problem" id="problem">
         <h2 className="lp-section-title">Why Live Looper?</h2>
+        <p className="lp-section-subtitle">Because you already know what you want to perform live.</p>
         <div className="lp-comparison-table-wrapper">
           <table className="lp-comparison-table">
             <thead>
@@ -155,7 +156,7 @@ export const Home: React.FC = () => {
       <section className="lp-section">
         <div className="lp-workflow-grid">
           <div className="lp-workflow-card">
-            <div className="lp-workflow-icon"><Record size={32} weight="fill" /></div>
+            <div className="lp-workflow-icon"><Record size={32} weight="fill" color="#ef4444" /></div>
             <h3>Record</h3>
             <div className="lp-workflow-img-wrapper">
               <img src="/screenshots/live.png" alt="Recording" />
@@ -168,7 +169,7 @@ export const Home: React.FC = () => {
             </ul>
           </div>
           <div className="lp-workflow-card">
-            <div className="lp-workflow-icon"><PlayCircle size={32} weight="fill" /></div>
+            <div className="lp-workflow-icon"><PlayCircle size={32} weight="fill" color="#10b981" /></div>
             <h3>Perform</h3>
             <div className="lp-workflow-img-wrapper">
               <img src="/screenshots/timeline.png" alt="Performance Timeline" />
@@ -181,7 +182,7 @@ export const Home: React.FC = () => {
             </ul>
           </div>
           <div className="lp-workflow-card">
-            <div className="lp-workflow-icon"><Sliders size={32} weight="fill" /></div>
+            <div className="lp-workflow-icon"><Sliders size={32} weight="fill" color="#3b82f6" /></div>
             <h3>Sound</h3>
             <div className="lp-workflow-img-wrapper">
               <img src="/screenshots/fx.png" alt="Modular FX" />
@@ -194,7 +195,7 @@ export const Home: React.FC = () => {
             </ul>
           </div>
           <div className="lp-workflow-card">
-            <div className="lp-workflow-icon"><Folders size={32} weight="fill" /></div>
+            <div className="lp-workflow-icon"><Folders size={32} weight="fill" color="#f59e0b" /></div>
             <h3>Manage</h3>
             <div className="lp-workflow-img-wrapper">
               <img src="/screenshots/io.png" alt="Session Management" />
@@ -590,6 +591,12 @@ export const Home: React.FC = () => {
         .lp-section-title {
           font-size: 40px;
           text-align: center;
+          margin-bottom: 16px;
+        }
+        .lp-section-subtitle {
+          text-align: center;
+          font-size: 20px;
+          color: #a0a0a0;
           margin-bottom: 60px;
         }
 
