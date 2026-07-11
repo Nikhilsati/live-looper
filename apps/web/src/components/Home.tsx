@@ -104,7 +104,7 @@ export const Home: React.FC = () => {
           </div>
           <div className="lp-hero-right">
             <div className="lp-hero-visual-mockup">
-              <img src="/screenshots/plan-full.png" alt="Live Looper Planning Mode" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <img src={`${import.meta.env.BASE_URL}screenshots/plan-full.png`} alt="Live Looper Planning Mode" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </div>
           </div>
         </div>
@@ -159,7 +159,7 @@ export const Home: React.FC = () => {
             <div className="lp-workflow-icon"><Record size={32} weight="fill" color="#ef4444" /></div>
             <h3>Record</h3>
             <div className="lp-workflow-img-wrapper">
-              <img src="/screenshots/live.png" alt="Recording" />
+              <img src={`${import.meta.env.BASE_URL}screenshots/live.png`} alt="Recording" />
             </div>
             <ul>
               <li>Multi-track recording</li>
@@ -172,7 +172,7 @@ export const Home: React.FC = () => {
             <div className="lp-workflow-icon"><PlayCircle size={32} weight="fill" color="#10b981" /></div>
             <h3>Perform</h3>
             <div className="lp-workflow-img-wrapper">
-              <img src="/screenshots/timeline.png" alt="Performance Timeline" />
+              <img src={`${import.meta.env.BASE_URL}screenshots/timeline.png`} alt="Performance Timeline" />
             </div>
             <ul>
               <li>Pre-planned sections</li>
@@ -185,7 +185,7 @@ export const Home: React.FC = () => {
             <div className="lp-workflow-icon"><Sliders size={32} weight="fill" color="#3b82f6" /></div>
             <h3>Sound</h3>
             <div className="lp-workflow-img-wrapper">
-              <img src="/screenshots/fx.png" alt="Modular FX" />
+              <img src={`${import.meta.env.BASE_URL}screenshots/fx.png`} alt="Modular FX" />
             </div>
             <ul>
               <li>Custom FX presets</li>
@@ -198,7 +198,7 @@ export const Home: React.FC = () => {
             <div className="lp-workflow-icon"><Folders size={32} weight="fill" color="#f59e0b" /></div>
             <h3>Manage</h3>
             <div className="lp-workflow-img-wrapper">
-              <img src="/screenshots/io.png" alt="Session Management" />
+              <img src={`${import.meta.env.BASE_URL}screenshots/io.png`} alt="Session Management" />
             </div>
             <ul>
               <li>Save full projects</li>
@@ -216,7 +216,7 @@ export const Home: React.FC = () => {
         <div className="lp-modes-grid">
           <div className="lp-mode-card">
             <div className="lp-mode-image-placeholder planning">
-              <img src="/screenshots/plan-full.png" alt="Planning Mode" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left top' }} />
+              <img src={`${import.meta.env.BASE_URL}screenshots/plan-full.png`} alt="Planning Mode" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left top' }} />
             </div>
             <div className="lp-mode-content">
               <h3>Planning</h3>
@@ -225,7 +225,7 @@ export const Home: React.FC = () => {
           </div>
           <div className="lp-mode-card">
             <div className="lp-mode-image-placeholder rehearsal">
-              <img src="/screenshots/practice-full.png" alt="Rehearsal Mode" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left top' }} />
+              <img src={`${import.meta.env.BASE_URL}screenshots/practice-full.png`} alt="Rehearsal Mode" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left top' }} />
             </div>
             <div className="lp-mode-content">
               <h3>Rehearsal</h3>
@@ -234,7 +234,7 @@ export const Home: React.FC = () => {
           </div>
           <div className="lp-mode-card live-mode-highlight">
             <div className="lp-mode-image-placeholder live">
-              <img src="/screenshots/live.png" alt="Live Mode" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={`${import.meta.env.BASE_URL}screenshots/live.png`} alt="Live Mode" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div className="lp-mode-content">
               <h3>Live</h3>
@@ -376,7 +376,7 @@ export const Home: React.FC = () => {
             <div className="lp-workflow-icon"><Headphones size={32} weight="fill" /></div>
             <h3>Guitar Practice</h3>
             <div className="lp-workflow-img-wrapper" style={{ height: '240px' }}>
-              <img src="/screenshots/guitar-practice.png" alt="Guitar Practice Mode" />
+              <img src={`${import.meta.env.BASE_URL}screenshots/guitar-practice.png`} alt="Guitar Practice Mode" />
             </div>
             <p style={{ marginTop: '16px', color: '#a0a0a0' }}>Includes a dedicated practice mode with a metronome, backing tracks, and loop recording to help you build muscle memory before you hit the stage.</p>
             <button className="lp-btn-green" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }} onClick={() => navigate("/practice")}>
